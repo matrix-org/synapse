@@ -20,7 +20,6 @@ from typing import (
     Any,
     Awaitable,
     Callable,
-    Collection,
     DefaultDict,
     Dict,
     FrozenSet,
@@ -33,7 +32,7 @@ from typing import (
 )
 
 import attr
-from frozendict import frozendict
+from immutabledict import immutabledict
 from prometheus_client import Counter, Histogram
 
 from synapse.api.constants import EventTypes
@@ -45,10 +44,11 @@ from synapse.events.snapshot import (
     UnpersistedEventContextBase,
 )
 from synapse.logging.context import ContextResourceUsage
+from synapse.logging.opentracing import tag_args, trace
 from synapse.replication.http.state import ReplicationUpdateCurrentStateRestServlet
 from synapse.state import v1, v2
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
-from synapse.types import StateMap
+from synapse.types import StateMap, StrCollection
 from synapse.types.state import StateFilter
 from synapse.util.async_helpers import Linearizer
 from synapse.util.caches.expiringcache import ExpiringCache
@@ -105,14 +105,18 @@ class _StateCacheEntry:
         #
         # This can be None if we have a `state_group` (as then we can fetch the
         # state from the DB.)
-        self._state = frozendict(state) if state is not None else None
+        self._state: Optional[StateMap[str]] = (
+            immutabledict(state) if state is not None else None
+        )
 
         # the ID of a state group if one and only one is involved.
         # otherwise, None otherwise?
         self.state_group = state_group
 
         self.prev_group = prev_group
-        self.delta_ids = frozendict(delta_ids) if delta_ids is not None else None
+        self.delta_ids: Optional[StateMap[str]] = (
+            immutabledict(delta_ids) if delta_ids is not None else None
+        )
 
     async def get_state(
         self,
@@ -192,7 +196,7 @@ class StateHandler:
     async def compute_state_after_events(
         self,
         room_id: str,
-        event_ids: Collection[str],
+        event_ids: StrCollection,
         state_filter: Optional[StateFilter] = None,
         await_full_state: bool = True,
     ) -> StateMap[str]:
@@ -226,7 +230,7 @@ class StateHandler:
         return await ret.get_state(self._state_storage_controller, state_filter)
 
     async def get_current_user_ids_in_room(
-        self, room_id: str, latest_event_ids: Collection[str]
+        self, room_id: str, latest_event_ids: StrCollection
     ) -> Set[str]:
         """
         Get the users IDs who are currently in a room.
@@ -251,7 +255,7 @@ class StateHandler:
         return await self.store.get_joined_user_ids_from_state(room_id, state)
 
     async def get_hosts_in_room_at_events(
-        self, room_id: str, event_ids: Collection[str]
+        self, room_id: str, event_ids: StrCollection
     ) -> FrozenSet[str]:
         """Get the hosts that were in a room at the given event ids
 
@@ -263,9 +267,10 @@ class StateHandler:
             The hosts in the room at the given events
         """
         entry = await self.resolve_state_groups_for_events(room_id, event_ids)
-        state = await entry.get_state(self._state_storage_controller, StateFilter.all())
-        return await self.store.get_joined_hosts(room_id, state, entry)
+        return await self._state_storage_controller.get_joined_hosts(room_id, entry)
 
+    @trace
+    @tag_args
     async def calculate_context_info(
         self,
         event: EventBase,
@@ -461,9 +466,10 @@ class StateHandler:
 
         return await unpersisted_context.persist(event)
 
+    @trace
     @measure_func()
     async def resolve_state_groups_for_events(
-        self, room_id: str, event_ids: Collection[str], await_full_state: bool = True
+        self, room_id: str, event_ids: StrCollection, await_full_state: bool = True
     ) -> _StateCacheEntry:
         """Given a list of event_ids this method fetches the state at each
         event, resolves conflicts between them and returns them.
@@ -875,7 +881,7 @@ class StateResolutionStore:
     store: "DataStore"
 
     def get_events(
-        self, event_ids: Collection[str], allow_rejected: bool = False
+        self, event_ids: StrCollection, allow_rejected: bool = False
     ) -> Awaitable[Dict[str, EventBase]]:
         """Get events from the database
 

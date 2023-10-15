@@ -52,10 +52,10 @@ class IdentityHandler:
         # An HTTP client for contacting trusted URLs.
         self.http_client = SimpleHttpClient(hs)
         # An HTTP client for contacting identity servers specified by clients.
-        self.blacklisting_http_client = SimpleHttpClient(
+        self._http_client = SimpleHttpClient(
             hs,
-            ip_blacklist=hs.config.server.federation_ip_range_blacklist,
-            ip_whitelist=hs.config.server.federation_ip_range_whitelist,
+            ip_blocklist=hs.config.server.federation_ip_range_blocklist,
+            ip_allowlist=hs.config.server.federation_ip_range_allowlist,
         )
         self.federation_http_client = hs.get_federation_http_client()
         self.hs = hs
@@ -66,14 +66,12 @@ class IdentityHandler:
         self._3pid_validation_ratelimiter_ip = Ratelimiter(
             store=self.store,
             clock=hs.get_clock(),
-            rate_hz=hs.config.ratelimiting.rc_3pid_validation.per_second,
-            burst_count=hs.config.ratelimiting.rc_3pid_validation.burst_count,
+            cfg=hs.config.ratelimiting.rc_3pid_validation,
         )
         self._3pid_validation_ratelimiter_address = Ratelimiter(
             store=self.store,
             clock=hs.get_clock(),
-            rate_hz=hs.config.ratelimiting.rc_3pid_validation.per_second,
-            burst_count=hs.config.ratelimiting.rc_3pid_validation.burst_count,
+            cfg=hs.config.ratelimiting.rc_3pid_validation,
         )
 
     async def ratelimit_request_token_requests(
@@ -197,7 +195,7 @@ class IdentityHandler:
         try:
             # Use the blacklisting http client as this call is only to identity servers
             # provided by a client
-            data = await self.blacklisting_http_client.post_json_get_json(
+            data = await self._http_client.post_json_get_json(
                 bind_url, bind_data, headers=headers
             )
 
@@ -308,9 +306,7 @@ class IdentityHandler:
         try:
             # Use the blacklisting http client as this call is only to identity servers
             # provided by a client
-            await self.blacklisting_http_client.post_json_get_json(
-                url, content, headers
-            )
+            await self._http_client.post_json_get_json(url, content, headers)
             changed = True
         except HttpResponseException as e:
             changed = False
@@ -579,7 +575,7 @@ class IdentityHandler:
         """
         # Check what hashing details are supported by this identity server
         try:
-            hash_details = await self.blacklisting_http_client.get_json(
+            hash_details = await self._http_client.get_json(
                 "%s%s/_matrix/identity/v2/hash_details" % (id_server_scheme, id_server),
                 {"access_token": id_access_token},
             )
@@ -646,7 +642,7 @@ class IdentityHandler:
         headers = {"Authorization": create_id_access_token_header(id_access_token)}
 
         try:
-            lookup_results = await self.blacklisting_http_client.post_json_get_json(
+            lookup_results = await self._http_client.post_json_get_json(
                 "%s%s/_matrix/identity/v2/lookup" % (id_server_scheme, id_server),
                 {
                     "addresses": [lookup_value],
@@ -752,7 +748,7 @@ class IdentityHandler:
 
         url = "%s%s/_matrix/identity/v2/store-invite" % (id_server_scheme, id_server)
         try:
-            data = await self.blacklisting_http_client.post_json_get_json(
+            data = await self._http_client.post_json_get_json(
                 url,
                 invite_config,
                 {"Authorization": create_id_access_token_header(id_access_token)},

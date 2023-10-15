@@ -23,12 +23,7 @@ from signedjson.key import (
     get_verify_key,
     is_signing_algorithm_supported,
 )
-from signedjson.sign import (
-    SignatureVerifyException,
-    encode_canonical_json,
-    signature_ids,
-    verify_signed_json,
-)
+from signedjson.sign import SignatureVerifyException, signature_ids, verify_signed_json
 from signedjson.types import VerifyKey
 from unpaddedbase64 import decode_base64
 
@@ -150,18 +145,19 @@ class Keyring:
     def __init__(
         self, hs: "HomeServer", key_fetchers: "Optional[Iterable[KeyFetcher]]" = None
     ):
-        self.clock = hs.get_clock()
-
         if key_fetchers is None:
-            key_fetchers = (
-                # Fetch keys from the database.
-                StoreKeyFetcher(hs),
-                # Fetch keys from a configured Perspectives server.
-                PerspectivesKeyFetcher(hs),
-                # Fetch keys from the origin server directly.
-                ServerKeyFetcher(hs),
-            )
-        self._key_fetchers = key_fetchers
+            # Always fetch keys from the database.
+            mutable_key_fetchers: List[KeyFetcher] = [StoreKeyFetcher(hs)]
+            # Fetch keys from configured trusted key servers, if any exist.
+            key_servers = hs.config.key.key_servers
+            if key_servers:
+                mutable_key_fetchers.append(PerspectivesKeyFetcher(hs))
+            # Finally, fetch keys from the origin server directly.
+            mutable_key_fetchers.append(ServerKeyFetcher(hs))
+
+            self._key_fetchers: Iterable[KeyFetcher] = tuple(mutable_key_fetchers)
+        else:
+            self._key_fetchers = key_fetchers
 
         self._fetch_keys_queue: BatchingQueue[
             _FetchKeyRequest, Dict[str, Dict[str, FetchKeyResult]]
@@ -172,7 +168,7 @@ class Keyring:
             process_batch_callback=self._inner_fetch_key_requests,
         )
 
-        self._hostname = hs.hostname
+        self._is_mine_server_name = hs.is_mine_server_name
 
         # build a FetchKeyResult for each of our own keys, to shortcircuit the
         # fetcher.
@@ -276,7 +272,7 @@ class Keyring:
 
         # If we are the originating server, short-circuit the key-fetch for any keys
         # we already have
-        if verify_request.server_name == self._hostname:
+        if self._is_mine_server_name(verify_request.server_name):
             for key_id in verify_request.key_ids:
                 if key_id in self._local_verify_keys:
                     found_keys[key_id] = self._local_verify_keys[key_id]
@@ -510,7 +506,7 @@ class StoreKeyFetcher(KeyFetcher):
             for key_id in queue_value.key_ids
         )
 
-        res = await self.store.get_server_verify_keys(key_ids_to_fetch)
+        res = await self.store.get_server_keys_json(key_ids_to_fetch)
         keys: Dict[str, Dict[str, FetchKeyResult]] = {}
         for (server_name, key_id), key in res.items():
             keys.setdefault(server_name, {})[key_id] = key
@@ -522,7 +518,6 @@ class BaseV2KeyFetcher(KeyFetcher):
         super().__init__(hs)
 
         self.store = hs.get_datastores().main
-        self.config = hs.config
 
     async def process_v2_response(
         self, from_server: str, response_json: JsonDict, time_added_ms: int
@@ -596,24 +591,12 @@ class BaseV2KeyFetcher(KeyFetcher):
                     verify_key=verify_key, valid_until_ts=key_data["expired_ts"]
                 )
 
-        key_json_bytes = encode_canonical_json(response_json)
-
-        await make_deferred_yieldable(
-            defer.gatherResults(
-                [
-                    run_in_background(
-                        self.store.store_server_keys_json,
-                        server_name=server_name,
-                        key_id=key_id,
-                        from_server=from_server,
-                        ts_now_ms=time_added_ms,
-                        ts_expires_ms=ts_valid_until_ms,
-                        key_json_bytes=key_json_bytes,
-                    )
-                    for key_id in verify_keys
-                ],
-                consumeErrors=True,
-            ).addErrback(unwrapFirstError)
+        await self.store.store_server_keys_response(
+            server_name=server_name,
+            from_server=from_server,
+            ts_added_ms=time_added_ms,
+            verify_keys=verify_keys,
+            response_json=response_json,
         )
 
         return verify_keys
@@ -626,7 +609,7 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
         super().__init__(hs)
         self.clock = hs.get_clock()
         self.client = hs.get_federation_http_client()
-        self.key_servers = self.config.key.key_servers
+        self.key_servers = hs.config.key.key_servers
 
     async def _fetch_keys(
         self, keys_to_fetch: List[_FetchKeyRequest]
@@ -721,7 +704,7 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
         )
 
         keys: Dict[str, Dict[str, FetchKeyResult]] = {}
-        added_keys: List[Tuple[str, str, FetchKeyResult]] = []
+        added_keys: Dict[Tuple[str, str], FetchKeyResult] = {}
 
         time_now_ms = self.clock.time_msec()
 
@@ -752,14 +735,28 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
                 # we continue to process the rest of the response
                 continue
 
-            added_keys.extend(
-                (server_name, key_id, key) for key_id, key in processed_response.items()
-            )
-            keys.setdefault(server_name, {}).update(processed_response)
+            for key_id, key in processed_response.items():
+                dict_key = (server_name, key_id)
+                if dict_key in added_keys:
+                    already_present_key = added_keys[dict_key]
+                    logger.warning(
+                        "Duplicate server keys for %s (%s) from perspective %s (%r, %r)",
+                        server_name,
+                        key_id,
+                        perspective_name,
+                        already_present_key,
+                        key,
+                    )
 
-        await self.store.store_server_verify_keys(
-            perspective_name, time_now_ms, added_keys
-        )
+                    if already_present_key.valid_until_ts > key.valid_until_ts:
+                        # Favour the entry with the largest valid_until_ts,
+                        # as `old_verify_keys` are also collected from this
+                        # response.
+                        continue
+
+                added_keys[dict_key] = key
+
+            keys.setdefault(server_name, {}).update(processed_response)
 
         return keys
 

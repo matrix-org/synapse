@@ -74,10 +74,11 @@ from twisted.web.iweb import (
 from synapse.api.errors import Codes, HttpResponseException, SynapseError
 from synapse.http import QuieterFileBodyProducer, RequestTimedOutError, redact_uri
 from synapse.http.proxyagent import ProxyAgent
+from synapse.http.replicationagent import ReplicationAgent
 from synapse.http.types import QueryParams
-from synapse.logging.context import make_deferred_yieldable
+from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.logging.opentracing import set_tag, start_active_span, tags
-from synapse.types import ISynapseReactor
+from synapse.types import ISynapseReactor, StrSequence
 from synapse.util import json_decoder
 from synapse.util.async_helpers import timeout_deferred
 
@@ -107,31 +108,30 @@ RawHeaders = Union[Mapping[str, "RawHeaderValue"], Mapping[bytes, "RawHeaderValu
 # the value actually has to be a List, but List is invariant so we can't specify that
 # the entries can either be Lists or bytes.
 RawHeaderValue = Union[
-    List[str],
+    StrSequence,
     List[bytes],
     List[Union[str, bytes]],
-    Tuple[str, ...],
     Tuple[bytes, ...],
     Tuple[Union[str, bytes], ...],
 ]
 
 
-def check_against_blacklist(
-    ip_address: IPAddress, ip_whitelist: Optional[IPSet], ip_blacklist: IPSet
+def _is_ip_blocked(
+    ip_address: IPAddress, allowlist: Optional[IPSet], blocklist: IPSet
 ) -> bool:
     """
     Compares an IP address to allowed and disallowed IP sets.
 
     Args:
         ip_address: The IP address to check
-        ip_whitelist: Allowed IP addresses.
-        ip_blacklist: Disallowed IP addresses.
+        allowlist: Allowed IP addresses.
+        blocklist: Disallowed IP addresses.
 
     Returns:
-        True if the IP address is in the blacklist and not in the whitelist.
+        True if the IP address is in the blocklist and not in the allowlist.
     """
-    if ip_address in ip_blacklist:
-        if ip_whitelist is None or ip_address not in ip_whitelist:
+    if ip_address in blocklist:
+        if allowlist is None or ip_address not in allowlist:
             return True
     return False
 
@@ -153,27 +153,27 @@ def _make_scheduler(
     return _scheduler
 
 
-class _IPBlacklistingResolver:
+class _IPBlockingResolver:
     """
-    A proxy for reactor.nameResolver which only produces non-blacklisted IP
-    addresses, preventing DNS rebinding attacks on URL preview.
+    A proxy for reactor.nameResolver which only produces non-blocklisted IP
+    addresses, preventing DNS rebinding attacks.
     """
 
     def __init__(
         self,
         reactor: IReactorPluggableNameResolver,
-        ip_whitelist: Optional[IPSet],
-        ip_blacklist: IPSet,
+        ip_allowlist: Optional[IPSet],
+        ip_blocklist: IPSet,
     ):
         """
         Args:
             reactor: The twisted reactor.
-            ip_whitelist: IP addresses to allow.
-            ip_blacklist: IP addresses to disallow.
+            ip_allowlist: IP addresses to allow.
+            ip_blocklist: IP addresses to disallow.
         """
         self._reactor = reactor
-        self._ip_whitelist = ip_whitelist
-        self._ip_blacklist = ip_blacklist
+        self._ip_allowlist = ip_allowlist
+        self._ip_blocklist = ip_blocklist
 
     def resolveHostName(
         self, recv: IResolutionReceiver, hostname: str, portNumber: int = 0
@@ -190,16 +190,13 @@ class _IPBlacklistingResolver:
 
                 ip_address = IPAddress(address.host)
 
-                if check_against_blacklist(
-                    ip_address, self._ip_whitelist, self._ip_blacklist
-                ):
+                if _is_ip_blocked(ip_address, self._ip_allowlist, self._ip_blocklist):
                     logger.info(
-                        "Dropped %s from DNS resolution to %s due to blacklist"
-                        % (ip_address, hostname)
+                        "Blocked %s from DNS resolution to %s" % (ip_address, hostname)
                     )
                     has_bad_ip = True
 
-            # if we have a blacklisted IP, we'd like to raise an error to block the
+            # if we have a blocked IP, we'd like to raise an error to block the
             # request, but all we can really do from here is claim that there were no
             # valid results.
             if not has_bad_ip:
@@ -231,24 +228,24 @@ class _IPBlacklistingResolver:
 # ISynapseReactor implies IReactorCore, but explicitly marking it this as an implementer
 # of IReactorCore seems to keep mypy-zope happier.
 @implementer(IReactorCore, ISynapseReactor)
-class BlacklistingReactorWrapper:
+class BlocklistingReactorWrapper:
     """
-    A Reactor wrapper which will prevent DNS resolution to blacklisted IP
+    A Reactor wrapper which will prevent DNS resolution to blocked IP
     addresses, to prevent DNS rebinding.
     """
 
     def __init__(
         self,
         reactor: IReactorPluggableNameResolver,
-        ip_whitelist: Optional[IPSet],
-        ip_blacklist: IPSet,
+        ip_allowlist: Optional[IPSet],
+        ip_blocklist: IPSet,
     ):
         self._reactor = reactor
 
-        # We need to use a DNS resolver which filters out blacklisted IP
+        # We need to use a DNS resolver which filters out blocked IP
         # addresses, to prevent DNS rebinding.
-        self._nameResolver = _IPBlacklistingResolver(
-            self._reactor, ip_whitelist, ip_blacklist
+        self._nameResolver = _IPBlockingResolver(
+            self._reactor, ip_allowlist, ip_blocklist
         )
 
     def __getattr__(self, attr: str) -> Any:
@@ -259,7 +256,7 @@ class BlacklistingReactorWrapper:
             return getattr(self._reactor, attr)
 
 
-class BlacklistingAgentWrapper(Agent):
+class BlocklistingAgentWrapper(Agent):
     """
     An Agent wrapper which will prevent access to IP addresses being accessed
     directly (without an IP address lookup).
@@ -268,18 +265,18 @@ class BlacklistingAgentWrapper(Agent):
     def __init__(
         self,
         agent: IAgent,
-        ip_whitelist: Optional[IPSet] = None,
-        ip_blacklist: Optional[IPSet] = None,
+        ip_blocklist: IPSet,
+        ip_allowlist: Optional[IPSet] = None,
     ):
         """
         Args:
             agent: The Agent to wrap.
-            ip_whitelist: IP addresses to allow.
-            ip_blacklist: IP addresses to disallow.
+            ip_allowlist: IP addresses to allow.
+            ip_blocklist: IP addresses to disallow.
         """
         self._agent = agent
-        self._ip_whitelist = ip_whitelist
-        self._ip_blacklist = ip_blacklist
+        self._ip_allowlist = ip_allowlist
+        self._ip_blocklist = ip_blocklist
 
     def request(
         self,
@@ -291,18 +288,16 @@ class BlacklistingAgentWrapper(Agent):
         h = urllib.parse.urlparse(uri.decode("ascii"))
 
         try:
-            ip_address = IPAddress(h.hostname)
+            # h.hostname is Optional[str], None raises an AddrFormatError, so
+            # this is safe even though IPAddress requires a str.
+            ip_address = IPAddress(h.hostname)  # type: ignore[arg-type]
         except AddrFormatError:
             # Not an IP
             pass
         else:
-            if check_against_blacklist(
-                ip_address, self._ip_whitelist, self._ip_blacklist
-            ):
-                logger.info("Blocking access to %s due to blacklist" % (ip_address,))
-                e = SynapseError(
-                    HTTPStatus.FORBIDDEN, "IP address blocked by IP blacklist entry"
-                )
+            if _is_ip_blocked(ip_address, self._ip_allowlist, self._ip_blocklist):
+                logger.info("Blocking access to %s" % (ip_address,))
+                e = SynapseError(HTTPStatus.FORBIDDEN, "IP address blocked")
                 return defer.fail(Failure(e))
 
         return self._agent.request(
@@ -310,35 +305,27 @@ class BlacklistingAgentWrapper(Agent):
         )
 
 
-class SimpleHttpClient:
+class BaseHttpClient:
     """
     A simple, no-frills HTTP client with methods that wrap up common ways of
-    using HTTP in Matrix
+    using HTTP in Matrix. Does not come with a default Agent, subclasses will need to
+    define their own.
+
+    Args:
+        hs: The HomeServer instance to pass in
+        treq_args: Extra keyword arguments to be given to treq.request.
     """
+
+    agent: IAgent
 
     def __init__(
         self,
         hs: "HomeServer",
         treq_args: Optional[Dict[str, Any]] = None,
-        ip_whitelist: Optional[IPSet] = None,
-        ip_blacklist: Optional[IPSet] = None,
-        use_proxy: bool = False,
     ):
-        """
-        Args:
-            hs
-            treq_args: Extra keyword arguments to be given to treq.request.
-            ip_blacklist: The IP addresses that are blacklisted that
-                we may not request.
-            ip_whitelist: The whitelisted IP addresses, that we can
-               request if it were otherwise caught in a blacklist.
-            use_proxy: Whether proxy settings should be discovered and used
-                from conventional environment variables.
-        """
         self.hs = hs
+        self.reactor = hs.get_reactor()
 
-        self._ip_whitelist = ip_whitelist
-        self._ip_blacklist = ip_blacklist
         self._extra_treq_args = treq_args or {}
         self.clock = hs.get_clock()
 
@@ -353,44 +340,6 @@ class SimpleHttpClient:
         # We use this for our body producers to ensure that they use the correct
         # reactor.
         self._cooperator = Cooperator(scheduler=_make_scheduler(hs.get_reactor()))
-
-        if self._ip_blacklist:
-            # If we have an IP blacklist, we need to use a DNS resolver which
-            # filters out blacklisted IP addresses, to prevent DNS rebinding.
-            self.reactor: ISynapseReactor = BlacklistingReactorWrapper(
-                hs.get_reactor(), self._ip_whitelist, self._ip_blacklist
-            )
-        else:
-            self.reactor = hs.get_reactor()
-
-        # the pusher makes lots of concurrent SSL connections to sygnal, and
-        # tends to do so in batches, so we need to allow the pool to keep
-        # lots of idle connections around.
-        pool = HTTPConnectionPool(self.reactor)
-        # XXX: The justification for using the cache factor here is that larger instances
-        # will need both more cache and more connections.
-        # Still, this should probably be a separate dial
-        pool.maxPersistentPerHost = max(int(100 * hs.config.caches.global_factor), 5)
-        pool.cachedConnectionTimeout = 2 * 60
-
-        self.agent: IAgent = ProxyAgent(
-            self.reactor,
-            hs.get_reactor(),
-            connectTimeout=15,
-            contextFactory=self.hs.get_http_client_context_factory(),
-            pool=pool,
-            use_proxy=use_proxy,
-        )
-
-        if self._ip_blacklist:
-            # If we have an IP blacklist, we then install the blacklisting Agent
-            # which prevents direct access to IP addresses, that are not caught
-            # by the DNS resolution.
-            self.agent = BlacklistingAgentWrapper(
-                self.agent,
-                ip_whitelist=self._ip_whitelist,
-                ip_blacklist=self._ip_blacklist,
-            )
 
     async def request(
         self,
@@ -797,6 +746,201 @@ class SimpleHttpClient:
         )
 
 
+class SimpleHttpClient(BaseHttpClient):
+    """
+    An HTTP client capable of crossing a proxy and respecting a block/allow list.
+
+    This also configures a larger / longer lasting HTTP connection pool.
+
+    Args:
+        hs: The HomeServer instance to pass in
+        treq_args: Extra keyword arguments to be given to treq.request.
+        ip_blocklist: The IP addresses that we may not request.
+        ip_allowlist: The allowed IP addresses, that we can
+           request if it were otherwise caught in a blocklist.
+        use_proxy: Whether proxy settings should be discovered and used
+            from conventional environment variables.
+    """
+
+    def __init__(
+        self,
+        hs: "HomeServer",
+        treq_args: Optional[Dict[str, Any]] = None,
+        ip_allowlist: Optional[IPSet] = None,
+        ip_blocklist: Optional[IPSet] = None,
+        use_proxy: bool = False,
+    ):
+        super().__init__(hs, treq_args=treq_args)
+        self._ip_allowlist = ip_allowlist
+        self._ip_blocklist = ip_blocklist
+
+        if self._ip_blocklist:
+            # If we have an IP blocklist, we need to use a DNS resolver which
+            # filters out blocked IP addresses, to prevent DNS rebinding.
+            self.reactor: ISynapseReactor = BlocklistingReactorWrapper(
+                self.reactor, self._ip_allowlist, self._ip_blocklist
+            )
+
+        # the pusher makes lots of concurrent SSL connections to Sygnal, and tends to
+        # do so in batches, so we need to allow the pool to keep lots of idle
+        # connections around.
+        pool = HTTPConnectionPool(self.reactor)
+        # XXX: The justification for using the cache factor here is that larger
+        # instances will need both more cache and more connections.
+        # Still, this should probably be a separate dial
+        pool.maxPersistentPerHost = max(int(100 * hs.config.caches.global_factor), 5)
+        pool.cachedConnectionTimeout = 2 * 60
+
+        self.agent: IAgent = ProxyAgent(
+            self.reactor,
+            hs.get_reactor(),
+            connectTimeout=15,
+            contextFactory=self.hs.get_http_client_context_factory(),
+            pool=pool,
+            use_proxy=use_proxy,
+        )
+
+        if self._ip_blocklist:
+            # If we have an IP blocklist, we then install the Agent which prevents
+            # direct access to IP addresses, that are not caught by the DNS resolution.
+            self.agent = BlocklistingAgentWrapper(
+                self.agent,
+                ip_blocklist=self._ip_blocklist,
+                ip_allowlist=self._ip_allowlist,
+            )
+
+
+class ReplicationClient(BaseHttpClient):
+    """Client for connecting to replication endpoints via HTTP and HTTPS.
+
+    Attributes:
+        agent: The custom Twisted Agent used for constructing the connection.
+    """
+
+    def __init__(
+        self,
+        hs: "HomeServer",
+    ):
+        """
+        Args:
+            hs: The HomeServer instance to pass in
+        """
+        super().__init__(hs)
+
+        # Use a pool, but a very small one.
+        pool = HTTPConnectionPool(self.reactor)
+        pool.maxPersistentPerHost = 5
+        pool.cachedConnectionTimeout = 2 * 60
+
+        self.agent: IAgent = ReplicationAgent(
+            hs.get_reactor(),
+            hs.config.worker.instance_map,
+            contextFactory=hs.get_http_client_context_factory(),
+            pool=pool,
+        )
+
+    async def request(
+        self,
+        method: str,
+        uri: str,
+        data: Optional[bytes] = None,
+        headers: Optional[Headers] = None,
+    ) -> IResponse:
+        """
+        Make a request, differs from BaseHttpClient.request in that it does not use treq.
+
+        Args:
+            method: HTTP method to use.
+            uri: URI to query.
+            data: Data to send in the request body, if applicable.
+            headers: Request headers.
+
+        Returns:
+            Response object, once the headers have been read.
+
+        Raises:
+            RequestTimedOutError if the request times out before the headers are read
+
+        """
+        outgoing_requests_counter.labels(method).inc()
+
+        logger.debug("Sending request %s %s", method, uri)
+
+        with start_active_span(
+            "outgoing-replication-request",
+            tags={
+                tags.SPAN_KIND: tags.SPAN_KIND_RPC_CLIENT,
+                tags.HTTP_METHOD: method,
+                tags.HTTP_URL: uri,
+            },
+            finish_on_close=True,
+        ):
+            try:
+                body_producer = None
+                if data is not None:
+                    body_producer = QuieterFileBodyProducer(
+                        BytesIO(data),
+                        cooperator=self._cooperator,
+                    )
+
+                # Skip the fancy treq stuff, we don't need cookie handling, redirects,
+                # or buffered response bodies.
+                method_bytes = method.encode("ascii")
+                uri_bytes = uri.encode("ascii")
+
+                # To preserve the logging context, the timeout is treated
+                # in a similar way to `defer.gatherResults`:
+                # * Each logging context-preserving fork is wrapped in
+                #   `run_in_background`. In this case there is only one,
+                #   since the timeout fork is not logging-context aware.
+                # * The `Deferred` that joins the forks back together is
+                #   wrapped in `make_deferred_yieldable` to restore the
+                #   logging context regardless of the path taken.
+                # (The logic/comments for this came from MatrixFederationHttpClient)
+                request_deferred = run_in_background(
+                    self.agent.request,
+                    method_bytes,
+                    uri_bytes,
+                    headers,
+                    bodyProducer=body_producer,
+                )
+
+                # we use our own timeout mechanism rather than twisted's as a workaround
+                # for https://twistedmatrix.com/trac/ticket/9534.
+                # (Updated url https://github.com/twisted/twisted/issues/9534)
+                request_deferred = timeout_deferred(
+                    request_deferred,
+                    60,
+                    self.hs.get_reactor(),
+                )
+
+                # turn timeouts into RequestTimedOutErrors
+                request_deferred.addErrback(_timeout_to_request_timed_out_error)
+
+                response = await make_deferred_yieldable(request_deferred)
+
+                incoming_responses_counter.labels(method, response.code).inc()
+                logger.info(
+                    "Received response to %s %s: %s",
+                    method,
+                    uri,
+                    response.code,
+                )
+                return response
+            except Exception as e:
+                incoming_responses_counter.labels(method, "ERR").inc()
+                logger.info(
+                    "Error sending request to  %s %s: %s %s",
+                    method,
+                    uri,
+                    type(e).__name__,
+                    e.args[0],
+                )
+                set_tag(tags.ERROR, True)
+                set_tag("error_reason", e.args[0])
+                raise
+
+
 def _timeout_to_request_timed_out_error(f: Failure) -> Failure:
     if f.check(twisted_error.TimeoutError, twisted_error.ConnectingCancelledError):
         # The TCP connection has its own timeout (set by the 'connectTimeout' param
@@ -892,7 +1036,12 @@ class _ReadBodyWithMaxSizeProtocol(protocol.Protocol):
         if reason.check(ResponseDone):
             self.deferred.callback(self.length)
         elif reason.check(PotentialDataLoss):
-            # stolen from https://github.com/twisted/treq/pull/49/files
+            # This applies to requests which don't set `Content-Length` or a
+            # `Transfer-Encoding` in the response because in this case the end of the
+            # response is indicated by the connection being closed, an event which may
+            # also be due to a transient network problem or other error. But since this
+            # behavior is expected of some servers (like YouTube), let's ignore it.
+            # Stolen from https://github.com/twisted/treq/pull/49/files
             # http://twistedmatrix.com/trac/ticket/4840
             self.deferred.callback(self.length)
         else:
@@ -964,3 +1113,42 @@ class InsecureInterceptableContextFactory(ssl.ContextFactory):
 
     def creatorForNetloc(self, hostname: bytes, port: int) -> IOpenSSLContextFactory:
         return self
+
+
+def is_unknown_endpoint(
+    e: HttpResponseException, synapse_error: Optional[SynapseError] = None
+) -> bool:
+    """
+    Returns true if the response was due to an endpoint being unimplemented.
+
+    Args:
+        e: The error response received from the remote server.
+        synapse_error: The above error converted to a SynapseError. This is
+            automatically generated if not provided.
+
+    """
+    if synapse_error is None:
+        synapse_error = e.to_synapse_error()
+
+    # Matrix v1.6 specifies that servers should return a 404 or 405 with an errcode
+    # of M_UNRECOGNIZED when they receive a request to an unknown endpoint or
+    # to an unknown method, respectively.
+    #
+    # Older versions of servers don't return proper errors, so be graceful. But,
+    # also handle that some endpoints truly do return 404 errors.
+    return (
+        # 404 is an unknown endpoint, 405 is a known endpoint, but unknown method.
+        (e.code == 404 or e.code == 405)
+        and (
+            # Consider empty body or non-JSON bodies to be unrecognised (matches
+            # older Dendrites & Conduits).
+            not e.response
+            or not e.response.startswith(b"{")
+            # The proper response JSON with M_UNRECOGNIZED errcode.
+            or synapse_error.errcode == Codes.UNRECOGNIZED
+        )
+    ) or (
+        # Older Synapses returned a 400 error.
+        e.code == 400
+        and synapse_error.errcode == Codes.UNRECOGNIZED
+    )

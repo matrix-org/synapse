@@ -52,7 +52,6 @@ from synapse.api.errors import (
     NotFoundError,
     StoreError,
     SynapseError,
-    UserDeactivatedError,
 )
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.handlers.ui_auth import (
@@ -212,27 +211,25 @@ class AuthHandler:
         self._password_enabled_for_login = hs.config.auth.password_enabled_for_login
         self._password_enabled_for_reauth = hs.config.auth.password_enabled_for_reauth
         self._password_localdb_enabled = hs.config.auth.password_localdb_enabled
-        self._third_party_rules = hs.get_third_party_event_rules()
-        self._account_validity_handler = hs.get_account_validity_handler()
+        self._third_party_rules = hs.get_module_api_callbacks().third_party_event_rules
+        self._account_validity_handler = hs.get_module_api_callbacks().account_validity
 
         # Ratelimiter for failed auth during UIA. Uses same ratelimit config
         # as per `rc_login.failed_attempts`.
         self._failed_uia_attempts_ratelimiter = Ratelimiter(
             store=self.store,
             clock=self.clock,
-            rate_hz=self.hs.config.ratelimiting.rc_login_failed_attempts.per_second,
-            burst_count=self.hs.config.ratelimiting.rc_login_failed_attempts.burst_count,
+            cfg=self.hs.config.ratelimiting.rc_login_failed_attempts,
         )
 
         # The number of seconds to keep a UI auth session active.
         self._ui_auth_session_timeout = hs.config.auth.ui_auth_session_timeout
 
-        # Ratelimitier for failed /login attempts
+        # Ratelimiter for failed /login attempts
         self._failed_login_attempts_ratelimiter = Ratelimiter(
             store=self.store,
             clock=hs.get_clock(),
-            rate_hz=self.hs.config.ratelimiting.rc_login_failed_attempts.per_second,
-            burst_count=self.hs.config.ratelimiting.rc_login_failed_attempts.burst_count,
+            cfg=self.hs.config.ratelimiting.rc_login_failed_attempts,
         )
 
         self._clock = self.hs.get_clock()
@@ -275,6 +272,8 @@ class AuthHandler:
         # A mapping of user ID to extra attributes to include in the login
         # response.
         self._extra_attributes: Dict[str, SsoLoginExtraAttributes] = {}
+
+        self.msc3861_oauth_delegation_enabled = hs.config.experimental.msc3861.enabled
 
     async def validate_user_via_ui_auth(
         self,
@@ -324,8 +323,12 @@ class AuthHandler:
 
             LimitExceededError if the ratelimiter's failed request count for this
                 user is too high to proceed
-
         """
+        if self.msc3861_oauth_delegation_enabled:
+            raise SynapseError(
+                HTTPStatus.INTERNAL_SERVER_ERROR, "UIA shouldn't be used with MSC3861"
+            )
+
         if not requester.access_token_id:
             raise ValueError("Cannot validate a user without an access token")
         if can_skip_ui_auth and self._ui_auth_session_timeout:
@@ -1420,12 +1423,6 @@ class AuthHandler:
             return None
         (user_id, password_hash) = lookupres
 
-        # If the password hash is None, the account has likely been deactivated
-        if not password_hash:
-            deactivated = await self.store.get_user_deactivated_status(user_id)
-            if deactivated:
-                raise UserDeactivatedError("This account has been deactivated")
-
         result = await self.validate_hash(password, password_hash)
         if not result:
             logger.warning("Failed password login for user %s", user_id)
@@ -1505,8 +1502,10 @@ class AuthHandler:
         )
 
         # delete pushers associated with this access token
+        # XXX(quenting): This is only needed until the 'set_device_id_for_pushers'
+        # background update completes.
         if token.token_id is not None:
-            await self.hs.get_pusherpool().remove_pushers_by_access_token(
+            await self.hs.get_pusherpool().remove_pushers_by_access_tokens(
                 token.user_id, (token.token_id,)
             )
 
@@ -1536,7 +1535,9 @@ class AuthHandler:
             )
 
         # delete pushers associated with the access tokens
-        await self.hs.get_pusherpool().remove_pushers_by_access_token(
+        # XXX(quenting): This is only needed until the 'set_device_id_for_pushers'
+        # background update completes.
+        await self.hs.get_pusherpool().remove_pushers_by_access_tokens(
             user_id, (token_id for _, token_id, _ in tokens_and_devices)
         )
 
@@ -1746,15 +1747,18 @@ class AuthHandler:
                 registered.
             auth_provider_session_id: The session ID from the SSO IdP received during login.
         """
-        # If the account has been deactivated, do not proceed with the login
-        # flow.
+        # If the account has been deactivated, do not proceed with the login.
+        #
+        # This gets checked again when the token is submitted but this lets us
+        # provide an HTML error page to the user (instead of issuing a token and
+        # having it error later).
         deactivated = await self.store.get_user_deactivated_status(registered_user_id)
         if deactivated:
             respond_with_html(request, 403, self._sso_account_deactivated_template)
             return
 
         user_profile_data = await self.store.get_profileinfo(
-            UserID.from_string(registered_user_id).localpart
+            UserID.from_string(registered_user_id)
         )
 
         # Store any extra attributes which will be passed in the login response.
@@ -1781,7 +1785,11 @@ class AuthHandler:
         )
 
         # Run post-login module callback handlers
-        await self._account_validity_handler.on_sso_login(registered_user_id)
+        await self._account_validity_handler.on_user_login(
+            user_id=registered_user_id,
+            auth_provider_type=LoginType.SSO,
+            auth_provider_id=auth_provider_id,
+        )
 
         # if the client is whitelisted, we can redirect straight to it
         if client_redirect_url.startswith(self._whitelisted_sso_clients):

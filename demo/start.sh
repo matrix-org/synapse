@@ -46,7 +46,7 @@ for port in 8080 8081 8082; do
             echo ''
 
 			# Warning, this heredoc depends on the interaction of tabs and spaces.
-			# Please don't accidentaly bork me with your fancy settings.
+			# Please don't accidentally bork me with your fancy settings.
 			listeners=$(cat <<-PORTLISTENERS
 			# Configure server to listen on both $https_port and $port
 			# This overides some of the default settings above
@@ -80,12 +80,8 @@ for port in 8080 8081 8082; do
             echo "tls_certificate_path: \"$DIR/$port/localhost:$port.tls.crt\""
             echo "tls_private_key_path: \"$DIR/$port/localhost:$port.tls.key\""
 
-            # Ignore keys from the trusted keys server
-            echo '# Ignore keys from the trusted keys server'
-            echo 'trusted_key_servers:'
-            echo '  - server_name: "matrix.org"'
-            echo '    accept_keys_insecurely: true'
-            echo ''
+            # Request keys directly from servers contacted over federation
+            echo 'trusted_key_servers: []'
 
 			# Allow the servers to communicate over localhost.
 			allow_list=$(cat <<-ALLOW_LIST

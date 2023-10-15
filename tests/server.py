@@ -12,10 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import hashlib
+import ipaddress
 import json
 import logging
 import os
 import os.path
+import sqlite3
 import time
 import uuid
 import warnings
@@ -25,6 +27,7 @@ from typing import (
     Any,
     Awaitable,
     Callable,
+    Deque,
     Dict,
     Iterable,
     List,
@@ -40,10 +43,10 @@ from typing import (
 from unittest.mock import Mock
 
 import attr
-from typing_extensions import Deque, ParamSpec
+from typing_extensions import ParamSpec
 from zope.interface import implementer
 
-from twisted.internet import address, threads, udp
+from twisted.internet import address, tcp, threads, udp
 from twisted.internet._resolver import SimpleResolverComplexifier
 from twisted.internet.defer import Deferred, fail, maybeDeferred, succeed
 from twisted.internet.error import DNSLookupError
@@ -52,6 +55,7 @@ from twisted.internet.interfaces import (
     IConnector,
     IConsumer,
     IHostnameResolver,
+    IListeningPort,
     IProducer,
     IProtocol,
     IPullProducer,
@@ -61,7 +65,7 @@ from twisted.internet.interfaces import (
     IResolverSimple,
     ITransport,
 )
-from twisted.internet.protocol import ClientFactory, DatagramProtocol
+from twisted.internet.protocol import ClientFactory, DatagramProtocol, Factory
 from twisted.python import threadpool
 from twisted.python.failure import Failure
 from twisted.test.proto_helpers import AccumulatingProtocol, MemoryReactorClock
@@ -72,14 +76,18 @@ from twisted.web.server import Request, Site
 from synapse.config.database import DatabaseConnectionConfig
 from synapse.config.homeserver import HomeServerConfig
 from synapse.events.presence_router import load_legacy_presence_router
-from synapse.events.spamcheck import load_legacy_spam_checkers
-from synapse.events.third_party_rules import load_legacy_third_party_event_rules
 from synapse.handlers.auth import load_legacy_password_auth_providers
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import ContextResourceUsage
+from synapse.module_api.callbacks.spamchecker_callbacks import load_legacy_spam_checkers
+from synapse.module_api.callbacks.third_party_event_rules_callbacks import (
+    load_legacy_third_party_event_rules,
+)
 from synapse.server import HomeServer
 from synapse.storage import DataStore
+from synapse.storage.database import LoggingDatabaseConnection
 from synapse.storage.engines import PostgresEngine, create_engine
+from synapse.storage.prepare_database import prepare_database
 from synapse.types import ISynapseReactor, JsonDict
 from synapse.util import Clock
 
@@ -103,6 +111,10 @@ P = ParamSpec("P")
 
 # the type of thing that can be passed into `make_request` in the headers list
 CustomHeaderType = Tuple[Union[str, bytes], Union[str, bytes]]
+
+# A pre-prepared SQLite DB that is used as a template when creating new SQLite
+# DB each test run. This dramatically speeds up test set up when using SQLite.
+PREPPED_SQLITE_DB_CONN: Optional[LoggingDatabaseConnection] = None
 
 
 class TimedOutException(Exception):
@@ -514,6 +526,35 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
         """
         self._tcp_callbacks[(host, port)] = callback
 
+    def connectUNIX(
+        self,
+        address: str,
+        factory: ClientFactory,
+        timeout: float = 30,
+        checkPID: int = 0,
+    ) -> IConnector:
+        """
+        Unix sockets aren't supported for unit tests yet. Make it obvious to any
+        developer trying it out that they will need to do some work before being able
+        to use it in tests.
+        """
+        raise Exception("Unix sockets are not implemented for tests yet, sorry.")
+
+    def listenUNIX(
+        self,
+        address: str,
+        factory: Factory,
+        backlog: int = 50,
+        mode: int = 0o666,
+        wantPID: int = 0,
+    ) -> IListeningPort:
+        """
+        Unix sockets aren't supported for unit tests yet. Make it obvious to any
+        developer trying it out that they will need to do some work before being able
+        to use it in tests.
+        """
+        raise Exception("Unix sockets are not implemented for tests, sorry")
+
     def connectTCP(
         self,
         host: str,
@@ -527,6 +568,8 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
         conn = super().connectTCP(
             host, port, factory, timeout=timeout, bindAddress=None
         )
+        if self.lookups and host in self.lookups:
+            validate_connector(conn, self.lookups[host])
 
         callback = self._tcp_callbacks.get((host, port))
         if callback:
@@ -557,6 +600,55 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
             # reactor.callFromThread to feed results back from the db functions to the
             # main thread.
             super().advance(0)
+
+
+def validate_connector(connector: tcp.Connector, expected_ip: str) -> None:
+    """Try to validate the obtained connector as it would happen when
+    synapse is running and the conection will be established.
+
+    This method will raise a useful exception when necessary, else it will
+    just do nothing.
+
+    This is in order to help catch quirks related to reactor.connectTCP,
+    since when called directly, the connector's destination will be of type
+    IPv4Address, with the hostname as the literal host that was given (which
+    could be an IPv6-only host or an IPv6 literal).
+
+    But when called from reactor.connectTCP *through* e.g. an Endpoint, the
+    connector's destination will contain the specific IP address with the
+    correct network stack class.
+
+    Note that testing code paths that use connectTCP directly should not be
+    affected by this check, unless they specifically add a test with a
+    matching reactor.lookups[HOSTNAME] = "IPv6Literal", where reactor is of
+    type ThreadedMemoryReactorClock.
+    For an example of implementing such tests, see test/handlers/send_email.py.
+    """
+    destination = connector.getDestination()
+
+    # We use address.IPv{4,6}Address to check what the reactor thinks it is
+    # is sending but check for validity with ipaddress.IPv{4,6}Address
+    # because they fail with IPs on the wrong network stack.
+    cls_mapping = {
+        address.IPv4Address: ipaddress.IPv4Address,
+        address.IPv6Address: ipaddress.IPv6Address,
+    }
+
+    cls = cls_mapping.get(destination.__class__)
+
+    if cls is not None:
+        try:
+            cls(expected_ip)
+        except Exception as exc:
+            raise ValueError(
+                "Invalid IP type and resolution for %s. Expected %s to be %s"
+                % (destination, expected_ip, cls.__name__)
+            ) from exc
+    else:
+        raise ValueError(
+            "Unknown address type %s for %s"
+            % (destination.__class__.__name__, destination)
+        )
 
 
 class ThreadPool:
@@ -630,10 +722,10 @@ def _make_test_homeserver_synchronous(server: HomeServer) -> None:
                 **kwargs,
             )
 
-        pool.runWithConnection = runWithConnection  # type: ignore[assignment]
+        pool.runWithConnection = runWithConnection  # type: ignore[method-assign]
         pool.runInteraction = runInteraction  # type: ignore[assignment]
         # Replace the thread pool with a threadless 'thread' pool
-        pool.threadpool = ThreadPool(clock._reactor)  # type: ignore[assignment]
+        pool.threadpool = ThreadPool(clock._reactor)
         pool.running = True
 
     # We've just changed the Databases to run DB transactions on the same
@@ -899,6 +991,22 @@ def setup_test_homeserver(
             "args": {"database": test_db_location, "cp_min": 1, "cp_max": 1},
         }
 
+        # Check if we have set up a DB that we can use as a template.
+        global PREPPED_SQLITE_DB_CONN
+        if PREPPED_SQLITE_DB_CONN is None:
+            temp_engine = create_engine(database_config)
+            PREPPED_SQLITE_DB_CONN = LoggingDatabaseConnection(
+                sqlite3.connect(":memory:"), temp_engine, "PREPPED_CONN"
+            )
+
+            database = DatabaseConnectionConfig("master", database_config)
+            config.database.databases = [database]
+            prepare_database(
+                PREPPED_SQLITE_DB_CONN, create_engine(database_config), config
+            )
+
+        database_config["_TEST_PREPPED_CONN"] = PREPPED_SQLITE_DB_CONN
+
     if "db_txn_limit" in kwargs:
         database_config["txn_limit"] = kwargs["db_txn_limit"]
 
@@ -944,8 +1052,6 @@ def setup_test_homeserver(
     hs.tls_server_context_factory = Mock()
 
     hs.setup()
-    if homeserver_to_use == TestHomeServer:
-        hs.setup_background_tasks()
 
     if isinstance(db_engine, PostgresEngine):
         database_pool = hs.get_datastores().databases[0]
@@ -983,7 +1089,9 @@ def setup_test_homeserver(
                     dropped = True
                 except psycopg2.OperationalError as e:
                     warnings.warn(
-                        "Couldn't drop old db: " + str(e), category=UserWarning
+                        "Couldn't drop old db: " + str(e),
+                        category=UserWarning,
+                        stacklevel=2,
                     )
                     time.sleep(0.5)
 
@@ -991,7 +1099,11 @@ def setup_test_homeserver(
             db_conn.close()
 
             if not dropped:
-                warnings.warn("Failed to drop old DB.", category=UserWarning)
+                warnings.warn(
+                    "Failed to drop old DB.",
+                    category=UserWarning,
+                    stacklevel=2,
+                )
 
         if not LEAVE_DB:
             # Register the cleanup hook

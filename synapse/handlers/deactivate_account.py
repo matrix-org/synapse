@@ -39,11 +39,11 @@ class DeactivateAccountHandler:
         self._profile_handler = hs.get_profile_handler()
         self.user_directory_handler = hs.get_user_directory_handler()
         self._server_name = hs.hostname
-        self._third_party_rules = hs.get_third_party_event_rules()
+        self._third_party_rules = hs.get_module_api_callbacks().third_party_event_rules
 
         # Flag that indicates whether the process to part users from rooms is running
         self._user_parter_running = False
-        self._third_party_rules = hs.get_third_party_event_rules()
+        self._third_party_rules = hs.get_module_api_callbacks().third_party_event_rules
 
         # Start the user parter loop so it can resume parting users from rooms where
         # it left off (if it has work left to do).
@@ -117,9 +117,9 @@ class DeactivateAccountHandler:
 
         # Remove any local threepid associations for this account.
         local_threepids = await self.store.user_get_threepids(user_id)
-        for threepid in local_threepids:
+        for local_threepid in local_threepids:
             await self._auth_handler.delete_local_threepid(
-                user_id, threepid["medium"], threepid["address"]
+                user_id, local_threepid.medium, local_threepid.address
             )
 
         # delete any devices belonging to the user, which will also
@@ -175,6 +175,9 @@ class DeactivateAccountHandler:
 
         # Remove account data (including ignored users and push rules).
         await self.store.purge_account_data_for_user(user_id)
+
+        # Delete any server-side backup keys
+        await self.store.bulk_delete_backup_keys_and_versions_for_user(user_id)
 
         # Let modules know the user has been deactivated.
         await self._third_party_rules.on_user_deactivation_status_changed(
@@ -294,5 +297,5 @@ class DeactivateAccountHandler:
         # Add the user to the directory, if necessary. Note that
         # this must be done after the user is re-activated, because
         # deactivated users are excluded from the user directory.
-        profile = await self.store.get_profileinfo(user.localpart)
+        profile = await self.store.get_profileinfo(user)
         await self.user_directory_handler.handle_local_profile_change(user_id, profile)

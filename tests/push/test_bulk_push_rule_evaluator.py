@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from typing import Any, Optional
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 from parameterized import parameterized
 
@@ -28,7 +28,6 @@ from synapse.server import HomeServer
 from synapse.types import JsonDict, create_requester
 from synapse.util import Clock
 
-from tests.test_utils import simple_async_mock
 from tests.unittest import HomeserverTestCase, override_config
 
 
@@ -191,7 +190,7 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
         # Mock the method which calculates push rules -- we do this instead of
         # e.g. checking the results in the database because we want to ensure
         # that code isn't even running.
-        bulk_evaluator._action_for_event_by_user = simple_async_mock()  # type: ignore[assignment]
+        bulk_evaluator._action_for_event_by_user = AsyncMock()  # type: ignore[method-assign]
 
         # Ensure no actions are generated!
         self.get_success(bulk_evaluator.action_for_events_by_user([(event, context)]))
@@ -228,15 +227,6 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
         )
         return len(result) > 0
 
-    @override_config(
-        {
-            "experimental_features": {
-                "msc3758_exact_event_match": True,
-                "msc3952_intentional_mentions": True,
-                "msc3966_exact_event_property_contains": True,
-            }
-        }
-    )
     def test_user_mentions(self) -> None:
         """Test the behavior of an event which includes invalid user mentions."""
         bulk_evaluator = BulkPushRuleEvaluator(self.hs)
@@ -245,41 +235,45 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
         self.assertFalse(self._create_and_process(bulk_evaluator))
         # An empty mentions field should not notify.
         self.assertFalse(
-            self._create_and_process(
-                bulk_evaluator, {EventContentFields.MSC3952_MENTIONS: {}}
-            )
+            self._create_and_process(bulk_evaluator, {EventContentFields.MENTIONS: {}})
         )
 
         # Non-dict mentions should be ignored.
-        mentions: Any
-        for mentions in (None, True, False, 1, "foo", []):
-            self.assertFalse(
-                self._create_and_process(
-                    bulk_evaluator, {EventContentFields.MSC3952_MENTIONS: mentions}
+        #
+        # Avoid C-S validation as these aren't expected.
+        with patch(
+            "synapse.events.validator.EventValidator.validate_new",
+            new=lambda s, event, config: True,
+        ):
+            mentions: Any
+            for mentions in (None, True, False, 1, "foo", []):
+                self.assertFalse(
+                    self._create_and_process(
+                        bulk_evaluator, {EventContentFields.MENTIONS: mentions}
+                    )
                 )
-            )
 
-        # A non-list should be ignored.
-        for mentions in (None, True, False, 1, "foo", {}):
-            self.assertFalse(
-                self._create_and_process(
-                    bulk_evaluator,
-                    {EventContentFields.MSC3952_MENTIONS: {"user_ids": mentions}},
+            # A non-list should be ignored.
+            for mentions in (None, True, False, 1, "foo", {}):
+                self.assertFalse(
+                    self._create_and_process(
+                        bulk_evaluator,
+                        {EventContentFields.MENTIONS: {"user_ids": mentions}},
+                    )
                 )
-            )
 
         # The Matrix ID appearing anywhere in the list should notify.
         self.assertTrue(
             self._create_and_process(
                 bulk_evaluator,
-                {EventContentFields.MSC3952_MENTIONS: {"user_ids": [self.alice]}},
+                {EventContentFields.MENTIONS: {"user_ids": [self.alice]}},
             )
         )
         self.assertTrue(
             self._create_and_process(
                 bulk_evaluator,
                 {
-                    EventContentFields.MSC3952_MENTIONS: {
+                    EventContentFields.MENTIONS: {
                         "user_ids": ["@another:test", self.alice]
                     }
                 },
@@ -290,35 +284,37 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
         self.assertTrue(
             self._create_and_process(
                 bulk_evaluator,
-                {
-                    EventContentFields.MSC3952_MENTIONS: {
-                        "user_ids": [self.alice, self.alice]
-                    }
-                },
+                {EventContentFields.MENTIONS: {"user_ids": [self.alice, self.alice]}},
             )
         )
 
         # Invalid entries in the list are ignored.
-        self.assertFalse(
-            self._create_and_process(
-                bulk_evaluator,
-                {
-                    EventContentFields.MSC3952_MENTIONS: {
-                        "user_ids": [None, True, False, {}, []]
-                    }
-                },
+        #
+        # Avoid C-S validation as these aren't expected.
+        with patch(
+            "synapse.events.validator.EventValidator.validate_new",
+            new=lambda s, event, config: True,
+        ):
+            self.assertFalse(
+                self._create_and_process(
+                    bulk_evaluator,
+                    {
+                        EventContentFields.MENTIONS: {
+                            "user_ids": [None, True, False, {}, []]
+                        }
+                    },
+                )
             )
-        )
-        self.assertTrue(
-            self._create_and_process(
-                bulk_evaluator,
-                {
-                    EventContentFields.MSC3952_MENTIONS: {
-                        "user_ids": [None, True, False, {}, [], self.alice]
-                    }
-                },
+            self.assertTrue(
+                self._create_and_process(
+                    bulk_evaluator,
+                    {
+                        EventContentFields.MENTIONS: {
+                            "user_ids": [None, True, False, {}, [], self.alice]
+                        }
+                    },
+                )
             )
-        )
 
         # The legacy push rule should not mention if the mentions field exists.
         self.assertFalse(
@@ -327,20 +323,11 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
                 {
                     "body": self.alice,
                     "msgtype": "m.text",
-                    EventContentFields.MSC3952_MENTIONS: {},
+                    EventContentFields.MENTIONS: {},
                 },
             )
         )
 
-    @override_config(
-        {
-            "experimental_features": {
-                "msc3758_exact_event_match": True,
-                "msc3952_intentional_mentions": True,
-                "msc3966_exact_event_property_contains": True,
-            }
-        }
-    )
     def test_room_mentions(self) -> None:
         """Test the behavior of an event which includes invalid room mentions."""
         bulk_evaluator = BulkPushRuleEvaluator(self.hs)
@@ -348,7 +335,7 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
         # Room mentions from those without power should not notify.
         self.assertFalse(
             self._create_and_process(
-                bulk_evaluator, {EventContentFields.MSC3952_MENTIONS: {"room": True}}
+                bulk_evaluator, {EventContentFields.MENTIONS: {"room": True}}
             )
         )
 
@@ -362,19 +349,25 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
         )
         self.assertTrue(
             self._create_and_process(
-                bulk_evaluator, {EventContentFields.MSC3952_MENTIONS: {"room": True}}
+                bulk_evaluator, {EventContentFields.MENTIONS: {"room": True}}
             )
         )
 
         # Invalid data should not notify.
-        mentions: Any
-        for mentions in (None, False, 1, "foo", [], {}):
-            self.assertFalse(
-                self._create_and_process(
-                    bulk_evaluator,
-                    {EventContentFields.MSC3952_MENTIONS: {"room": mentions}},
+        #
+        # Avoid C-S validation as these aren't expected.
+        with patch(
+            "synapse.events.validator.EventValidator.validate_new",
+            new=lambda s, event, config: True,
+        ):
+            mentions: Any
+            for mentions in (None, False, 1, "foo", [], {}):
+                self.assertFalse(
+                    self._create_and_process(
+                        bulk_evaluator,
+                        {EventContentFields.MENTIONS: {"room": mentions}},
+                    )
                 )
-            )
 
         # The legacy push rule should not mention if the mentions field exists.
         self.assertFalse(
@@ -383,12 +376,11 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
                 {
                     "body": "@room",
                     "msgtype": "m.text",
-                    EventContentFields.MSC3952_MENTIONS: {},
+                    EventContentFields.MENTIONS: {},
                 },
             )
         )
 
-    @override_config({"experimental_features": {"msc3958_supress_edit_notifs": True}})
     def test_suppress_edits(self) -> None:
         """Under the default push rules, event edits should not generate notifications."""
         bulk_evaluator = BulkPushRuleEvaluator(self.hs)
@@ -415,15 +407,32 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
             )
         )
 
-        # Room mentions from those without power should not notify.
+        # The edit should not cause a notification.
         self.assertFalse(
             self._create_and_process(
                 bulk_evaluator,
                 {
-                    "body": self.alice,
+                    "body": "Test message",
                     "m.relates_to": {
                         "rel_type": RelationTypes.REPLACE,
                         "event_id": event.event_id,
+                    },
+                },
+            )
+        )
+
+        # An edit which is a mention will cause a notification.
+        self.assertTrue(
+            self._create_and_process(
+                bulk_evaluator,
+                {
+                    "body": "Test message",
+                    "m.relates_to": {
+                        "rel_type": RelationTypes.REPLACE,
+                        "event_id": event.event_id,
+                    },
+                    "m.mentions": {
+                        "user_ids": [self.alice],
                     },
                 },
             )

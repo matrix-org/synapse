@@ -14,7 +14,7 @@
 
 from http import HTTPStatus
 from typing import Any, Generator, Tuple, cast
-from unittest.mock import Mock, call
+from unittest.mock import AsyncMock, Mock, call
 
 from twisted.internet import defer, reactor as _reactor
 
@@ -24,7 +24,6 @@ from synapse.types import ISynapseReactor, JsonDict
 from synapse.util import Clock
 
 from tests import unittest
-from tests.test_utils import make_awaitable
 from tests.utils import MockClock
 
 reactor = cast(ISynapseReactor, _reactor)
@@ -39,15 +38,23 @@ class HttpTransactionCacheTestCase(unittest.TestCase):
         self.cache = HttpTransactionCache(self.hs)
 
         self.mock_http_response = (HTTPStatus.OK, {"result": "GOOD JOB!"})
-        self.mock_key = "foo"
+
+        # Here we make sure that we're setting all the fields that HttpTransactionCache
+        # uses to build the transaction key.
+        self.mock_request = Mock()
+        self.mock_request.path = b"/foo/bar"
+        self.mock_requester = Mock()
+        self.mock_requester.app_service = None
+        self.mock_requester.is_guest = False
+        self.mock_requester.access_token_id = 1234
 
     @defer.inlineCallbacks
     def test_executes_given_function(
         self,
     ) -> Generator["defer.Deferred[Any]", object, None]:
-        cb = Mock(return_value=make_awaitable(self.mock_http_response))
-        res = yield self.cache.fetch_or_execute(
-            self.mock_key, cb, "some_arg", keyword="arg"
+        cb = AsyncMock(return_value=self.mock_http_response)
+        res = yield self.cache.fetch_or_execute_request(
+            self.mock_request, self.mock_requester, cb, "some_arg", keyword="arg"
         )
         cb.assert_called_once_with("some_arg", keyword="arg")
         self.assertEqual(res, self.mock_http_response)
@@ -56,10 +63,15 @@ class HttpTransactionCacheTestCase(unittest.TestCase):
     def test_deduplicates_based_on_key(
         self,
     ) -> Generator["defer.Deferred[Any]", object, None]:
-        cb = Mock(return_value=make_awaitable(self.mock_http_response))
+        cb = AsyncMock(return_value=self.mock_http_response)
         for i in range(3):  # invoke multiple times
-            res = yield self.cache.fetch_or_execute(
-                self.mock_key, cb, "some_arg", keyword="arg", changing_args=i
+            res = yield self.cache.fetch_or_execute_request(
+                self.mock_request,
+                self.mock_requester,
+                cb,
+                "some_arg",
+                keyword="arg",
+                changing_args=i,
             )
             self.assertEqual(res, self.mock_http_response)
         # expect only a single call to do the work
@@ -77,7 +89,9 @@ class HttpTransactionCacheTestCase(unittest.TestCase):
         @defer.inlineCallbacks
         def test() -> Generator["defer.Deferred[Any]", object, None]:
             with LoggingContext("c") as c1:
-                res = yield self.cache.fetch_or_execute(self.mock_key, cb)
+                res = yield self.cache.fetch_or_execute_request(
+                    self.mock_request, self.mock_requester, cb
+                )
                 self.assertIs(current_context(), c1)
                 self.assertEqual(res, (1, {}))
 
@@ -106,12 +120,16 @@ class HttpTransactionCacheTestCase(unittest.TestCase):
 
         with LoggingContext("test") as test_context:
             try:
-                yield self.cache.fetch_or_execute(self.mock_key, cb)
+                yield self.cache.fetch_or_execute_request(
+                    self.mock_request, self.mock_requester, cb
+                )
             except Exception as e:
                 self.assertEqual(e.args[0], "boo")
             self.assertIs(current_context(), test_context)
 
-            res = yield self.cache.fetch_or_execute(self.mock_key, cb)
+            res = yield self.cache.fetch_or_execute_request(
+                self.mock_request, self.mock_requester, cb
+            )
             self.assertEqual(res, self.mock_http_response)
             self.assertIs(current_context(), test_context)
 
@@ -134,29 +152,39 @@ class HttpTransactionCacheTestCase(unittest.TestCase):
 
         with LoggingContext("test") as test_context:
             try:
-                yield self.cache.fetch_or_execute(self.mock_key, cb)
+                yield self.cache.fetch_or_execute_request(
+                    self.mock_request, self.mock_requester, cb
+                )
             except Exception as e:
                 self.assertEqual(e.args[0], "boo")
             self.assertIs(current_context(), test_context)
 
-            res = yield self.cache.fetch_or_execute(self.mock_key, cb)
+            res = yield self.cache.fetch_or_execute_request(
+                self.mock_request, self.mock_requester, cb
+            )
             self.assertEqual(res, self.mock_http_response)
             self.assertIs(current_context(), test_context)
 
     @defer.inlineCallbacks
     def test_cleans_up(self) -> Generator["defer.Deferred[Any]", object, None]:
-        cb = Mock(return_value=make_awaitable(self.mock_http_response))
-        yield self.cache.fetch_or_execute(self.mock_key, cb, "an arg")
+        cb = AsyncMock(return_value=self.mock_http_response)
+        yield self.cache.fetch_or_execute_request(
+            self.mock_request, self.mock_requester, cb, "an arg"
+        )
         # should NOT have cleaned up yet
         self.clock.advance_time_msec(CLEANUP_PERIOD_MS / 2)
 
-        yield self.cache.fetch_or_execute(self.mock_key, cb, "an arg")
+        yield self.cache.fetch_or_execute_request(
+            self.mock_request, self.mock_requester, cb, "an arg"
+        )
         # still using cache
         cb.assert_called_once_with("an arg")
 
         self.clock.advance_time_msec(CLEANUP_PERIOD_MS)
 
-        yield self.cache.fetch_or_execute(self.mock_key, cb, "an arg")
+        yield self.cache.fetch_or_execute_request(
+            self.mock_request, self.mock_requester, cb, "an arg"
+        )
         # no longer using cache
         self.assertEqual(cb.call_count, 2)
         self.assertEqual(cb.call_args_list, [call("an arg"), call("an arg")])

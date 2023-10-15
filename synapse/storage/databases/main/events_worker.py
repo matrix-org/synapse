@@ -24,6 +24,7 @@ from typing import (
     Dict,
     Iterable,
     List,
+    Mapping,
     MutableMapping,
     Optional,
     Set,
@@ -72,7 +73,6 @@ from synapse.storage.engines import PostgresEngine
 from synapse.storage.types import Cursor
 from synapse.storage.util.id_generators import (
     AbstractStreamIdGenerator,
-    AbstractStreamIdTracker,
     MultiWriterIdGenerator,
     StreamIdGenerator,
 )
@@ -187,8 +187,8 @@ class EventsWorkerStore(SQLBaseStore):
     ):
         super().__init__(database, db_conn, hs)
 
-        self._stream_id_gen: AbstractStreamIdTracker
-        self._backfill_id_gen: AbstractStreamIdTracker
+        self._stream_id_gen: AbstractStreamIdGenerator
+        self._backfill_id_gen: AbstractStreamIdGenerator
         if isinstance(database.engine, PostgresEngine):
             # If we're using Postgres than we can use `MultiWriterIdGenerator`
             # regardless of whether this process writes to the streams or not.
@@ -214,13 +214,10 @@ class EventsWorkerStore(SQLBaseStore):
                 writers=hs.config.worker.writers.events,
             )
         else:
+            # Multiple writers are not supported for SQLite.
+            #
             # We shouldn't be running in worker mode with SQLite, but its useful
             # to support it for unit tests.
-            #
-            # If this process is the writer than we need to use
-            # `StreamIdGenerator`, otherwise we use `SlavedIdTracker` which gets
-            # updated over replication. (Multiple writers are not supported for
-            # SQLite).
             self._stream_id_gen = StreamIdGenerator(
                 db_conn,
                 hs.get_replication_notifier(),
@@ -806,7 +803,6 @@ class EventsWorkerStore(SQLBaseStore):
                 # the events have been redacted, and if so pulling the redaction event
                 # out of the database to check it.
                 #
-                missing_events = {}
                 try:
                     # Try to fetch from any external cache. We already checked the
                     # in-memory cache above.
@@ -888,7 +884,7 @@ class EventsWorkerStore(SQLBaseStore):
 
     async def _invalidate_async_get_event_cache(self, event_id: str) -> None:
         """
-        Invalidates an event in the asyncronous get event cache, which may be remote.
+        Invalidates an event in the asynchronous get event cache, which may be remote.
 
         Arguments:
             event_id: the event ID to invalidate
@@ -907,6 +903,15 @@ class EventsWorkerStore(SQLBaseStore):
         self._get_event_cache.invalidate_local((event_id,))
         self._event_ref.pop(event_id, None)
         self._current_event_fetches.pop(event_id, None)
+
+    def _invalidate_local_get_event_cache_all(self) -> None:
+        """Clears the in-memory get event caches.
+
+        Used when we purge room history.
+        """
+        self._get_event_cache.clear()
+        self._event_ref.clear()
+        self._current_event_fetches.clear()
 
     async def _get_events_from_cache(
         self, events: Iterable[str], update_metrics: bool = True
@@ -1579,16 +1584,19 @@ class EventsWorkerStore(SQLBaseStore):
         """Given a list of event ids, check if we have already processed and
         stored them as non outliers.
         """
-        rows = await self.db_pool.simple_select_many_batch(
-            table="events",
-            retcols=("event_id",),
-            column="event_id",
-            iterable=list(event_ids),
-            keyvalues={"outlier": False},
-            desc="have_events_in_timeline",
+        rows = cast(
+            List[Tuple[str]],
+            await self.db_pool.simple_select_many_batch(
+                table="events",
+                retcols=("event_id",),
+                column="event_id",
+                iterable=list(event_ids),
+                keyvalues={"outlier": False},
+                desc="have_events_in_timeline",
+            ),
         )
 
-        return {r["event_id"] for r in rows}
+        return {r[0] for r in rows}
 
     @trace
     @tag_args
@@ -1629,7 +1637,7 @@ class EventsWorkerStore(SQLBaseStore):
         self,
         room_id: str,
         event_ids: Collection[str],
-    ) -> Dict[str, bool]:
+    ) -> Mapping[str, bool]:
         """Helper for have_seen_events
 
         Returns:
@@ -1978,12 +1986,6 @@ class EventsWorkerStore(SQLBaseStore):
 
         return rows, to_token, True
 
-    async def is_event_after(self, event_id1: str, event_id2: str) -> bool:
-        """Returns True if event_id1 is after event_id2 in the stream"""
-        to_1, so_1 = await self.get_event_ordering(event_id1)
-        to_2, so_2 = await self.get_event_ordering(event_id2)
-        return (to_1, so_1) > (to_2, so_2)
-
     @cached(max_entries=5000)
     async def get_event_ordering(self, event_id: str) -> Tuple[int, int]:
         res = await self.db_pool.simple_select_one(
@@ -2024,23 +2026,23 @@ class EventsWorkerStore(SQLBaseStore):
             desc="get_next_event_to_expire", func=get_next_event_to_expire_txn
         )
 
-    async def get_event_id_from_transaction_id(
-        self, room_id: str, user_id: str, token_id: int, txn_id: str
+    async def get_event_id_from_transaction_id_and_device_id(
+        self, room_id: str, user_id: str, device_id: str, txn_id: str
     ) -> Optional[str]:
         """Look up if we have already persisted an event for the transaction ID,
         returning the event ID if so.
         """
         return await self.db_pool.simple_select_one_onecol(
-            table="event_txn_id",
+            table="event_txn_id_device_id",
             keyvalues={
                 "room_id": room_id,
                 "user_id": user_id,
-                "token_id": token_id,
+                "device_id": device_id,
                 "txn_id": txn_id,
             },
             retcol="event_id",
             allow_none=True,
-            desc="get_event_id_from_transaction_id",
+            desc="get_event_id_from_transaction_id_and_device_id",
         )
 
     async def get_already_persisted_events(
@@ -2055,29 +2057,35 @@ class EventsWorkerStore(SQLBaseStore):
         """
 
         mapping = {}
-        txn_id_to_event: Dict[Tuple[str, int, str], str] = {}
+        txn_id_to_event: Dict[Tuple[str, str, str, str], str] = {}
 
         for event in events:
-            token_id = getattr(event.internal_metadata, "token_id", None)
+            device_id = getattr(event.internal_metadata, "device_id", None)
             txn_id = getattr(event.internal_metadata, "txn_id", None)
 
-            if token_id and txn_id:
+            if device_id and txn_id:
                 # Check if this is a duplicate of an event in the given events.
-                existing = txn_id_to_event.get((event.room_id, token_id, txn_id))
+                existing = txn_id_to_event.get(
+                    (event.room_id, event.sender, device_id, txn_id)
+                )
                 if existing:
                     mapping[event.event_id] = existing
                     continue
 
                 # Check if this is a duplicate of an event we've already
                 # persisted.
-                existing = await self.get_event_id_from_transaction_id(
-                    event.room_id, event.sender, token_id, txn_id
+                existing = await self.get_event_id_from_transaction_id_and_device_id(
+                    event.room_id, event.sender, device_id, txn_id
                 )
                 if existing:
                     mapping[event.event_id] = existing
-                    txn_id_to_event[(event.room_id, token_id, txn_id)] = existing
+                    txn_id_to_event[
+                        (event.room_id, event.sender, device_id, txn_id)
+                    ] = existing
                 else:
-                    txn_id_to_event[(event.room_id, token_id, txn_id)] = event.event_id
+                    txn_id_to_event[
+                        (event.room_id, event.sender, device_id, txn_id)
+                    ] = event.event_id
 
         return mapping
 
@@ -2086,11 +2094,17 @@ class EventsWorkerStore(SQLBaseStore):
         """Cleans out transaction id mappings older than 24hrs."""
 
         def _cleanup_old_transaction_ids_txn(txn: LoggingTransaction) -> None:
+            one_day_ago = self._clock.time_msec() - 24 * 60 * 60 * 1000
             sql = """
                 DELETE FROM event_txn_id
                 WHERE inserted_ts < ?
             """
-            one_day_ago = self._clock.time_msec() - 24 * 60 * 60 * 1000
+            txn.execute(sql, (one_day_ago,))
+
+            sql = """
+                DELETE FROM event_txn_id_device_id
+                WHERE inserted_ts < ?
+            """
             txn.execute(sql, (one_day_ago,))
 
         return await self.db_pool.runInteraction(
@@ -2315,7 +2329,7 @@ class EventsWorkerStore(SQLBaseStore):
     @cachedList(cached_method_name="is_partial_state_event", list_name="event_ids")
     async def get_partial_state_events(
         self, event_ids: Collection[str]
-    ) -> Dict[str, bool]:
+    ) -> Mapping[str, bool]:
         """Checks which of the given events have partial state
 
         Args:
@@ -2325,15 +2339,18 @@ class EventsWorkerStore(SQLBaseStore):
             a dict mapping from event id to partial-stateness. We return True for
             any of the events which are unknown (or are outliers).
         """
-        result = await self.db_pool.simple_select_many_batch(
-            table="partial_state_events",
-            column="event_id",
-            iterable=event_ids,
-            retcols=["event_id"],
-            desc="get_partial_state_events",
+        result = cast(
+            List[Tuple[str]],
+            await self.db_pool.simple_select_many_batch(
+                table="partial_state_events",
+                column="event_id",
+                iterable=event_ids,
+                retcols=["event_id"],
+                desc="get_partial_state_events",
+            ),
         )
         # convert the result to a dict, to make @cachedList work
-        partial = {r["event_id"] for r in result}
+        partial = {r[0] for r in result}
         return {e_id: e_id in partial for e_id in event_ids}
 
     @cached()

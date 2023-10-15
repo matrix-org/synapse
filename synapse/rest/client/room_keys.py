@@ -37,6 +37,7 @@ class RoomKeysServlet(RestServlet):
     PATTERNS = client_patterns(
         "/room_keys/keys(/(?P<room_id>[^/]+))?(/(?P<session_id>[^/]+))?$"
     )
+    CATEGORY = "Encryption requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -253,6 +254,7 @@ class RoomKeysServlet(RestServlet):
 
 class RoomKeysNewVersionServlet(RestServlet):
     PATTERNS = client_patterns("/room_keys/version$")
+    CATEGORY = "Encryption requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -328,6 +330,7 @@ class RoomKeysNewVersionServlet(RestServlet):
 
 class RoomKeysVersionServlet(RestServlet):
     PATTERNS = client_patterns("/room_keys/version/(?P<version>[^/]+)$")
+    CATEGORY = "Encryption requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()

@@ -24,10 +24,10 @@ from twisted.internet.address import IPv4Address, IPv6Address
 from twisted.internet.error import DNSLookupError
 from twisted.internet.interfaces import IAddress, IResolutionReceiver
 from twisted.test.proto_helpers import AccumulatingProtocol, MemoryReactor
+from twisted.web.resource import Resource
 
 from synapse.config.oembed import OEmbedEndpointConfig
-from synapse.rest.media.media_repository_resource import MediaRepositoryResource
-from synapse.rest.media.preview_url_resource import IMAGE_CACHE_EXPIRY_MS
+from synapse.media.url_previewer import IMAGE_CACHE_EXPIRY_MS
 from synapse.server import HomeServer
 from synapse.types import JsonDict
 from synapse.util import Clock
@@ -36,12 +36,11 @@ from synapse.util.stringutils import parse_and_validate_mxc_uri
 from tests import unittest
 from tests.server import FakeTransport
 from tests.test_utils import SMALL_PNG
-from tests.utils import MockClock
 
 try:
     import lxml
 except ImportError:
-    lxml = None
+    lxml = None  # type: ignore[assignment]
 
 
 class URLPreviewTests(unittest.HomeserverTestCase):
@@ -117,8 +116,9 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         return hs
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
-        self.media_repo = hs.get_media_repository_resource()
-        self.preview_url = self.media_repo.children[b"preview_url"]
+        self.media_repo = hs.get_media_repository()
+        assert self.media_repo.url_previewer is not None
+        self.url_previewer = self.media_repo.url_previewer
 
         self.lookups: Dict[str, Any] = {}
 
@@ -143,8 +143,15 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         self.reactor.nameResolver = Resolver()  # type: ignore[assignment]
 
-    def create_test_resource(self) -> MediaRepositoryResource:
-        return self.hs.get_media_repository_resource()
+    def create_resource_dict(self) -> Dict[str, Resource]:
+        """Create a resource tree for the test server
+
+        A resource tree is a mapping from path to twisted.web.resource.
+
+        The default implementation creates a JsonResource and calls each function in
+        `servlets` to register servlets against it.
+        """
+        return {"/_matrix/media": self.hs.get_media_repository_resource()}
 
     def _assert_small_png(self, json_body: JsonDict) -> None:
         """Assert properties from the SMALL_PNG test image."""
@@ -159,7 +166,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "GET",
-            "preview_url?url=http://matrix.org",
+            "/_matrix/media/v3/preview_url?url=http://matrix.org",
             shorthand=False,
             await_result=False,
         )
@@ -183,7 +190,9 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         # Check the cache returns the correct response
         channel = self.make_request(
-            "GET", "preview_url?url=http://matrix.org", shorthand=False
+            "GET",
+            "/_matrix/media/v3/preview_url?url=http://matrix.org",
+            shorthand=False,
         )
 
         # Check the cache response has the same content
@@ -193,13 +202,15 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         )
 
         # Clear the in-memory cache
-        self.assertIn("http://matrix.org", self.preview_url._cache)
-        self.preview_url._cache.pop("http://matrix.org")
-        self.assertNotIn("http://matrix.org", self.preview_url._cache)
+        self.assertIn("http://matrix.org", self.url_previewer._cache)
+        self.url_previewer._cache.pop("http://matrix.org")
+        self.assertNotIn("http://matrix.org", self.url_previewer._cache)
 
         # Check the database cache returns the correct response
         channel = self.make_request(
-            "GET", "preview_url?url=http://matrix.org", shorthand=False
+            "GET",
+            "/_matrix/media/v3/preview_url?url=http://matrix.org",
+            shorthand=False,
         )
 
         # Check the cache response has the same content
@@ -221,7 +232,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "GET",
-            "preview_url?url=http://matrix.org",
+            "/_matrix/media/v3/preview_url?url=http://matrix.org",
             shorthand=False,
             await_result=False,
         )
@@ -251,7 +262,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "GET",
-            "preview_url?url=http://matrix.org",
+            "/_matrix/media/v3/preview_url?url=http://matrix.org",
             shorthand=False,
             await_result=False,
         )
@@ -287,7 +298,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "GET",
-            "preview_url?url=http://matrix.org",
+            "/_matrix/media/v3/preview_url?url=http://matrix.org",
             shorthand=False,
             await_result=False,
         )
@@ -328,7 +339,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "GET",
-            "preview_url?url=http://matrix.org",
+            "/_matrix/media/v3/preview_url?url=http://matrix.org",
             shorthand=False,
             await_result=False,
         )
@@ -363,7 +374,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "GET",
-            "preview_url?url=http://matrix.org",
+            "/_matrix/media/v3/preview_url?url=http://matrix.org",
             shorthand=False,
             await_result=False,
         )
@@ -396,7 +407,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "GET",
-            "preview_url?url=http://example.com",
+            "/_matrix/media/v3/preview_url?url=http://example.com",
             shorthand=False,
             await_result=False,
         )
@@ -418,14 +429,16 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             channel.json_body, {"og:title": "~matrix~", "og:description": "hi"}
         )
 
-    def test_blacklisted_ip_specific(self) -> None:
+    def test_blocked_ip_specific(self) -> None:
         """
-        Blacklisted IP addresses, found via DNS, are not spidered.
+        Blocked IP addresses, found via DNS, are not spidered.
         """
         self.lookups["example.com"] = [(IPv4Address, "192.168.1.1")]
 
         channel = self.make_request(
-            "GET", "preview_url?url=http://example.com", shorthand=False
+            "GET",
+            "/_matrix/media/v3/preview_url?url=http://example.com",
+            shorthand=False,
         )
 
         # No requests made.
@@ -439,14 +452,16 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             },
         )
 
-    def test_blacklisted_ip_range(self) -> None:
+    def test_blocked_ip_range(self) -> None:
         """
-        Blacklisted IP ranges, IPs found over DNS, are not spidered.
+        Blocked IP ranges, IPs found over DNS, are not spidered.
         """
         self.lookups["example.com"] = [(IPv4Address, "1.1.1.2")]
 
         channel = self.make_request(
-            "GET", "preview_url?url=http://example.com", shorthand=False
+            "GET",
+            "/_matrix/media/v3/preview_url?url=http://example.com",
+            shorthand=False,
         )
 
         self.assertEqual(channel.code, 502)
@@ -458,52 +473,48 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             },
         )
 
-    def test_blacklisted_ip_specific_direct(self) -> None:
+    def test_blocked_ip_specific_direct(self) -> None:
         """
-        Blacklisted IP addresses, accessed directly, are not spidered.
+        Blocked IP addresses, accessed directly, are not spidered.
         """
         channel = self.make_request(
-            "GET", "preview_url?url=http://192.168.1.1", shorthand=False
+            "GET",
+            "/_matrix/media/v3/preview_url?url=http://192.168.1.1",
+            shorthand=False,
         )
 
         # No requests made.
         self.assertEqual(len(self.reactor.tcpClients), 0)
         self.assertEqual(
             channel.json_body,
-            {
-                "errcode": "M_UNKNOWN",
-                "error": "IP address blocked by IP blacklist entry",
-            },
+            {"errcode": "M_UNKNOWN", "error": "IP address blocked"},
         )
         self.assertEqual(channel.code, 403)
 
-    def test_blacklisted_ip_range_direct(self) -> None:
+    def test_blocked_ip_range_direct(self) -> None:
         """
-        Blacklisted IP ranges, accessed directly, are not spidered.
+        Blocked IP ranges, accessed directly, are not spidered.
         """
         channel = self.make_request(
-            "GET", "preview_url?url=http://1.1.1.2", shorthand=False
+            "GET", "/_matrix/media/v3/preview_url?url=http://1.1.1.2", shorthand=False
         )
 
         self.assertEqual(channel.code, 403)
         self.assertEqual(
             channel.json_body,
-            {
-                "errcode": "M_UNKNOWN",
-                "error": "IP address blocked by IP blacklist entry",
-            },
+            {"errcode": "M_UNKNOWN", "error": "IP address blocked"},
         )
 
-    def test_blacklisted_ip_range_whitelisted_ip(self) -> None:
+    def test_blocked_ip_range_whitelisted_ip(self) -> None:
         """
-        Blacklisted but then subsequently whitelisted IP addresses can be
+        Blocked but then subsequently whitelisted IP addresses can be
         spidered.
         """
         self.lookups["example.com"] = [(IPv4Address, "1.1.1.1")]
 
         channel = self.make_request(
             "GET",
-            "preview_url?url=http://example.com",
+            "/_matrix/media/v3/preview_url?url=http://example.com",
             shorthand=False,
             await_result=False,
         )
@@ -527,10 +538,10 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             channel.json_body, {"og:title": "~matrix~", "og:description": "hi"}
         )
 
-    def test_blacklisted_ip_with_external_ip(self) -> None:
+    def test_blocked_ip_with_external_ip(self) -> None:
         """
-        If a hostname resolves a blacklisted IP, even if there's a
-        non-blacklisted one, it will be rejected.
+        If a hostname resolves a blocked IP, even if there's a non-blocked one,
+        it will be rejected.
         """
         # Hardcode the URL resolving to the IP we want.
         self.lookups["example.com"] = [
@@ -539,7 +550,9 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         ]
 
         channel = self.make_request(
-            "GET", "preview_url?url=http://example.com", shorthand=False
+            "GET",
+            "/_matrix/media/v3/preview_url?url=http://example.com",
+            shorthand=False,
         )
         self.assertEqual(channel.code, 502)
         self.assertEqual(
@@ -550,16 +563,18 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             },
         )
 
-    def test_blacklisted_ipv6_specific(self) -> None:
+    def test_blocked_ipv6_specific(self) -> None:
         """
-        Blacklisted IP addresses, found via DNS, are not spidered.
+        Blocked IP addresses, found via DNS, are not spidered.
         """
         self.lookups["example.com"] = [
             (IPv6Address, "3fff:ffff:ffff:ffff:ffff:ffff:ffff:ffff")
         ]
 
         channel = self.make_request(
-            "GET", "preview_url?url=http://example.com", shorthand=False
+            "GET",
+            "/_matrix/media/v3/preview_url?url=http://example.com",
+            shorthand=False,
         )
 
         # No requests made.
@@ -573,14 +588,16 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             },
         )
 
-    def test_blacklisted_ipv6_range(self) -> None:
+    def test_blocked_ipv6_range(self) -> None:
         """
-        Blacklisted IP ranges, IPs found over DNS, are not spidered.
+        Blocked IP ranges, IPs found over DNS, are not spidered.
         """
         self.lookups["example.com"] = [(IPv6Address, "2001:800::1")]
 
         channel = self.make_request(
-            "GET", "preview_url?url=http://example.com", shorthand=False
+            "GET",
+            "/_matrix/media/v3/preview_url?url=http://example.com",
+            shorthand=False,
         )
 
         self.assertEqual(channel.code, 502)
@@ -597,10 +614,11 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         OPTIONS returns the OPTIONS.
         """
         channel = self.make_request(
-            "OPTIONS", "preview_url?url=http://example.com", shorthand=False
+            "OPTIONS",
+            "/_matrix/media/v3/preview_url?url=http://example.com",
+            shorthand=False,
         )
-        self.assertEqual(channel.code, 200)
-        self.assertEqual(channel.json_body, {})
+        self.assertEqual(channel.code, 204)
 
     def test_accept_language_config_option(self) -> None:
         """
@@ -611,7 +629,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         # Build and make a request to the server
         channel = self.make_request(
             "GET",
-            "preview_url?url=http://example.com",
+            "/_matrix/media/v3/preview_url?url=http://example.com",
             shorthand=False,
             await_result=False,
         )
@@ -653,6 +671,57 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             server.data,
         )
 
+    def test_image(self) -> None:
+        """An image should be precached if mentioned in the HTML."""
+        self.lookups["matrix.org"] = [(IPv4Address, "10.1.2.3")]
+        self.lookups["cdn.matrix.org"] = [(IPv4Address, "10.1.2.4")]
+
+        result = (
+            b"""<html><body><img src="http://cdn.matrix.org/foo.png"></body></html>"""
+        )
+
+        channel = self.make_request(
+            "GET",
+            "/_matrix/media/v3/preview_url?url=http://matrix.org",
+            shorthand=False,
+            await_result=False,
+        )
+        self.pump()
+
+        # Respond with the HTML.
+        client = self.reactor.tcpClients[0][2].buildProtocol(None)
+        server = AccumulatingProtocol()
+        server.makeConnection(FakeTransport(client, self.reactor))
+        client.makeConnection(FakeTransport(server, self.reactor))
+        client.dataReceived(
+            (
+                b"HTTP/1.0 200 OK\r\nContent-Length: %d\r\n"
+                b'Content-Type: text/html; charset="utf8"\r\n\r\n'
+            )
+            % (len(result),)
+            + result
+        )
+        self.pump()
+
+        # Respond with the photo.
+        client = self.reactor.tcpClients[1][2].buildProtocol(None)
+        server = AccumulatingProtocol()
+        server.makeConnection(FakeTransport(client, self.reactor))
+        client.makeConnection(FakeTransport(server, self.reactor))
+        client.dataReceived(
+            (
+                b"HTTP/1.0 200 OK\r\nContent-Length: %d\r\n"
+                b"Content-Type: image/png\r\n\r\n"
+            )
+            % (len(SMALL_PNG),)
+            + SMALL_PNG
+        )
+        self.pump()
+
+        # The image should be in the result.
+        self.assertEqual(channel.code, 200)
+        self._assert_small_png(channel.json_body)
+
     def test_nonexistent_image(self) -> None:
         """If the preview image doesn't exist, ensure some data is returned."""
         self.lookups["matrix.org"] = [(IPv4Address, "10.1.2.3")]
@@ -663,7 +732,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "GET",
-            "preview_url?url=http://matrix.org",
+            "/_matrix/media/v3/preview_url?url=http://matrix.org",
             shorthand=False,
             await_result=False,
         )
@@ -683,9 +752,53 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         )
 
         self.pump()
-        self.assertEqual(channel.code, 200)
+
+        # There should not be a second connection.
+        self.assertEqual(len(self.reactor.tcpClients), 1)
 
         # The image should not be in the result.
+        self.assertEqual(channel.code, 200)
+        self.assertNotIn("og:image", channel.json_body)
+
+    @unittest.override_config(
+        {"url_preview_url_blacklist": [{"netloc": "cdn.matrix.org"}]}
+    )
+    def test_image_blocked(self) -> None:
+        """If the preview image doesn't exist, ensure some data is returned."""
+        self.lookups["matrix.org"] = [(IPv4Address, "10.1.2.3")]
+        self.lookups["cdn.matrix.org"] = [(IPv4Address, "10.1.2.4")]
+
+        result = (
+            b"""<html><body><img src="http://cdn.matrix.org/foo.jpg"></body></html>"""
+        )
+
+        channel = self.make_request(
+            "GET",
+            "/_matrix/media/v3/preview_url?url=http://matrix.org",
+            shorthand=False,
+            await_result=False,
+        )
+        self.pump()
+
+        client = self.reactor.tcpClients[0][2].buildProtocol(None)
+        server = AccumulatingProtocol()
+        server.makeConnection(FakeTransport(client, self.reactor))
+        client.makeConnection(FakeTransport(server, self.reactor))
+        client.dataReceived(
+            (
+                b"HTTP/1.0 200 OK\r\nContent-Length: %d\r\n"
+                b'Content-Type: text/html; charset="utf8"\r\n\r\n'
+            )
+            % (len(result),)
+            + result
+        )
+        self.pump()
+
+        # There should not be a second connection.
+        self.assertEqual(len(self.reactor.tcpClients), 1)
+
+        # The image should not be in the result.
+        self.assertEqual(channel.code, 200)
         self.assertNotIn("og:image", channel.json_body)
 
     def test_oembed_failure(self) -> None:
@@ -701,7 +814,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "GET",
-            "preview_url?url=http://matrix.org",
+            "/_matrix/media/v3/preview_url?url=http://matrix.org",
             shorthand=False,
             await_result=False,
         )
@@ -742,7 +855,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "GET",
-            f"preview_url?{query_params}",
+            f"/_matrix/media/v3/preview_url?{query_params}",
             shorthand=False,
         )
         self.pump()
@@ -763,7 +876,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "GET",
-            "preview_url?url=http://matrix.org",
+            "/_matrix/media/v3/preview_url?url=http://matrix.org",
             shorthand=False,
             await_result=False,
         )
@@ -800,7 +913,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "GET",
-            "preview_url?url=http://twitter.com/matrixdotorg/status/12345",
+            "/_matrix/media/v3/preview_url?url=http://twitter.com/matrixdotorg/status/12345",
             shorthand=False,
             await_result=False,
         )
@@ -860,7 +973,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "GET",
-            "preview_url?url=http://twitter.com/matrixdotorg/status/12345",
+            "/_matrix/media/v3/preview_url?url=http://twitter.com/matrixdotorg/status/12345",
             shorthand=False,
             await_result=False,
         )
@@ -880,6 +993,11 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         )
 
         self.pump()
+
+        # Double check that the proper host is being connected to. (Note that
+        # twitter.com can't be resolved so this is already implicitly checked.)
+        self.assertIn(b"\r\nHost: publish.twitter.com\r\n", server.data)
+
         self.assertEqual(channel.code, 200)
         body = channel.json_body
         self.assertEqual(
@@ -904,7 +1022,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "GET",
-            "preview_url?url=http://www.hulu.com/watch/12345",
+            "/_matrix/media/v3/preview_url?url=http://www.hulu.com/watch/12345",
             shorthand=False,
             await_result=False,
         )
@@ -940,6 +1058,22 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             },
         )
 
+    @unittest.override_config(
+        {"url_preview_url_blacklist": [{"netloc": "publish.twitter.com"}]}
+    )
+    def test_oembed_blocked(self) -> None:
+        """The oEmbed URL should not be downloaded if the oEmbed URL is blocked."""
+        self.lookups["twitter.com"] = [(IPv4Address, "10.1.2.3")]
+
+        channel = self.make_request(
+            "GET",
+            "/_matrix/media/v3/preview_url?url=http://twitter.com/matrixdotorg/status/12345",
+            shorthand=False,
+            await_result=False,
+        )
+        self.pump()
+        self.assertEqual(channel.code, 403, channel.result)
+
     def test_oembed_autodiscovery(self) -> None:
         """
         Autodiscovery works by finding the link in the HTML response and then requesting an oEmbed URL.
@@ -962,7 +1096,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "GET",
-            "preview_url?url=http://www.twitter.com/matrixdotorg/status/12345",
+            "/_matrix/media/v3/preview_url?url=http://www.twitter.com/matrixdotorg/status/12345",
             shorthand=False,
             await_result=False,
         )
@@ -980,7 +1114,6 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             % (len(result),)
             + result
         )
-
         self.pump()
 
         # The oEmbed response.
@@ -1004,7 +1137,6 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             % (len(oembed_content),)
             + oembed_content
         )
-
         self.pump()
 
         # Ensure the URL is what was requested.
@@ -1023,7 +1155,6 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             % (len(SMALL_PNG),)
             + SMALL_PNG
         )
-
         self.pump()
 
         # Ensure the URL is what was requested.
@@ -1036,6 +1167,59 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         )
         self._assert_small_png(body)
 
+    @unittest.override_config(
+        {"url_preview_url_blacklist": [{"netloc": "publish.twitter.com"}]}
+    )
+    def test_oembed_autodiscovery_blocked(self) -> None:
+        """
+        If the discovered oEmbed URL is blocked, it should be discarded.
+        """
+        # This is a little cheesy in that we use the www subdomain (which isn't the
+        # list of oEmbed patterns) to get "raw" HTML response.
+        self.lookups["www.twitter.com"] = [(IPv4Address, "10.1.2.3")]
+        self.lookups["publish.twitter.com"] = [(IPv4Address, "10.1.2.4")]
+
+        result = b"""
+        <title>Test</title>
+        <link rel="alternate" type="application/json+oembed"
+            href="http://publish.twitter.com/oembed?url=http%3A%2F%2Fcdn.twitter.com%2Fmatrixdotorg%2Fstatus%2F12345&format=json"
+            title="matrixdotorg" />
+        """
+
+        channel = self.make_request(
+            "GET",
+            "/_matrix/media/v3/preview_url?url=http://www.twitter.com/matrixdotorg/status/12345",
+            shorthand=False,
+            await_result=False,
+        )
+        self.pump()
+
+        client = self.reactor.tcpClients[0][2].buildProtocol(None)
+        server = AccumulatingProtocol()
+        server.makeConnection(FakeTransport(client, self.reactor))
+        client.makeConnection(FakeTransport(server, self.reactor))
+        client.dataReceived(
+            (
+                b"HTTP/1.0 200 OK\r\nContent-Length: %d\r\n"
+                b'Content-Type: text/html; charset="utf8"\r\n\r\n'
+            )
+            % (len(result),)
+            + result
+        )
+
+        self.pump()
+
+        # Ensure there's no additional connections.
+        self.assertEqual(len(self.reactor.tcpClients), 1)
+
+        # Ensure the URL is what was requested.
+        self.assertIn(b"\r\nHost: www.twitter.com\r\n", server.data)
+
+        self.assertEqual(channel.code, 200)
+        body = channel.json_body
+        self.assertEqual(body["og:title"], "Test")
+        self.assertNotIn("og:image", body)
+
     def _download_image(self) -> Tuple[str, str]:
         """Downloads an image into the URL cache.
         Returns:
@@ -1045,7 +1229,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "GET",
-            "preview_url?url=http://cdn.twitter.com/matrixdotorg",
+            "/_matrix/media/v3/preview_url?url=http://cdn.twitter.com/matrixdotorg",
             shorthand=False,
             await_result=False,
         )
@@ -1073,7 +1257,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         """Test that files are not stored in or fetched from storage providers."""
         host, media_id = self._download_image()
 
-        rel_file_path = self.preview_url.filepaths.url_cache_filepath_rel(media_id)
+        rel_file_path = self.media_repo.filepaths.url_cache_filepath_rel(media_id)
         media_store_path = os.path.join(self.media_store_path, rel_file_path)
         storage_provider_path = os.path.join(self.storage_path, rel_file_path)
 
@@ -1087,7 +1271,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         # Check fetching
         channel = self.make_request(
             "GET",
-            f"download/{host}/{media_id}",
+            f"/_matrix/media/v3/download/{host}/{media_id}",
             shorthand=False,
             await_result=False,
         )
@@ -1100,7 +1284,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "GET",
-            f"download/{host}/{media_id}",
+            f"/_matrix/media/v3/download/{host}/{media_id}",
             shorthand=False,
             await_result=False,
         )
@@ -1116,7 +1300,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         host, media_id = self._download_image()
 
         rel_thumbnail_path = (
-            self.preview_url.filepaths.url_cache_thumbnail_directory_rel(media_id)
+            self.media_repo.filepaths.url_cache_thumbnail_directory_rel(media_id)
         )
         media_store_thumbnail_path = os.path.join(
             self.media_store_path, rel_thumbnail_path
@@ -1135,7 +1319,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         # Check fetching
         channel = self.make_request(
             "GET",
-            f"thumbnail/{host}/{media_id}?width=32&height=32&method=scale",
+            f"/_matrix/media/v3/thumbnail/{host}/{media_id}?width=32&height=32&method=scale",
             shorthand=False,
             await_result=False,
         )
@@ -1143,7 +1327,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 200)
 
         # Remove the original, otherwise thumbnails will regenerate
-        rel_file_path = self.preview_url.filepaths.url_cache_filepath_rel(media_id)
+        rel_file_path = self.media_repo.filepaths.url_cache_filepath_rel(media_id)
         media_store_path = os.path.join(self.media_store_path, rel_file_path)
         os.remove(media_store_path)
 
@@ -1153,7 +1337,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "GET",
-            f"thumbnail/{host}/{media_id}?width=32&height=32&method=scale",
+            f"/_matrix/media/v3/thumbnail/{host}/{media_id}?width=32&height=32&method=scale",
             shorthand=False,
             await_result=False,
         )
@@ -1166,26 +1350,24 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
     def test_cache_expiry(self) -> None:
         """Test that URL cache files and thumbnails are cleaned up properly on expiry."""
-        self.preview_url.clock = MockClock()
-
         _host, media_id = self._download_image()
 
-        file_path = self.preview_url.filepaths.url_cache_filepath(media_id)
-        file_dirs = self.preview_url.filepaths.url_cache_filepath_dirs_to_delete(
+        file_path = self.media_repo.filepaths.url_cache_filepath(media_id)
+        file_dirs = self.media_repo.filepaths.url_cache_filepath_dirs_to_delete(
             media_id
         )
-        thumbnail_dir = self.preview_url.filepaths.url_cache_thumbnail_directory(
+        thumbnail_dir = self.media_repo.filepaths.url_cache_thumbnail_directory(
             media_id
         )
-        thumbnail_dirs = self.preview_url.filepaths.url_cache_thumbnail_dirs_to_delete(
+        thumbnail_dirs = self.media_repo.filepaths.url_cache_thumbnail_dirs_to_delete(
             media_id
         )
 
         self.assertTrue(os.path.isfile(file_path))
         self.assertTrue(os.path.isdir(thumbnail_dir))
 
-        self.preview_url.clock.advance_time_msec(IMAGE_CACHE_EXPIRY_MS + 1)
-        self.get_success(self.preview_url._expire_url_cache_data())
+        self.reactor.advance(IMAGE_CACHE_EXPIRY_MS * 1000 + 1)
+        self.get_success(self.url_previewer._expire_url_cache_data())
 
         for path in [file_path] + file_dirs + [thumbnail_dir] + thumbnail_dirs:
             self.assertFalse(
@@ -1194,8 +1376,8 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             )
 
     @unittest.override_config({"url_preview_url_blacklist": [{"port": "*"}]})
-    def test_blacklist_port(self) -> None:
-        """Tests that blacklisting URLs with a port makes previewing such URLs
+    def test_blocked_port(self) -> None:
+        """Tests that blocking URLs with a port makes previewing such URLs
         fail with a 403 error and doesn't impact other previews.
         """
         self.lookups["matrix.org"] = [(IPv4Address, "10.1.2.3")]
@@ -1205,7 +1387,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "GET",
-            "preview_url?url=" + bad_url,
+            "/_matrix/media/v3/preview_url?url=" + bad_url,
             shorthand=False,
             await_result=False,
         )
@@ -1214,7 +1396,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "GET",
-            "preview_url?url=" + good_url,
+            "/_matrix/media/v3/preview_url?url=" + good_url,
             shorthand=False,
             await_result=False,
         )
@@ -1232,3 +1414,23 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         self.pump()
         self.assertEqual(channel.code, 200)
+
+    @unittest.override_config(
+        {"url_preview_url_blacklist": [{"netloc": "example.com"}]}
+    )
+    def test_blocked_url(self) -> None:
+        """Tests that blocking URLs with a host makes previewing such URLs
+        fail with a 403 error.
+        """
+        self.lookups["example.com"] = [(IPv4Address, "10.1.2.3")]
+
+        bad_url = quote("http://example.com/foo")
+
+        channel = self.make_request(
+            "GET",
+            "/_matrix/media/v3/preview_url?url=" + bad_url,
+            shorthand=False,
+            await_result=False,
+        )
+        self.pump()
+        self.assertEqual(channel.code, 403, channel.result)

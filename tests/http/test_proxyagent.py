@@ -32,8 +32,8 @@ from twisted.internet.protocol import Factory, Protocol
 from twisted.protocols.tls import TLSMemoryBIOFactory, TLSMemoryBIOProtocol
 from twisted.web.http import HTTPChannel
 
-from synapse.http.client import BlacklistingReactorWrapper
-from synapse.http.connectproxyclient import ProxyCredentials
+from synapse.http.client import BlocklistingReactorWrapper
+from synapse.http.connectproxyclient import BasicProxyCredentials
 from synapse.http.proxyagent import ProxyAgent, parse_proxy
 
 from tests.http import (
@@ -205,7 +205,7 @@ class ProxyParserTests(TestCase):
         """
         proxy_cred = None
         if expected_credentials:
-            proxy_cred = ProxyCredentials(expected_credentials)
+            proxy_cred = BasicProxyCredentials(expected_credentials)
         self.assertEqual(
             (
                 expected_scheme,
@@ -684,11 +684,11 @@ class MatrixFederationAgentTests(TestCase):
         self.assertEqual(body, b"result")
 
     @patch.dict(os.environ, {"http_proxy": "proxy.com:8888"})
-    def test_http_request_via_proxy_with_blacklist(self) -> None:
-        # The blacklist includes the configured proxy IP.
+    def test_http_request_via_proxy_with_blocklist(self) -> None:
+        # The blocklist includes the configured proxy IP.
         agent = ProxyAgent(
-            BlacklistingReactorWrapper(
-                self.reactor, ip_whitelist=None, ip_blacklist=IPSet(["1.0.0.0/8"])
+            BlocklistingReactorWrapper(
+                self.reactor, ip_allowlist=None, ip_blocklist=IPSet(["1.0.0.0/8"])
             ),
             self.reactor,
             use_proxy=True,
@@ -730,11 +730,11 @@ class MatrixFederationAgentTests(TestCase):
         self.assertEqual(body, b"result")
 
     @patch.dict(os.environ, {"HTTPS_PROXY": "proxy.com"})
-    def test_https_request_via_uppercase_proxy_with_blacklist(self) -> None:
-        # The blacklist includes the configured proxy IP.
+    def test_https_request_via_uppercase_proxy_with_blocklist(self) -> None:
+        # The blocklist includes the configured proxy IP.
         agent = ProxyAgent(
-            BlacklistingReactorWrapper(
-                self.reactor, ip_whitelist=None, ip_blacklist=IPSet(["1.0.0.0/8"])
+            BlocklistingReactorWrapper(
+                self.reactor, ip_allowlist=None, ip_blocklist=IPSet(["1.0.0.0/8"])
             ),
             self.reactor,
             contextFactory=get_test_https_policy(),

@@ -35,6 +35,7 @@ from synapse.api.errors import (
     UnsupportedRoomVersionError,
 )
 from synapse.api.ratelimiting import Ratelimiter
+from synapse.config.ratelimiting import RatelimitSettings
 from synapse.events import EventBase
 from synapse.types import JsonDict, Requester, StrCollection
 from synapse.util.caches.response_cache import ResponseCache
@@ -94,7 +95,9 @@ class RoomSummaryHandler:
         self._server_name = hs.hostname
         self._federation_client = hs.get_federation_client()
         self._ratelimiter = Ratelimiter(
-            store=self._store, clock=hs.get_clock(), rate_hz=5, burst_count=10
+            store=self._store,
+            clock=hs.get_clock(),
+            cfg=RatelimitSettings("<room summary>", per_second=5, burst_count=10),
         )
 
         # If a user tries to fetch the same page multiple times in quick succession,
@@ -564,9 +567,9 @@ class RoomSummaryHandler:
             join_rule = join_rules_event.content.get("join_rule")
             if (
                 join_rule == JoinRules.PUBLIC
-                or (room_version.msc2403_knocking and join_rule == JoinRules.KNOCK)
+                or (room_version.knock_join_rule and join_rule == JoinRules.KNOCK)
                 or (
-                    room_version.msc3787_knock_restricted_join_rule
+                    room_version.knock_restricted_join_rule
                     and join_rule == JoinRules.KNOCK_RESTRICTED
                 )
             ):

@@ -36,6 +36,8 @@ logger = logging.getLogger(__name__)
 class NotificationsServlet(RestServlet):
     PATTERNS = client_patterns("/notifications$")
 
+    CATEGORY = "Client API requests"
+
     def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.store = hs.get_datastores().main
@@ -72,6 +74,12 @@ class NotificationsServlet(RestServlet):
 
         next_token = None
 
+        serialize_options = SerializeEventConfig(
+            event_format=format_event_for_client_v2_without_room_id,
+            requester=requester,
+        )
+        now = self.clock.time_msec()
+
         for pa in push_actions:
             returned_pa = {
                 "room_id": pa.room_id,
@@ -81,10 +89,8 @@ class NotificationsServlet(RestServlet):
                 "event": (
                     self._event_serializer.serialize_event(
                         notif_events[pa.event_id],
-                        self.clock.time_msec(),
-                        config=SerializeEventConfig(
-                            event_format=format_event_for_client_v2_without_room_id
-                        ),
+                        now,
+                        config=serialize_options,
                     )
                 ),
             }

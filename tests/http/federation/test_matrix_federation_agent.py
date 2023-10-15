@@ -14,8 +14,8 @@
 import base64
 import logging
 import os
-from typing import Any, Awaitable, Callable, Generator, List, Optional, cast
-from unittest.mock import Mock, patch
+from typing import Generator, List, Optional, cast
+from unittest.mock import AsyncMock, call, patch
 
 import treq
 from netaddr import IPSet
@@ -41,7 +41,7 @@ from twisted.web.iweb import IPolicyForHTTPS, IResponse
 from synapse.config.homeserver import HomeServerConfig
 from synapse.crypto.context_factory import FederationPolicyForHTTPS
 from synapse.http.federation.matrix_federation_agent import MatrixFederationAgent
-from synapse.http.federation.srv_resolver import Server
+from synapse.http.federation.srv_resolver import Server, SrvResolver
 from synapse.http.federation.well_known_resolver import (
     WELL_KNOWN_MAX_SIZE,
     WellKnownResolver,
@@ -68,21 +68,11 @@ from tests.utils import checked_cast, default_config
 logger = logging.getLogger(__name__)
 
 
-# Once Async Mocks or lambdas are supported this can go away.
-def generate_resolve_service(
-    result: List[Server],
-) -> Callable[[Any], Awaitable[List[Server]]]:
-    async def resolve_service(_: Any) -> List[Server]:
-        return result
-
-    return resolve_service
-
-
 class MatrixFederationAgentTests(unittest.TestCase):
     def setUp(self) -> None:
         self.reactor = ThreadedMemoryReactorClock()
 
-        self.mock_resolver = Mock()
+        self.mock_resolver = AsyncMock(spec=SrvResolver)
 
         config_dict = default_config("test", parse=False)
         config_dict["federation_custom_ca_list"] = [get_test_ca_cert_file()]
@@ -269,8 +259,8 @@ class MatrixFederationAgentTests(unittest.TestCase):
             reactor=cast(ISynapseReactor, self.reactor),
             tls_client_options_factory=self.tls_factory,
             user_agent=b"test-agent",  # Note that this is unused since _well_known_resolver is provided.
-            ip_whitelist=IPSet(),
-            ip_blacklist=IPSet(),
+            ip_allowlist=IPSet(),
+            ip_blocklist=IPSet(),
             _srv_resolver=self.mock_resolver,
             _well_known_resolver=self.well_known_resolver,
         )
@@ -292,7 +282,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         self.agent = self._make_agent()
 
         self.reactor.lookups["testserv"] = "1.2.3.4"
-        test_d = self._make_get_request(b"matrix://testserv:8448/foo/bar")
+        test_d = self._make_get_request(b"matrix-federation://testserv:8448/foo/bar")
 
         # Nothing happened yet
         self.assertNoResult(test_d)
@@ -393,7 +383,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
 
         self.reactor.lookups["testserv"] = "1.2.3.4"
         self.reactor.lookups["proxy.com"] = "9.9.9.9"
-        test_d = self._make_get_request(b"matrix://testserv:8448/foo/bar")
+        test_d = self._make_get_request(b"matrix-federation://testserv:8448/foo/bar")
 
         # Nothing happened yet
         self.assertNoResult(test_d)
@@ -514,7 +504,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         self.assertEqual(response.code, 200)
 
         # Send the body
-        request.write('{ "a": 1 }'.encode("ascii"))
+        request.write(b'{ "a": 1 }')
         request.finish()
 
         self.reactor.pump((0.1,))
@@ -532,7 +522,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         # there will be a getaddrinfo on the IP
         self.reactor.lookups["1.2.3.4"] = "1.2.3.4"
 
-        test_d = self._make_get_request(b"matrix://1.2.3.4/foo/bar")
+        test_d = self._make_get_request(b"matrix-federation://1.2.3.4/foo/bar")
 
         # Nothing happened yet
         self.assertNoResult(test_d)
@@ -568,7 +558,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         # there will be a getaddrinfo on the IP
         self.reactor.lookups["::1"] = "::1"
 
-        test_d = self._make_get_request(b"matrix://[::1]/foo/bar")
+        test_d = self._make_get_request(b"matrix-federation://[::1]/foo/bar")
 
         # Nothing happened yet
         self.assertNoResult(test_d)
@@ -604,7 +594,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         # there will be a getaddrinfo on the IP
         self.reactor.lookups["::1"] = "::1"
 
-        test_d = self._make_get_request(b"matrix://[::1]:80/foo/bar")
+        test_d = self._make_get_request(b"matrix-federation://[::1]:80/foo/bar")
 
         # Nothing happened yet
         self.assertNoResult(test_d)
@@ -636,10 +626,10 @@ class MatrixFederationAgentTests(unittest.TestCase):
         """
         self.agent = self._make_agent()
 
-        self.mock_resolver.resolve_service.side_effect = generate_resolve_service([])
+        self.mock_resolver.resolve_service.return_value = []
         self.reactor.lookups["testserv1"] = "1.2.3.4"
 
-        test_d = self._make_get_request(b"matrix://testserv1/foo/bar")
+        test_d = self._make_get_request(b"matrix-federation://testserv1/foo/bar")
 
         # Nothing happened yet
         self.assertNoResult(test_d)
@@ -661,9 +651,9 @@ class MatrixFederationAgentTests(unittest.TestCase):
         # .well-known request fails.
         self.reactor.pump((0.4,))
 
-        # now there should be a SRV lookup
-        self.mock_resolver.resolve_service.assert_called_once_with(
-            b"_matrix._tcp.testserv1"
+        # now there should be two SRV lookups
+        self.mock_resolver.resolve_service.assert_has_calls(
+            [call(b"_matrix-fed._tcp.testserv1"), call(b"_matrix._tcp.testserv1")]
         )
 
         # we should fall back to a direct connection
@@ -693,7 +683,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         # there will be a getaddrinfo on the IP
         self.reactor.lookups["1.2.3.5"] = "1.2.3.5"
 
-        test_d = self._make_get_request(b"matrix://1.2.3.5/foo/bar")
+        test_d = self._make_get_request(b"matrix-federation://1.2.3.5/foo/bar")
 
         # Nothing happened yet
         self.assertNoResult(test_d)
@@ -722,10 +712,10 @@ class MatrixFederationAgentTests(unittest.TestCase):
         """
         self.agent = self._make_agent()
 
-        self.mock_resolver.resolve_service.side_effect = generate_resolve_service([])
+        self.mock_resolver.resolve_service.return_value = []
         self.reactor.lookups["testserv"] = "1.2.3.4"
 
-        test_d = self._make_get_request(b"matrix://testserv/foo/bar")
+        test_d = self._make_get_request(b"matrix-federation://testserv/foo/bar")
 
         # Nothing happened yet
         self.assertNoResult(test_d)
@@ -747,9 +737,9 @@ class MatrixFederationAgentTests(unittest.TestCase):
         # .well-known request fails.
         self.reactor.pump((0.4,))
 
-        # now there should be a SRV lookup
-        self.mock_resolver.resolve_service.assert_called_once_with(
-            b"_matrix._tcp.testserv"
+        # now there should be two SRV lookups
+        self.mock_resolver.resolve_service.assert_has_calls(
+            [call(b"_matrix-fed._tcp.testserv"), call(b"_matrix._tcp.testserv")]
         )
 
         # we should fall back to a direct connection
@@ -776,11 +766,11 @@ class MatrixFederationAgentTests(unittest.TestCase):
         """Test the behaviour when the .well-known delegates elsewhere"""
         self.agent = self._make_agent()
 
-        self.mock_resolver.resolve_service.side_effect = generate_resolve_service([])
+        self.mock_resolver.resolve_service.return_value = []
         self.reactor.lookups["testserv"] = "1.2.3.4"
         self.reactor.lookups["target-server"] = "1::f"
 
-        test_d = self._make_get_request(b"matrix://testserv/foo/bar")
+        test_d = self._make_get_request(b"matrix-federation://testserv/foo/bar")
 
         # Nothing happened yet
         self.assertNoResult(test_d)
@@ -798,9 +788,12 @@ class MatrixFederationAgentTests(unittest.TestCase):
             content=b'{ "m.server": "target-server" }',
         )
 
-        # there should be a SRV lookup
-        self.mock_resolver.resolve_service.assert_called_once_with(
-            b"_matrix._tcp.target-server"
+        # there should be two SRV lookups
+        self.mock_resolver.resolve_service.assert_has_calls(
+            [
+                call(b"_matrix-fed._tcp.target-server"),
+                call(b"_matrix._tcp.target-server"),
+            ]
         )
 
         # now we should get a connection to the target server
@@ -840,11 +833,11 @@ class MatrixFederationAgentTests(unittest.TestCase):
         """
         self.agent = self._make_agent()
 
-        self.mock_resolver.resolve_service.side_effect = generate_resolve_service([])
+        self.mock_resolver.resolve_service.return_value = []
         self.reactor.lookups["testserv"] = "1.2.3.4"
         self.reactor.lookups["target-server"] = "1::f"
 
-        test_d = self._make_get_request(b"matrix://testserv/foo/bar")
+        test_d = self._make_get_request(b"matrix-federation://testserv/foo/bar")
 
         # Nothing happened yet
         self.assertNoResult(test_d)
@@ -888,9 +881,12 @@ class MatrixFederationAgentTests(unittest.TestCase):
 
         self.reactor.pump((0.1,))
 
-        # there should be a SRV lookup
-        self.mock_resolver.resolve_service.assert_called_once_with(
-            b"_matrix._tcp.target-server"
+        # there should be two SRV lookups
+        self.mock_resolver.resolve_service.assert_has_calls(
+            [
+                call(b"_matrix-fed._tcp.target-server"),
+                call(b"_matrix._tcp.target-server"),
+            ]
         )
 
         # now we should get a connection to the target server
@@ -930,10 +926,10 @@ class MatrixFederationAgentTests(unittest.TestCase):
         """
         self.agent = self._make_agent()
 
-        self.mock_resolver.resolve_service.side_effect = generate_resolve_service([])
+        self.mock_resolver.resolve_service.return_value = []
         self.reactor.lookups["testserv"] = "1.2.3.4"
 
-        test_d = self._make_get_request(b"matrix://testserv/foo/bar")
+        test_d = self._make_get_request(b"matrix-federation://testserv/foo/bar")
 
         # Nothing happened yet
         self.assertNoResult(test_d)
@@ -952,9 +948,9 @@ class MatrixFederationAgentTests(unittest.TestCase):
             client_factory, expected_sni=b"testserv", content=b"NOT JSON"
         )
 
-        # now there should be a SRV lookup
-        self.mock_resolver.resolve_service.assert_called_once_with(
-            b"_matrix._tcp.testserv"
+        # now there should be two SRV lookups
+        self.mock_resolver.resolve_service.assert_has_calls(
+            [call(b"_matrix-fed._tcp.testserv"), call(b"_matrix._tcp.testserv")]
         )
 
         # we should fall back to a direct connection
@@ -986,7 +982,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         # the config left to the default, which will not trust it (since the
         # presented cert is signed by a test CA)
 
-        self.mock_resolver.resolve_service.side_effect = generate_resolve_service([])
+        self.mock_resolver.resolve_service.return_value = []
         self.reactor.lookups["testserv"] = "1.2.3.4"
 
         config = default_config("test", parse=True)
@@ -997,8 +993,8 @@ class MatrixFederationAgentTests(unittest.TestCase):
             reactor=self.reactor,
             tls_client_options_factory=tls_factory,
             user_agent=b"test-agent",  # This is unused since _well_known_resolver is passed below.
-            ip_whitelist=IPSet(),
-            ip_blacklist=IPSet(),
+            ip_allowlist=IPSet(),
+            ip_blocklist=IPSet(),
             _srv_resolver=self.mock_resolver,
             _well_known_resolver=WellKnownResolver(
                 cast(ISynapseReactor, self.reactor),
@@ -1009,7 +1005,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
             ),
         )
 
-        test_d = agent.request(b"GET", b"matrix://testserv/foo/bar")
+        test_d = agent.request(b"GET", b"matrix-federation://testserv/foo/bar")
 
         # Nothing happened yet
         self.assertNoResult(test_d)
@@ -1026,30 +1022,74 @@ class MatrixFederationAgentTests(unittest.TestCase):
         # there should be no requests
         self.assertEqual(len(http_proto.requests), 0)
 
-        # and there should be a SRV lookup instead
-        self.mock_resolver.resolve_service.assert_called_once_with(
-            b"_matrix._tcp.testserv"
+        # and there should be two SRV lookups instead
+        self.mock_resolver.resolve_service.assert_has_calls(
+            [call(b"_matrix-fed._tcp.testserv"), call(b"_matrix._tcp.testserv")]
         )
 
     def test_get_hostname_srv(self) -> None:
         """
-        Test the behaviour when there is a single SRV record
+        Test the behaviour when there is a single SRV record for _matrix-fed.
         """
         self.agent = self._make_agent()
 
-        self.mock_resolver.resolve_service.side_effect = generate_resolve_service(
-            [Server(host=b"srvtarget", port=8443)]
-        )
+        self.mock_resolver.resolve_service.return_value = [
+            Server(host=b"srvtarget", port=8443)
+        ]
         self.reactor.lookups["srvtarget"] = "1.2.3.4"
 
-        test_d = self._make_get_request(b"matrix://testserv/foo/bar")
+        test_d = self._make_get_request(b"matrix-federation://testserv/foo/bar")
 
         # Nothing happened yet
         self.assertNoResult(test_d)
 
         # the request for a .well-known will have failed with a DNS lookup error.
         self.mock_resolver.resolve_service.assert_called_once_with(
-            b"_matrix._tcp.testserv"
+            b"_matrix-fed._tcp.testserv"
+        )
+
+        # Make sure treq is trying to connect
+        clients = self.reactor.tcpClients
+        self.assertEqual(len(clients), 1)
+        (host, port, client_factory, _timeout, _bindAddress) = clients[0]
+        self.assertEqual(host, "1.2.3.4")
+        self.assertEqual(port, 8443)
+
+        # make a test server, and wire up the client
+        http_server = self._make_connection(client_factory, expected_sni=b"testserv")
+
+        self.assertEqual(len(http_server.requests), 1)
+        request = http_server.requests[0]
+        self.assertEqual(request.method, b"GET")
+        self.assertEqual(request.path, b"/foo/bar")
+        self.assertEqual(request.requestHeaders.getRawHeaders(b"host"), [b"testserv"])
+
+        # finish the request
+        request.finish()
+        self.reactor.pump((0.1,))
+        self.successResultOf(test_d)
+
+    def test_get_hostname_srv_legacy(self) -> None:
+        """
+        Test the behaviour when there is a single SRV record for _matrix.
+        """
+        self.agent = self._make_agent()
+
+        # Return no entries for the _matrix-fed lookup, and a response for _matrix.
+        self.mock_resolver.resolve_service.side_effect = [
+            [],
+            [Server(host=b"srvtarget", port=8443)],
+        ]
+        self.reactor.lookups["srvtarget"] = "1.2.3.4"
+
+        test_d = self._make_get_request(b"matrix-federation://testserv/foo/bar")
+
+        # Nothing happened yet
+        self.assertNoResult(test_d)
+
+        # the request for a .well-known will have failed with a DNS lookup error.
+        self.mock_resolver.resolve_service.assert_has_calls(
+            [call(b"_matrix-fed._tcp.testserv"), call(b"_matrix._tcp.testserv")]
         )
 
         # Make sure treq is trying to connect
@@ -1075,14 +1115,14 @@ class MatrixFederationAgentTests(unittest.TestCase):
 
     def test_get_well_known_srv(self) -> None:
         """Test the behaviour when the .well-known redirects to a place where there
-        is a SRV.
+        is a _matrix-fed SRV record.
         """
         self.agent = self._make_agent()
 
         self.reactor.lookups["testserv"] = "1.2.3.4"
         self.reactor.lookups["srvtarget"] = "5.6.7.8"
 
-        test_d = self._make_get_request(b"matrix://testserv/foo/bar")
+        test_d = self._make_get_request(b"matrix-federation://testserv/foo/bar")
 
         # Nothing happened yet
         self.assertNoResult(test_d)
@@ -1094,9 +1134,9 @@ class MatrixFederationAgentTests(unittest.TestCase):
         self.assertEqual(host, "1.2.3.4")
         self.assertEqual(port, 443)
 
-        self.mock_resolver.resolve_service.side_effect = generate_resolve_service(
-            [Server(host=b"srvtarget", port=8443)]
-        )
+        self.mock_resolver.resolve_service.return_value = [
+            Server(host=b"srvtarget", port=8443)
+        ]
 
         self._handle_well_known_connection(
             client_factory,
@@ -1106,7 +1146,72 @@ class MatrixFederationAgentTests(unittest.TestCase):
 
         # there should be a SRV lookup
         self.mock_resolver.resolve_service.assert_called_once_with(
-            b"_matrix._tcp.target-server"
+            b"_matrix-fed._tcp.target-server"
+        )
+
+        # now we should get a connection to the target of the SRV record
+        self.assertEqual(len(clients), 2)
+        (host, port, client_factory, _timeout, _bindAddress) = clients[1]
+        self.assertEqual(host, "5.6.7.8")
+        self.assertEqual(port, 8443)
+
+        # make a test server, and wire up the client
+        http_server = self._make_connection(
+            client_factory, expected_sni=b"target-server"
+        )
+
+        self.assertEqual(len(http_server.requests), 1)
+        request = http_server.requests[0]
+        self.assertEqual(request.method, b"GET")
+        self.assertEqual(request.path, b"/foo/bar")
+        self.assertEqual(
+            request.requestHeaders.getRawHeaders(b"host"), [b"target-server"]
+        )
+
+        # finish the request
+        request.finish()
+        self.reactor.pump((0.1,))
+        self.successResultOf(test_d)
+
+    def test_get_well_known_srv_legacy(self) -> None:
+        """Test the behaviour when the .well-known redirects to a place where there
+        is a _matrix SRV record.
+        """
+        self.agent = self._make_agent()
+
+        self.reactor.lookups["testserv"] = "1.2.3.4"
+        self.reactor.lookups["srvtarget"] = "5.6.7.8"
+
+        test_d = self._make_get_request(b"matrix-federation://testserv/foo/bar")
+
+        # Nothing happened yet
+        self.assertNoResult(test_d)
+
+        # there should be an attempt to connect on port 443 for the .well-known
+        clients = self.reactor.tcpClients
+        self.assertEqual(len(clients), 1)
+        (host, port, client_factory, _timeout, _bindAddress) = clients[0]
+        self.assertEqual(host, "1.2.3.4")
+        self.assertEqual(port, 443)
+
+        # Return no entries for the _matrix-fed lookup, and a response for _matrix.
+        self.mock_resolver.resolve_service.side_effect = [
+            [],
+            [Server(host=b"srvtarget", port=8443)],
+        ]
+
+        self._handle_well_known_connection(
+            client_factory,
+            expected_sni=b"testserv",
+            content=b'{ "m.server": "target-server" }',
+        )
+
+        # there should be two SRV lookups
+        self.mock_resolver.resolve_service.assert_has_calls(
+            [
+                call(b"_matrix-fed._tcp.target-server"),
+                call(b"_matrix._tcp.target-server"),
+            ]
         )
 
         # now we should get a connection to the target of the SRV record
@@ -1137,13 +1242,15 @@ class MatrixFederationAgentTests(unittest.TestCase):
         """test the behaviour when the server name has idna chars in"""
         self.agent = self._make_agent()
 
-        self.mock_resolver.resolve_service.side_effect = generate_resolve_service([])
+        self.mock_resolver.resolve_service.return_value = []
 
         # the resolver is always called with the IDNA hostname as a native string.
         self.reactor.lookups["xn--bcher-kva.com"] = "1.2.3.4"
 
         # this is idna for bücher.com
-        test_d = self._make_get_request(b"matrix://xn--bcher-kva.com/foo/bar")
+        test_d = self._make_get_request(
+            b"matrix-federation://xn--bcher-kva.com/foo/bar"
+        )
 
         # Nothing happened yet
         self.assertNoResult(test_d)
@@ -1166,8 +1273,11 @@ class MatrixFederationAgentTests(unittest.TestCase):
         self.reactor.pump((0.4,))
 
         # now there should have been a SRV lookup
-        self.mock_resolver.resolve_service.assert_called_once_with(
-            b"_matrix._tcp.xn--bcher-kva.com"
+        self.mock_resolver.resolve_service.assert_has_calls(
+            [
+                call(b"_matrix-fed._tcp.xn--bcher-kva.com"),
+                call(b"_matrix._tcp.xn--bcher-kva.com"),
+            ]
         )
 
         # We should fall back to port 8448
@@ -1196,21 +1306,73 @@ class MatrixFederationAgentTests(unittest.TestCase):
         self.successResultOf(test_d)
 
     def test_idna_srv_target(self) -> None:
-        """test the behaviour when the target of a SRV record has idna chars"""
+        """test the behaviour when the target of a _matrix-fed SRV record has idna chars"""
         self.agent = self._make_agent()
 
-        self.mock_resolver.resolve_service.side_effect = generate_resolve_service(
-            [Server(host=b"xn--trget-3qa.com", port=8443)]  # târget.com
-        )
+        self.mock_resolver.resolve_service.return_value = [
+            Server(host=b"xn--trget-3qa.com", port=8443)
+        ]  # târget.com
         self.reactor.lookups["xn--trget-3qa.com"] = "1.2.3.4"
 
-        test_d = self._make_get_request(b"matrix://xn--bcher-kva.com/foo/bar")
+        test_d = self._make_get_request(
+            b"matrix-federation://xn--bcher-kva.com/foo/bar"
+        )
 
         # Nothing happened yet
         self.assertNoResult(test_d)
 
         self.mock_resolver.resolve_service.assert_called_once_with(
-            b"_matrix._tcp.xn--bcher-kva.com"
+            b"_matrix-fed._tcp.xn--bcher-kva.com"
+        )
+
+        # Make sure treq is trying to connect
+        clients = self.reactor.tcpClients
+        self.assertEqual(len(clients), 1)
+        (host, port, client_factory, _timeout, _bindAddress) = clients[0]
+        self.assertEqual(host, "1.2.3.4")
+        self.assertEqual(port, 8443)
+
+        # make a test server, and wire up the client
+        http_server = self._make_connection(
+            client_factory, expected_sni=b"xn--bcher-kva.com"
+        )
+
+        self.assertEqual(len(http_server.requests), 1)
+        request = http_server.requests[0]
+        self.assertEqual(request.method, b"GET")
+        self.assertEqual(request.path, b"/foo/bar")
+        self.assertEqual(
+            request.requestHeaders.getRawHeaders(b"host"), [b"xn--bcher-kva.com"]
+        )
+
+        # finish the request
+        request.finish()
+        self.reactor.pump((0.1,))
+        self.successResultOf(test_d)
+
+    def test_idna_srv_target_legacy(self) -> None:
+        """test the behaviour when the target of a _matrix SRV record has idna chars"""
+        self.agent = self._make_agent()
+
+        # Return no entries for the _matrix-fed lookup, and a response for _matrix.
+        self.mock_resolver.resolve_service.side_effect = [
+            [],
+            [Server(host=b"xn--trget-3qa.com", port=8443)],
+        ]  # târget.com
+        self.reactor.lookups["xn--trget-3qa.com"] = "1.2.3.4"
+
+        test_d = self._make_get_request(
+            b"matrix-federation://xn--bcher-kva.com/foo/bar"
+        )
+
+        # Nothing happened yet
+        self.assertNoResult(test_d)
+
+        self.mock_resolver.resolve_service.assert_has_calls(
+            [
+                call(b"_matrix-fed._tcp.xn--bcher-kva.com"),
+                call(b"_matrix._tcp.xn--bcher-kva.com"),
+            ]
         )
 
         # Make sure treq is trying to connect
@@ -1400,24 +1562,22 @@ class MatrixFederationAgentTests(unittest.TestCase):
         self.assertIsNone(r.delegated_server)
 
     def test_srv_fallbacks(self) -> None:
-        """Test that other SRV results are tried if the first one fails."""
+        """Test that other SRV results are tried if the first one fails for _matrix-fed SRV."""
         self.agent = self._make_agent()
 
-        self.mock_resolver.resolve_service.side_effect = generate_resolve_service(
-            [
-                Server(host=b"target.com", port=8443),
-                Server(host=b"target.com", port=8444),
-            ]
-        )
+        self.mock_resolver.resolve_service.return_value = [
+            Server(host=b"target.com", port=8443),
+            Server(host=b"target.com", port=8444),
+        ]
         self.reactor.lookups["target.com"] = "1.2.3.4"
 
-        test_d = self._make_get_request(b"matrix://testserv/foo/bar")
+        test_d = self._make_get_request(b"matrix-federation://testserv/foo/bar")
 
         # Nothing happened yet
         self.assertNoResult(test_d)
 
         self.mock_resolver.resolve_service.assert_called_once_with(
-            b"_matrix._tcp.testserv"
+            b"_matrix-fed._tcp.testserv"
         )
 
         # We should see an attempt to connect to the first server
@@ -1456,6 +1616,103 @@ class MatrixFederationAgentTests(unittest.TestCase):
         request.finish()
         self.reactor.pump((0.1,))
         self.successResultOf(test_d)
+
+    def test_srv_fallbacks_legacy(self) -> None:
+        """Test that other SRV results are tried if the first one fails for _matrix SRV."""
+        self.agent = self._make_agent()
+
+        # Return no entries for the _matrix-fed lookup, and a response for _matrix.
+        self.mock_resolver.resolve_service.side_effect = [
+            [],
+            [
+                Server(host=b"target.com", port=8443),
+                Server(host=b"target.com", port=8444),
+            ],
+        ]
+        self.reactor.lookups["target.com"] = "1.2.3.4"
+
+        test_d = self._make_get_request(b"matrix-federation://testserv/foo/bar")
+
+        # Nothing happened yet
+        self.assertNoResult(test_d)
+
+        self.mock_resolver.resolve_service.assert_has_calls(
+            [call(b"_matrix-fed._tcp.testserv"), call(b"_matrix._tcp.testserv")]
+        )
+
+        # We should see an attempt to connect to the first server
+        clients = self.reactor.tcpClients
+        self.assertEqual(len(clients), 1)
+        (host, port, client_factory, _timeout, _bindAddress) = clients.pop(0)
+        self.assertEqual(host, "1.2.3.4")
+        self.assertEqual(port, 8443)
+
+        # Fonx the connection
+        client_factory.clientConnectionFailed(None, Exception("nope"))
+
+        # There's a 300ms delay in HostnameEndpoint
+        self.reactor.pump((0.4,))
+
+        # Hasn't failed yet
+        self.assertNoResult(test_d)
+
+        # We shouldnow see an attempt to connect to the second server
+        clients = self.reactor.tcpClients
+        self.assertEqual(len(clients), 1)
+        (host, port, client_factory, _timeout, _bindAddress) = clients.pop(0)
+        self.assertEqual(host, "1.2.3.4")
+        self.assertEqual(port, 8444)
+
+        # make a test server, and wire up the client
+        http_server = self._make_connection(client_factory, expected_sni=b"testserv")
+
+        self.assertEqual(len(http_server.requests), 1)
+        request = http_server.requests[0]
+        self.assertEqual(request.method, b"GET")
+        self.assertEqual(request.path, b"/foo/bar")
+        self.assertEqual(request.requestHeaders.getRawHeaders(b"host"), [b"testserv"])
+
+        # finish the request
+        request.finish()
+        self.reactor.pump((0.1,))
+        self.successResultOf(test_d)
+
+    def test_srv_no_fallback_to_legacy(self) -> None:
+        """Test that _matrix SRV results are not tried if the _matrix-fed one fails."""
+        self.agent = self._make_agent()
+
+        # Return a failing entry for _matrix-fed.
+        self.mock_resolver.resolve_service.side_effect = [
+            [Server(host=b"target.com", port=8443)],
+            [],
+        ]
+        self.reactor.lookups["target.com"] = "1.2.3.4"
+
+        test_d = self._make_get_request(b"matrix-federation://testserv/foo/bar")
+
+        # Nothing happened yet
+        self.assertNoResult(test_d)
+
+        # Only the _matrix-fed is checked, _matrix is ignored.
+        self.mock_resolver.resolve_service.assert_called_once_with(
+            b"_matrix-fed._tcp.testserv"
+        )
+
+        # We should see an attempt to connect to the first server
+        clients = self.reactor.tcpClients
+        self.assertEqual(len(clients), 1)
+        (host, port, client_factory, _timeout, _bindAddress) = clients.pop(0)
+        self.assertEqual(host, "1.2.3.4")
+        self.assertEqual(port, 8443)
+
+        # Fonx the connection
+        client_factory.clientConnectionFailed(None, Exception("nope"))
+
+        # There's a 300ms delay in HostnameEndpoint
+        self.reactor.pump((0.4,))
+
+        # Failed to resolve a server.
+        self.assertFailure(test_d, Exception)
 
 
 class TestCachePeriodFromHeaders(unittest.TestCase):

@@ -136,6 +136,7 @@ OIDC_PROVIDER_CONFIG_SCHEMA = {
             "type": "array",
             "items": SsoAttributeRequirement.JSON_SCHEMA,
         },
+        "enable_registration": {"type": "boolean"},
     },
 }
 
@@ -279,6 +280,20 @@ def _parse_oidc_config_dict(
         for x in oidc_config.get("attribute_requirements", [])
     ]
 
+    # Read from either `client_secret_path` or `client_secret`. If both exist, error.
+    client_secret = oidc_config.get("client_secret")
+    client_secret_path = oidc_config.get("client_secret_path")
+    if client_secret_path is not None:
+        if client_secret is None:
+            client_secret = read_file(
+                client_secret_path, config_path + ("client_secret_path",)
+            ).rstrip("\n")
+        else:
+            raise ConfigError(
+                "Cannot specify both client_secret and client_secret_path",
+                config_path + ("client_secret",),
+            )
+
     return OidcProviderConfig(
         idp_id=idp_id,
         idp_name=oidc_config.get("idp_name", "OIDC"),
@@ -287,7 +302,7 @@ def _parse_oidc_config_dict(
         discover=oidc_config.get("discover", True),
         issuer=oidc_config["issuer"],
         client_id=oidc_config["client_id"],
-        client_secret=oidc_config.get("client_secret"),
+        client_secret=client_secret,
         client_secret_jwt_key=client_secret_jwt_key,
         client_auth_method=oidc_config.get("client_auth_method", "client_secret_basic"),
         pkce_method=oidc_config.get("pkce_method", "auto"),
@@ -306,6 +321,7 @@ def _parse_oidc_config_dict(
         user_mapping_provider_class=user_mapping_provider_class,
         user_mapping_provider_config=user_mapping_provider_config,
         attribute_requirements=attribute_requirements,
+        enable_registration=oidc_config.get("enable_registration", True),
     )
 
 
@@ -405,3 +421,6 @@ class OidcProviderConfig:
 
     # required attributes to require in userinfo to allow login/registration
     attribute_requirements: List[SsoAttributeRequirement]
+
+    # Whether automatic registrations are enabled in the ODIC flow. Defaults to True
+    enable_registration: bool

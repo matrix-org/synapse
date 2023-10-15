@@ -16,7 +16,7 @@ import logging
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Tuple
 
-from synapse.api.errors import Codes, NotFoundError, SynapseError
+from synapse.api.errors import AuthError, Codes, NotFoundError, SynapseError
 from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.http.site import SynapseRequest
@@ -55,19 +55,25 @@ class ReportEventRestServlet(RestServlet):
                 "Param 'reason' must be a string",
                 Codes.BAD_JSON,
             )
-        if type(body.get("score", 0)) is not int:
+        if type(body.get("score", 0)) is not int:  # noqa: E721
             raise SynapseError(
                 HTTPStatus.BAD_REQUEST,
                 "Param 'score' must be an integer",
                 Codes.BAD_JSON,
             )
 
-        event = await self._event_handler.get_event(
-            requester.user, room_id, event_id, show_redacted=False
-        )
+        try:
+            event = await self._event_handler.get_event(
+                requester.user, room_id, event_id, show_redacted=False
+            )
+        except AuthError:
+            # The event exists, but this user is not allowed to access this event.
+            event = None
+
         if event is None:
             raise NotFoundError(
-                "Unable to report event: it does not exist or you aren't able to see it."
+                "Unable to report event: "
+                "it does not exist or you aren't able to see it."
             )
 
         await self.store.add_event_report(

@@ -218,7 +218,7 @@ class FederationKnockingTestCase(
         ) -> EventBase:
             return pdu
 
-        homeserver.get_federation_server()._check_sigs_and_hash = (  # type: ignore[assignment]
+        homeserver.get_federation_server()._check_sigs_and_hash = (  # type: ignore[method-assign]
             approve_all_signature_checking
         )
 
@@ -229,7 +229,7 @@ class FederationKnockingTestCase(
         ) -> None:
             pass
 
-        homeserver.get_federation_event_handler()._check_event_auth = _check_event_auth  # type: ignore[assignment]
+        homeserver.get_federation_event_handler()._check_event_auth = _check_event_auth  # type: ignore[method-assign]
 
         return super().prepare(reactor, clock, homeserver)
 
@@ -308,7 +308,7 @@ class FederationKnockingTestCase(
         self.assertEqual(200, channel.code, channel.result)
 
         # Check that we got the stripped room state in return
-        room_state_events = channel.json_body["knock_state_events"]
+        room_state_events = channel.json_body["knock_room_state"]
 
         # Validate the stripped room state events
         self.check_knock_room_state_against_room_state(

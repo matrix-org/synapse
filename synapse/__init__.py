@@ -17,16 +17,25 @@
 """ This is an implementation of a Matrix homeserver.
 """
 
-import json
 import os
 import sys
+from typing import Any, Dict
+
+from PIL import ImageFile
 
 from synapse.util.rust import check_rust_lib_up_to_date
 from synapse.util.stringutils import strtobool
 
+# Allow truncated JPEG images to be thumbnailed.
+ImageFile.LOAD_TRUNCATED_IMAGES = True
+
 # Check that we're not running on an unsupported Python version.
-if sys.version_info < (3, 7):
-    print("Synapse requires Python 3.7 or above.")
+#
+# Note that we use an (unneeded) variable here so that pyupgrade doesn't nuke the
+# if-statement completely.
+py_version = sys.version_info
+if py_version < (3, 8):
+    print("Synapse requires Python 3.8 or above.")
     sys.exit(1)
 
 # Allow using the asyncio reactor via env var.
@@ -61,15 +70,24 @@ try:
 except ImportError:
     pass
 
-# Use the standard library json implementation instead of simplejson.
+# Teach canonicaljson how to serialise immutabledicts.
 try:
-    from canonicaljson import set_json_library
+    from canonicaljson import register_preserialisation_callback
+    from immutabledict import immutabledict
 
-    set_json_library(json)
+    def _immutabledict_cb(d: immutabledict) -> Dict[str, Any]:
+        try:
+            return d._dict
+        except Exception:
+            # Paranoia: fall back to a `dict()` call, in case a future version of
+            # immutabledict removes `_dict` from the implementation.
+            return dict(d)
+
+    register_preserialisation_callback(immutabledict, _immutabledict_cb)
 except ImportError:
     pass
 
-import synapse.util
+import synapse.util  # noqa: E402
 
 __version__ = synapse.util.SYNAPSE_VERSION
 

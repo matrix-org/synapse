@@ -126,7 +126,7 @@ def validate_event_for_room_version(event: "EventBase") -> None:
             raise AuthError(403, "Event not signed by sending server")
 
     is_invite_via_allow_rule = (
-        event.room_version.msc3083_join_rules
+        event.room_version.restricted_join_rule
         and event.type == EventTypes.Member
         and event.membership == Membership.JOIN
         and EventContentFields.AUTHORISING_USER in event.content
@@ -168,13 +168,24 @@ async def check_state_independent_auth_rules(
         return
 
     # 2. Reject if event has auth_events that: ...
-    auth_events = await store.get_events(
-        event.auth_event_ids(),
-        redact_behaviour=EventRedactBehaviour.as_is,
-        allow_rejected=True,
-    )
     if batched_auth_events:
-        auth_events.update(batched_auth_events)
+        # Copy the batched auth events to avoid mutating them.
+        auth_events = dict(batched_auth_events)
+        needed_auth_event_ids = set(event.auth_event_ids()) - batched_auth_events.keys()
+        if needed_auth_event_ids:
+            auth_events.update(
+                await store.get_events(
+                    needed_auth_event_ids,
+                    redact_behaviour=EventRedactBehaviour.as_is,
+                    allow_rejected=True,
+                )
+            )
+    else:
+        auth_events = await store.get_events(
+            event.auth_event_ids(),
+            redact_behaviour=EventRedactBehaviour.as_is,
+            allow_rejected=True,
+        )
 
     room_id = event.room_id
     auth_dict: MutableStateMap[str] = {}
@@ -328,13 +339,6 @@ def check_state_dependent_auth_rules(
     if event.type == EventTypes.Redaction:
         check_redaction(event.room_version, event, auth_dict)
 
-    if (
-        event.type == EventTypes.MSC2716_INSERTION
-        or event.type == EventTypes.MSC2716_BATCH
-        or event.type == EventTypes.MSC2716_MARKER
-    ):
-        check_historical(event.room_version, event, auth_dict)
-
     logger.debug("Allowing! %s", event)
 
 
@@ -348,13 +352,10 @@ LENIENT_EVENT_BYTE_LIMITS_ROOM_VERSIONS = {
     RoomVersions.V4,
     RoomVersions.V5,
     RoomVersions.V6,
-    RoomVersions.MSC2176,
     RoomVersions.V7,
     RoomVersions.V8,
     RoomVersions.V9,
-    RoomVersions.MSC3787,
     RoomVersions.V10,
-    RoomVersions.MSC2716v4,
     RoomVersions.MSC1767v10,
 }
 
@@ -444,8 +445,11 @@ def _check_create(event: "EventBase") -> None:
             "room appears to have unsupported version %s" % (room_version_prop,),
         )
 
-    # 1.4 If content has no creator field, reject.
-    if EventContentFields.ROOM_CREATOR not in event.content:
+    # 1.4 If content has no creator field, reject if the room version requires it.
+    if (
+        not event.room_version.implicit_room_creator
+        and EventContentFields.ROOM_CREATOR not in event.content
+    ):
         raise AuthError(403, "Create event lacks a 'creator' property")
 
 
@@ -480,7 +484,11 @@ def _is_membership_change_allowed(
         key = (EventTypes.Create, "")
         create = auth_events.get(key)
         if create and event.prev_event_ids()[0] == create.event_id:
-            if create.content["creator"] == event.state_key:
+            if room_version.implicit_room_creator:
+                creator = create.sender
+            else:
+                creator = create.content[EventContentFields.ROOM_CREATOR]
+            if creator == event.state_key:
                 return
 
     target_user_id = event.state_key
@@ -499,7 +507,7 @@ def _is_membership_change_allowed(
     caller_invited = caller and caller.membership == Membership.INVITE
     caller_knocked = (
         caller
-        and room_version.msc2403_knocking
+        and room_version.knock_join_rule
         and caller.membership == Membership.KNOCK
     )
 
@@ -599,9 +607,9 @@ def _is_membership_change_allowed(
         elif join_rule == JoinRules.PUBLIC:
             pass
         elif (
-            room_version.msc3083_join_rules and join_rule == JoinRules.RESTRICTED
+            room_version.restricted_join_rule and join_rule == JoinRules.RESTRICTED
         ) or (
-            room_version.msc3787_knock_restricted_join_rule
+            room_version.knock_restricted_join_rule
             and join_rule == JoinRules.KNOCK_RESTRICTED
         ):
             # This is the same as public, but the event must contain a reference
@@ -631,9 +639,9 @@ def _is_membership_change_allowed(
 
         elif (
             join_rule == JoinRules.INVITE
-            or (room_version.msc2403_knocking and join_rule == JoinRules.KNOCK)
+            or (room_version.knock_join_rule and join_rule == JoinRules.KNOCK)
             or (
-                room_version.msc3787_knock_restricted_join_rule
+                room_version.knock_restricted_join_rule
                 and join_rule == JoinRules.KNOCK_RESTRICTED
             )
         ):
@@ -661,15 +669,21 @@ def _is_membership_change_allowed(
                     errcode=Codes.INSUFFICIENT_POWER,
                 )
     elif Membership.BAN == membership:
-        if user_level < ban_level or user_level <= target_level:
+        if user_level < ban_level:
             raise UnstableSpecAuthError(
                 403,
                 "You don't have permission to ban",
                 errcode=Codes.INSUFFICIENT_POWER,
             )
-    elif room_version.msc2403_knocking and Membership.KNOCK == membership:
+        elif user_level <= target_level:
+            raise UnstableSpecAuthError(
+                403,
+                "You don't have permission to ban this user",
+                errcode=Codes.INSUFFICIENT_POWER,
+            )
+    elif room_version.knock_join_rule and Membership.KNOCK == membership:
         if join_rule != JoinRules.KNOCK and (
-            not room_version.msc3787_knock_restricted_join_rule
+            not room_version.knock_restricted_join_rule
             or join_rule != JoinRules.KNOCK_RESTRICTED
         ):
             raise AuthError(403, "You don't have permission to knock")
@@ -775,7 +789,7 @@ def check_redaction(
     """Check whether the event sender is allowed to redact the target event.
 
     Returns:
-        True if the the sender is allowed to redact the target event if the
+        True if the sender is allowed to redact the target event if the
         target event was created by them.
         False if the sender is allowed to redact the target event with no
         further checks.
@@ -805,38 +819,6 @@ def check_redaction(
     raise AuthError(403, "You don't have permission to redact events")
 
 
-def check_historical(
-    room_version_obj: RoomVersion,
-    event: "EventBase",
-    auth_events: StateMap["EventBase"],
-) -> None:
-    """Check whether the event sender is allowed to send historical related
-    events like "insertion", "batch", and "marker".
-
-    Returns:
-        None
-
-    Raises:
-        AuthError if the event sender is not allowed to send historical related events
-        ("insertion", "batch", and "marker").
-    """
-    # Ignore the auth checks in room versions that do not support historical
-    # events
-    if not room_version_obj.msc2716_historical:
-        return
-
-    user_level = get_user_power_level(event.user_id, auth_events)
-
-    historical_level = get_named_level(auth_events, "historical", 100)
-
-    if user_level < historical_level:
-        raise UnstableSpecAuthError(
-            403,
-            'You don\'t have permission to send send historical related events ("insertion", "batch", and "marker")',
-            errcode=Codes.INSUFFICIENT_POWER,
-        )
-
-
 def _check_power_levels(
     room_version_obj: RoomVersion,
     event: "EventBase",
@@ -858,7 +840,7 @@ def _check_power_levels(
     # Reject events with stringy power levels if required by room version
     if (
         event.type == EventTypes.PowerLevels
-        and room_version_obj.msc3667_int_only_power_levels
+        and room_version_obj.enforce_int_power_levels
     ):
         for k, v in event.content.items():
             if k in {
@@ -870,11 +852,11 @@ def _check_power_levels(
                 "kick",
                 "invite",
             }:
-                if type(v) is not int:
+                if type(v) is not int:  # noqa: E721
                     raise SynapseError(400, f"{v!r} must be an integer.")
             if k in {"events", "notifications", "users"}:
                 if not isinstance(v, collections.abc.Mapping) or not all(
-                    type(v) is int for v in v.values()
+                    type(v) is int for v in v.values()  # noqa: E721
                 ):
                     raise SynapseError(
                         400,
@@ -993,10 +975,14 @@ def get_user_power_level(user_id: str, auth_events: StateMap["EventBase"]) -> in
         # that.
         key = (EventTypes.Create, "")
         create_event = auth_events.get(key)
-        if create_event is not None and create_event.content["creator"] == user_id:
-            return 100
-        else:
-            return 0
+        if create_event is not None:
+            if create_event.room_version.implicit_room_creator:
+                creator = create_event.sender
+            else:
+                creator = create_event.content[EventContentFields.ROOM_CREATOR]
+            if creator == user_id:
+                return 100
+        return 0
 
 
 def get_named_level(auth_events: StateMap["EventBase"], name: str, default: int) -> int:
@@ -1032,10 +1018,15 @@ def _verify_third_party_invite(
     """
     if "third_party_invite" not in event.content:
         return False
-    if "signed" not in event.content["third_party_invite"]:
+    third_party_invite = event.content["third_party_invite"]
+    if not isinstance(third_party_invite, collections.abc.Mapping):
         return False
-    signed = event.content["third_party_invite"]["signed"]
-    for key in {"mxid", "token"}:
+    if "signed" not in third_party_invite:
+        return False
+    signed = third_party_invite["signed"]
+    if not isinstance(signed, collections.abc.Mapping):
+        return False
+    for key in {"mxid", "token", "signatures"}:
         if key not in signed:
             return False
 
@@ -1053,8 +1044,6 @@ def _verify_third_party_invite(
 
     if signed["mxid"] != event.state_key:
         return False
-    if signed["token"] != token:
-        return False
 
     for public_key_object in get_public_keys(invite_event):
         public_key = public_key_object["public_key"]
@@ -1066,7 +1055,9 @@ def _verify_third_party_invite(
                     verify_key = decode_verify_key_bytes(
                         key_name, decode_base64(public_key)
                     )
-                    verify_signed_json(signed, server, verify_key)
+                    # verify_signed_json incorrectly states it wants a dict, it
+                    # just needs a mapping.
+                    verify_signed_json(signed, server, verify_key)  # type: ignore[arg-type]
 
                     # We got the public key from the invite, so we know that the
                     # correct server signed the signed bundle.
@@ -1123,7 +1114,7 @@ def auth_types_for_event(
                 )
                 auth_types.add(key)
 
-        if room_version.msc3083_join_rules and membership == Membership.JOIN:
+        if room_version.restricted_join_rule and membership == Membership.JOIN:
             if EventContentFields.AUTHORISING_USER in event.content:
                 key = (
                     EventTypes.Member,

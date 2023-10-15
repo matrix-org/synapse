@@ -164,10 +164,12 @@ impl PushRule {
 /// The "action" Synapse should perform for a matching push rule.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Action {
-    DontNotify,
     Notify,
-    Coalesce,
     SetTweak(SetTweak),
+
+    // Legacy actions that should be understood, but are equivalent to no-ops.
+    DontNotify,
+    Coalesce,
 
     // An unrecognized custom action.
     Unknown(Value),
@@ -254,7 +256,7 @@ impl<'de> Deserialize<'de> for Action {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(untagged)]
 pub enum SimpleJsonValue {
-    Str(String),
+    Str(Cow<'static, str>),
     Int(i64),
     Bool(bool),
     Null,
@@ -263,7 +265,7 @@ pub enum SimpleJsonValue {
 impl<'source> FromPyObject<'source> for SimpleJsonValue {
     fn extract(ob: &'source PyAny) -> PyResult<Self> {
         if let Ok(s) = <PyString as pyo3::PyTryFrom>::try_from(ob) {
-            Ok(SimpleJsonValue::Str(s.to_string()))
+            Ok(SimpleJsonValue::Str(Cow::Owned(s.to_string())))
         // A bool *is* an int, ensure we try bool first.
         } else if let Ok(b) = <PyBool as pyo3::PyTryFrom>::try_from(ob) {
             Ok(SimpleJsonValue::Bool(b.extract()?))
@@ -294,8 +296,7 @@ impl<'source> FromPyObject<'source> for JsonValue {
             match l.iter().map(SimpleJsonValue::extract).collect() {
                 Ok(a) => Ok(JsonValue::Array(a)),
                 Err(e) => Err(PyTypeError::new_err(format!(
-                    "Can't convert to JsonValue::Array: {}",
-                    e
+                    "Can't convert to JsonValue::Array: {e}"
                 ))),
             }
         } else if let Ok(v) = SimpleJsonValue::extract(ob) {
@@ -331,21 +332,16 @@ pub enum KnownCondition {
     // Identical to event_match but gives predefined patterns. Cannot be added by users.
     #[serde(skip_deserializing, rename = "event_match")]
     EventMatchType(EventMatchTypeCondition),
-    #[serde(rename = "com.beeper.msc3758.exact_event_match")]
-    ExactEventMatch(ExactEventMatchCondition),
+    EventPropertyIs(EventPropertyIsCondition),
     #[serde(rename = "im.nheko.msc3664.related_event_match")]
     RelatedEventMatch(RelatedEventMatchCondition),
     // Identical to related_event_match but gives predefined patterns. Cannot be added by users.
     #[serde(skip_deserializing, rename = "im.nheko.msc3664.related_event_match")]
     RelatedEventMatchType(RelatedEventMatchTypeCondition),
-    #[serde(rename = "org.matrix.msc3966.exact_event_property_contains")]
-    ExactEventPropertyContains(ExactEventMatchCondition),
+    EventPropertyContains(EventPropertyIsCondition),
     // Identical to exact_event_property_contains but gives predefined patterns. Cannot be added by users.
-    #[serde(
-        skip_deserializing,
-        rename = "org.matrix.msc3966.exact_event_property_contains"
-    )]
-    ExactEventPropertyContainsType(ExactEventMatchTypeCondition),
+    #[serde(skip_deserializing, rename = "event_property_contains")]
+    ExactEventPropertyContainsType(EventPropertyIsTypeCondition),
     ContainsDisplayName,
     RoomMemberCount {
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -395,16 +391,16 @@ pub struct EventMatchTypeCondition {
     pub pattern_type: Cow<'static, EventMatchPatternType>,
 }
 
-/// The body of a [`Condition::ExactEventMatch`]
+/// The body of a [`Condition::EventPropertyIs`]
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ExactEventMatchCondition {
+pub struct EventPropertyIsCondition {
     pub key: Cow<'static, str>,
     pub value: Cow<'static, SimpleJsonValue>,
 }
 
-/// The body of a [`Condition::ExactEventMatch`] that uses user_id or user_localpart as a pattern.
+/// The body of a [`Condition::EventPropertyIs`] that uses user_id or user_localpart as a pattern.
 #[derive(Serialize, Debug, Clone)]
-pub struct ExactEventMatchTypeCondition {
+pub struct EventPropertyIsTypeCondition {
     pub key: Cow<'static, str>,
     // During serialization, the pattern_type property gets replaced with a
     // pattern property of the correct value in synapse.push.clientformat.format_push_rules_for_user.
@@ -530,8 +526,7 @@ pub struct FilteredPushRules {
     msc1767_enabled: bool,
     msc3381_polls_enabled: bool,
     msc3664_enabled: bool,
-    msc3952_intentional_mentions: bool,
-    msc3958_suppress_edits_enabled: bool,
+    msc4028_push_encrypted_events: bool,
 }
 
 #[pymethods]
@@ -543,8 +538,7 @@ impl FilteredPushRules {
         msc1767_enabled: bool,
         msc3381_polls_enabled: bool,
         msc3664_enabled: bool,
-        msc3952_intentional_mentions: bool,
-        msc3958_suppress_edits_enabled: bool,
+        msc4028_push_encrypted_events: bool,
     ) -> Self {
         Self {
             push_rules,
@@ -552,8 +546,7 @@ impl FilteredPushRules {
             msc1767_enabled,
             msc3381_polls_enabled,
             msc3664_enabled,
-            msc3952_intentional_mentions,
-            msc3958_suppress_edits_enabled,
+            msc4028_push_encrypted_events,
         }
     }
 
@@ -573,7 +566,10 @@ impl FilteredPushRules {
             .filter(|rule| {
                 // Ignore disabled experimental push rules
 
-                if !self.msc1767_enabled && rule.rule_id.contains("org.matrix.msc1767") {
+                if !self.msc1767_enabled
+                    && (rule.rule_id.contains("org.matrix.msc1767")
+                        || rule.rule_id.contains("org.matrix.msc3933"))
+                {
                     return false;
                 }
 
@@ -587,12 +583,8 @@ impl FilteredPushRules {
                     return false;
                 }
 
-                if !self.msc3952_intentional_mentions && rule.rule_id.contains("org.matrix.msc3952")
-                {
-                    return false;
-                }
-                if !self.msc3958_suppress_edits_enabled
-                    && rule.rule_id == "global/override/.com.beeper.suppress_edits"
+                if !self.msc4028_push_encrypted_events
+                    && rule.rule_id == "global/override/.org.matrix.msc4028.encrypted_event"
                 {
                     return false;
                 }
@@ -711,44 +703,41 @@ fn test_deserialize_unstable_msc3931_condition() {
 }
 
 #[test]
-fn test_deserialize_unstable_msc3758_condition() {
+fn test_deserialize_event_property_is_condition() {
     // A string condition should work.
-    let json =
-        r#"{"kind":"com.beeper.msc3758.exact_event_match","key":"content.value","value":"foo"}"#;
+    let json = r#"{"kind":"event_property_is","key":"content.value","value":"foo"}"#;
 
     let condition: Condition = serde_json::from_str(json).unwrap();
     assert!(matches!(
         condition,
-        Condition::Known(KnownCondition::ExactEventMatch(_))
+        Condition::Known(KnownCondition::EventPropertyIs(_))
     ));
 
     // A boolean condition should work.
-    let json =
-        r#"{"kind":"com.beeper.msc3758.exact_event_match","key":"content.value","value":true}"#;
+    let json = r#"{"kind":"event_property_is","key":"content.value","value":true}"#;
 
     let condition: Condition = serde_json::from_str(json).unwrap();
     assert!(matches!(
         condition,
-        Condition::Known(KnownCondition::ExactEventMatch(_))
+        Condition::Known(KnownCondition::EventPropertyIs(_))
     ));
 
     // An integer condition should work.
-    let json = r#"{"kind":"com.beeper.msc3758.exact_event_match","key":"content.value","value":1}"#;
+    let json = r#"{"kind":"event_property_is","key":"content.value","value":1}"#;
 
     let condition: Condition = serde_json::from_str(json).unwrap();
     assert!(matches!(
         condition,
-        Condition::Known(KnownCondition::ExactEventMatch(_))
+        Condition::Known(KnownCondition::EventPropertyIs(_))
     ));
 
     // A null condition should work
-    let json =
-        r#"{"kind":"com.beeper.msc3758.exact_event_match","key":"content.value","value":null}"#;
+    let json = r#"{"kind":"event_property_is","key":"content.value","value":null}"#;
 
     let condition: Condition = serde_json::from_str(json).unwrap();
     assert!(matches!(
         condition,
-        Condition::Known(KnownCondition::ExactEventMatch(_))
+        Condition::Known(KnownCondition::EventPropertyIs(_))
     ));
 }
 

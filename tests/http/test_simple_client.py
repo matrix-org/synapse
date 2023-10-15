@@ -123,17 +123,17 @@ class SimpleHttpClientTests(HomeserverTestCase):
 
         self.assertIsInstance(f.value, RequestTimedOutError)
 
-    def test_client_ip_range_blacklist(self) -> None:
-        """Ensure that Synapse does not try to connect to blacklisted IPs"""
+    def test_client_ip_range_blocklist(self) -> None:
+        """Ensure that Synapse does not try to connect to blocked IPs"""
 
-        # Add some DNS entries we'll blacklist
+        # Add some DNS entries we'll block
         self.reactor.lookups["internal"] = "127.0.0.1"
         self.reactor.lookups["internalv6"] = "fe80:0:0:0:0:8a2e:370:7337"
-        ip_blacklist = IPSet(["127.0.0.0/8", "fe80::/64"])
+        ip_blocklist = IPSet(["127.0.0.0/8", "fe80::/64"])
 
-        cl = SimpleHttpClient(self.hs, ip_blacklist=ip_blacklist)
+        cl = SimpleHttpClient(self.hs, ip_blocklist=ip_blocklist)
 
-        # Try making a GET request to a blacklisted IPv4 address
+        # Try making a GET request to a blocked IPv4 address
         # ------------------------------------------------------
         # Make the request
         d = defer.ensureDeferred(cl.get_json("http://internal:8008/foo/bar"))
@@ -145,7 +145,7 @@ class SimpleHttpClientTests(HomeserverTestCase):
 
         self.failureResultOf(d, DNSLookupError)
 
-        # Try making a POST request to a blacklisted IPv6 address
+        # Try making a POST request to a blocked IPv6 address
         # -------------------------------------------------------
         # Make the request
         d = defer.ensureDeferred(
@@ -159,10 +159,10 @@ class SimpleHttpClientTests(HomeserverTestCase):
         clients = self.reactor.tcpClients
         self.assertEqual(len(clients), 0)
 
-        # Check that it was due to a blacklisted DNS lookup
+        # Check that it was due to a blocked DNS lookup
         self.failureResultOf(d, DNSLookupError)
 
-        # Try making a GET request to a non-blacklisted IPv4 address
+        # Try making a GET request to a non-blocked IPv4 address
         # ----------------------------------------------------------
         # Make the request
         d = defer.ensureDeferred(cl.get_json("http://testserv:8008/foo/bar"))

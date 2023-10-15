@@ -696,6 +696,8 @@ class UserDirectoryICUTestCase(HomeserverTestCase):
                 ["lazy'fox", "jumped", "over", "the", "dog"],
                 # ICU 70 on Ubuntu 22.04
                 ["lazy'fox", "jumped:over", "the.dog"],
+                # pyicu 2.10.2 on Alpine edge / macOS
+                ["lazy'fox", "jumped", "over", "the.dog"],
             ),
         )
 

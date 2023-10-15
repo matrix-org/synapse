@@ -12,7 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.storage.engines import PostgresEngine
+
+from synapse.storage.database import LoggingTransaction
+from synapse.storage.engines import BaseDatabaseEngine
 from synapse.storage.prepare_database import get_statements
 
 FIX_INDEXES = """
@@ -34,8 +36,8 @@ CREATE INDEX group_rooms_r_idx ON group_rooms(room_id);
 """
 
 
-def run_create(cur, database_engine, *args, **kwargs):
-    rowid = "ctid" if isinstance(database_engine, PostgresEngine) else "rowid"
+def run_create(cur: LoggingTransaction, database_engine: BaseDatabaseEngine) -> None:
+    rowid = database_engine.row_id_name
 
     # remove duplicates from group_users & group_invites tables
     cur.execute(
@@ -57,7 +59,3 @@ def run_create(cur, database_engine, *args, **kwargs):
 
     for statement in get_statements(FIX_INDEXES.splitlines()):
         cur.execute(statement)
-
-
-def run_upgrade(*args, **kwargs):
-    pass

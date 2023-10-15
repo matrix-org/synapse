@@ -104,7 +104,7 @@ class _NotifierUserStream:
     def __init__(
         self,
         user_id: str,
-        rooms: Collection[str],
+        rooms: StrCollection,
         current_token: StreamToken,
         time_now_ms: int,
     ):
@@ -126,7 +126,7 @@ class _NotifierUserStream:
 
     def notify(
         self,
-        stream_key: str,
+        stream_key: StreamKeyType,
         stream_id: Union[int, RoomStreamToken],
         time_now_ms: int,
     ) -> None:
@@ -232,7 +232,10 @@ class Notifier:
 
         self._federation_client = hs.get_federation_http_client()
 
-        self._third_party_rules = hs.get_third_party_event_rules()
+        self._third_party_rules = hs.get_module_api_callbacks().third_party_event_rules
+
+        # List of callbacks to be notified when a lock is released
+        self._lock_released_callback: List[Callable[[str, str, str], None]] = []
 
         self.clock = hs.get_clock()
         self.appservice_handler = hs.get_application_service_handler()
@@ -451,10 +454,10 @@ class Notifier:
 
     def on_new_event(
         self,
-        stream_key: str,
+        stream_key: StreamKeyType,
         new_token: Union[int, RoomStreamToken],
         users: Optional[Collection[Union[str, UserID]]] = None,
-        rooms: Optional[Collection[str]] = None,
+        rooms: Optional[StrCollection] = None,
     ) -> None:
         """Used to inform listeners that something has happened event wise.
 
@@ -526,7 +529,7 @@ class Notifier:
         user_id: str,
         timeout: int,
         callback: Callable[[StreamToken, StreamToken], Awaitable[T]],
-        room_ids: Optional[Collection[str]] = None,
+        room_ids: Optional[StrCollection] = None,
         from_token: StreamToken = StreamToken.START,
     ) -> T:
         """Wait until the callback returns a non empty response or the
@@ -652,30 +655,29 @@ class Notifier:
             events: List[Union[JsonDict, EventBase]] = []
             end_token = from_token
 
-            for name, source in self.event_sources.sources.get_sources():
-                keyname = "%s_key" % name
-                before_id = getattr(before_token, keyname)
-                after_id = getattr(after_token, keyname)
+            for keyname, source in self.event_sources.sources.get_sources():
+                before_id = before_token.get_field(keyname)
+                after_id = after_token.get_field(keyname)
                 if before_id == after_id:
                     continue
 
                 new_events, new_key = await source.get_new_events(
                     user=user,
-                    from_key=getattr(from_token, keyname),
+                    from_key=from_token.get_field(keyname),
                     limit=limit,
                     is_guest=is_peeking,
                     room_ids=room_ids,
                     explicit_room_id=explicit_room_id,
                 )
 
-                if name == "room":
+                if keyname == StreamKeyType.ROOM:
                     new_events = await filter_events_for_client(
                         self._storage_controllers,
                         user.to_string(),
                         new_events,
                         is_peeking=is_peeking,
                     )
-                elif name == "presence":
+                elif keyname == StreamKeyType.PRESENCE:
                     now = self.clock.time_msec()
                     new_events[:] = [
                         {
@@ -784,6 +786,19 @@ class Notifier:
         # Tell the federation client about the fact the server is back up, so
         # that any in flight requests can be immediately retried.
         self._federation_client.wake_destination(server)
+
+    def add_lock_released_callback(
+        self, callback: Callable[[str, str, str], None]
+    ) -> None:
+        """Add a function to be called whenever we are notified about a released lock."""
+        self._lock_released_callback.append(callback)
+
+    def notify_lock_released(
+        self, instance_name: str, lock_name: str, lock_key: str
+    ) -> None:
+        """Notify the callbacks that a lock has been released."""
+        for cb in self._lock_released_callback:
+            cb(instance_name, lock_name, lock_key)
 
 
 @attr.s(auto_attribs=True)

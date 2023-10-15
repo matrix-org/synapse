@@ -37,7 +37,7 @@ from synapse.api.constants import EduTypes, EventContentFields
 from synapse.api.errors import SynapseError
 from synapse.api.presence import UserPresenceState
 from synapse.events import EventBase, relation_from_event
-from synapse.types import JsonDict, RoomID, UserID
+from synapse.types import JsonDict, JsonMapping, RoomID, UserID
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -128,20 +128,7 @@ USER_FILTER_SCHEMA = {
         "account_data": {"$ref": "#/definitions/filter"},
         "room": {"$ref": "#/definitions/room_filter"},
         "event_format": {"type": "string", "enum": ["client", "federation"]},
-        "event_fields": {
-            "type": "array",
-            "items": {
-                "type": "string",
-                # Don't allow '\\' in event field filters. This makes matching
-                # events a lot easier as we can then use a negative lookbehind
-                # assertion to split '\.' If we allowed \\ then it would
-                # incorrectly split '\\.' See synapse.events.utils.serialize_event
-                #
-                # Note that because this is a regular expression, we have to escape
-                # each backslash in the pattern.
-                "pattern": r"^((?!\\\\).)*$",
-            },
-        },
+        "event_fields": {"type": "array", "items": {"type": "string"}},
     },
     "additionalProperties": True,  # Allow new fields for forward compatibility
 }
@@ -165,16 +152,14 @@ class Filtering:
         self.DEFAULT_FILTER_COLLECTION = FilterCollection(hs, {})
 
     async def get_user_filter(
-        self, user_localpart: str, filter_id: Union[int, str]
+        self, user_id: UserID, filter_id: Union[int, str]
     ) -> "FilterCollection":
-        result = await self.store.get_user_filter(user_localpart, filter_id)
+        result = await self.store.get_user_filter(user_id, filter_id)
         return FilterCollection(self._hs, result)
 
-    def add_user_filter(
-        self, user_localpart: str, user_filter: JsonDict
-    ) -> Awaitable[int]:
+    def add_user_filter(self, user_id: UserID, user_filter: JsonDict) -> Awaitable[int]:
         self.check_valid_filter(user_filter)
-        return self.store.add_user_filter(user_localpart, user_filter)
+        return self.store.add_user_filter(user_id, user_filter)
 
     # TODO(paul): surely we should probably add a delete_user_filter or
     #   replace_user_filter at some point? There's no REST API specified for
@@ -206,7 +191,7 @@ FilterEvent = TypeVar("FilterEvent", EventBase, UserPresenceState, JsonDict)
 
 
 class FilterCollection:
-    def __init__(self, hs: "HomeServer", filter_json: JsonDict):
+    def __init__(self, hs: "HomeServer", filter_json: JsonMapping):
         self._filter_json = filter_json
 
         room_filter_json = self._filter_json.get("room", {})
@@ -234,7 +219,7 @@ class FilterCollection:
     def __repr__(self) -> str:
         return "<FilterCollection %s>" % (json.dumps(self._filter_json),)
 
-    def get_filter_json(self) -> JsonDict:
+    def get_filter_json(self) -> JsonMapping:
         return self._filter_json
 
     def timeline_limit(self) -> int:
@@ -328,7 +313,7 @@ class FilterCollection:
 
 
 class Filter:
-    def __init__(self, hs: "HomeServer", filter_json: JsonDict):
+    def __init__(self, hs: "HomeServer", filter_json: JsonMapping):
         self._hs = hs
         self._store = hs.get_datastores().main
         self.filter_json = filter_json

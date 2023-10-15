@@ -36,7 +36,6 @@ from synapse.storage.database import (
 )
 from synapse.storage.util.id_generators import (
     AbstractStreamIdGenerator,
-    AbstractStreamIdTracker,
     StreamIdGenerator,
 )
 from synapse.types import JsonDict
@@ -47,6 +46,27 @@ if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
+
+# The type of a row in the pushers table.
+PusherRow = Tuple[
+    int,  # id
+    str,  # user_name
+    Optional[int],  # access_token
+    str,  # profile_tag
+    str,  # kind
+    str,  # app_id
+    str,  # app_display_name
+    str,  # device_display_name
+    str,  # pushkey
+    int,  # ts
+    str,  # lang
+    str,  # data
+    int,  # last_stream_ordering
+    int,  # last_success
+    int,  # failing_since
+    bool,  # enabled
+    str,  # device_id
+]
 
 
 class PusherWorkerStore(SQLBaseStore):
@@ -60,7 +80,7 @@ class PusherWorkerStore(SQLBaseStore):
 
         # In the worker store this is an ID tracker which we overwrite in the non-worker
         # class below that is used on the main process.
-        self._pushers_id_gen: AbstractStreamIdTracker = StreamIdGenerator(
+        self._pushers_id_gen = StreamIdGenerator(
             db_conn,
             hs.get_replication_notifier(),
             "pushers",
@@ -84,30 +104,66 @@ class PusherWorkerStore(SQLBaseStore):
             self._remove_deleted_email_pushers,
         )
 
-    def _decode_pushers_rows(self, rows: Iterable[dict]) -> Iterator[PusherConfig]:
+    def _decode_pushers_rows(
+        self,
+        rows: Iterable[PusherRow],
+    ) -> Iterator[PusherConfig]:
         """JSON-decode the data in the rows returned from the `pushers` table
 
         Drops any rows whose data cannot be decoded
         """
-        for r in rows:
-            data_json = r["data"]
+        for (
+            id,
+            user_name,
+            access_token,
+            profile_tag,
+            kind,
+            app_id,
+            app_display_name,
+            device_display_name,
+            pushkey,
+            ts,
+            lang,
+            data,
+            last_stream_ordering,
+            last_success,
+            failing_since,
+            enabled,
+            device_id,
+        ) in rows:
             try:
-                r["data"] = db_to_json(data_json)
+                data_json = db_to_json(data)
             except Exception as e:
                 logger.warning(
                     "Invalid JSON in data for pusher %d: %s, %s",
-                    r["id"],
-                    data_json,
+                    id,
+                    data,
                     e.args[0],
                 )
                 continue
 
-            # If we're using SQLite, then boolean values are integers. This is
-            # troublesome since some code using the return value of this method might
-            # expect it to be a boolean, or will expose it to clients (in responses).
-            r["enabled"] = bool(r["enabled"])
-
-            yield PusherConfig(**r)
+            yield PusherConfig(
+                id=id,
+                user_name=user_name,
+                profile_tag=profile_tag,
+                kind=kind,
+                app_id=app_id,
+                app_display_name=app_display_name,
+                device_display_name=device_display_name,
+                pushkey=pushkey,
+                ts=ts,
+                lang=lang,
+                data=data_json,
+                last_stream_ordering=last_stream_ordering,
+                last_success=last_success,
+                failing_since=failing_since,
+                # If we're using SQLite, then boolean values are integers. This is
+                # troublesome since some code using the return value of this method might
+                # expect it to be a boolean, or will expose it to clients (in responses).
+                enabled=bool(enabled),
+                device_id=device_id,
+                access_token=access_token,
+            )
 
     def get_pushers_stream_token(self) -> int:
         return self._pushers_id_gen.get_current_token()
@@ -137,7 +193,7 @@ class PusherWorkerStore(SQLBaseStore):
             The pushers for which the given columns have the given values.
         """
 
-        def get_pushers_by_txn(txn: LoggingTransaction) -> List[Dict[str, Any]]:
+        def get_pushers_by_txn(txn: LoggingTransaction) -> List[PusherRow]:
             # We could technically use simple_select_list here, but we need to call
             # COALESCE on the 'enabled' column. While it is technically possible to give
             # simple_select_list the whole `COALESCE(...) AS ...` as a column name, it
@@ -155,7 +211,7 @@ class PusherWorkerStore(SQLBaseStore):
 
             txn.execute(sql, list(keyvalues.values()))
 
-            return self.db_pool.cursor_to_dict(txn)
+            return cast(List[PusherRow], txn.fetchall())
 
         ret = await self.db_pool.runInteraction(
             desc="get_pushers_by",
@@ -165,14 +221,22 @@ class PusherWorkerStore(SQLBaseStore):
         return self._decode_pushers_rows(ret)
 
     async def get_enabled_pushers(self) -> Iterator[PusherConfig]:
-        def get_enabled_pushers_txn(txn: LoggingTransaction) -> Iterator[PusherConfig]:
-            txn.execute("SELECT * FROM pushers WHERE COALESCE(enabled, TRUE)")
-            rows = self.db_pool.cursor_to_dict(txn)
+        def get_enabled_pushers_txn(txn: LoggingTransaction) -> List[PusherRow]:
+            txn.execute(
+                """
+                SELECT id, user_name, access_token, profile_tag, kind, app_id,
+                    app_display_name, device_display_name, pushkey, ts, lang, data,
+                    last_stream_ordering, last_success, failing_since,
+                    enabled, device_id
+                FROM pushers WHERE COALESCE(enabled, TRUE)
+                """
+            )
+            return cast(List[PusherRow], txn.fetchall())
 
-            return self._decode_pushers_rows(rows)
-
-        return await self.db_pool.runInteraction(
-            "get_enabled_pushers", get_enabled_pushers_txn
+        return self._decode_pushers_rows(
+            await self.db_pool.runInteraction(
+                "get_enabled_pushers", get_enabled_pushers_txn
+            )
         )
 
     async def get_all_updated_pushers_rows(
@@ -305,7 +369,7 @@ class PusherWorkerStore(SQLBaseStore):
         )
 
     async def get_throttle_params_by_room(
-        self, pusher_id: str
+        self, pusher_id: int
     ) -> Dict[str, ThrottleParams]:
         res = await self.db_pool.simple_select_list(
             "pusher_throttle",
@@ -324,7 +388,7 @@ class PusherWorkerStore(SQLBaseStore):
         return params_by_room
 
     async def set_throttle_params(
-        self, pusher_id: str, room_id: str, params: ThrottleParams
+        self, pusher_id: int, room_id: str, params: ThrottleParams
     ) -> None:
         await self.db_pool.simple_upsert(
             "pusher_throttle",
@@ -510,19 +574,24 @@ class PusherBackgroundUpdatesStore(SQLBaseStore):
     async def _set_device_id_for_pushers(
         self, progress: JsonDict, batch_size: int
     ) -> int:
-        """Background update to populate the device_id column of the pushers table."""
+        """
+        Background update to populate the device_id column and clear the access_token
+        column for the pushers table.
+        """
         last_pusher_id = progress.get("pusher_id", 0)
 
         def set_device_id_for_pushers_txn(txn: LoggingTransaction) -> int:
             txn.execute(
                 """
-                    SELECT p.id, at.device_id
+                    SELECT
+                        p.id AS pusher_id,
+                        p.device_id AS pusher_device_id,
+                        at.device_id AS token_device_id
                     FROM pushers AS p
-                    INNER JOIN access_tokens AS at
+                    LEFT JOIN access_tokens AS at
                         ON p.access_token = at.id
                     WHERE
                         p.access_token IS NOT NULL
-                        AND at.device_id IS NOT NULL
                         AND p.id > ?
                     ORDER BY p.id
                     LIMIT ?
@@ -530,21 +599,35 @@ class PusherBackgroundUpdatesStore(SQLBaseStore):
                 (last_pusher_id, batch_size),
             )
 
-            rows = self.db_pool.cursor_to_dict(txn)
+            rows = txn.fetchall()
             if len(rows) == 0:
                 return 0
 
+            # The reason we're clearing the access_token column here is a bit subtle.
+            # When a user logs out, we:
+            #  (1) delete the access token
+            #  (2) delete the device
+            #
+            # Ideally, we would delete the pushers only via its link to the device
+            # during (2), but since this background update might not have fully run yet,
+            # we're still deleting the pushers via the access token during (1).
             self.db_pool.simple_update_many_txn(
                 txn=txn,
                 table="pushers",
                 key_names=("id",),
-                key_values=[(row["id"],) for row in rows],
-                value_names=("device_id",),
-                value_values=[(row["device_id"],) for row in rows],
+                key_values=[row[0] for row in rows],
+                value_names=("device_id", "access_token"),
+                # If there was already a device_id on the pusher, we only want to clear
+                # the access_token column, so we keep the existing device_id. Otherwise,
+                # we set the device_id we got from joining the access_tokens table.
+                value_values=[
+                    (pusher_device_id or token_device_id, None)
+                    for _, pusher_device_id, token_device_id in rows
+                ],
             )
 
             self.db_pool.updates._background_update_progress_txn(
-                txn, "set_device_id_for_pushers", {"pusher_id": rows[-1]["id"]}
+                txn, "set_device_id_for_pushers", {"pusher_id": rows[-1][0]}
             )
 
             return len(rows)
@@ -569,7 +652,6 @@ class PusherStore(PusherWorkerStore, PusherBackgroundUpdatesStore):
     async def add_pusher(
         self,
         user_id: str,
-        access_token: Optional[int],
         kind: str,
         app_id: str,
         app_display_name: str,
@@ -582,13 +664,13 @@ class PusherStore(PusherWorkerStore, PusherBackgroundUpdatesStore):
         profile_tag: str = "",
         enabled: bool = True,
         device_id: Optional[str] = None,
+        access_token_id: Optional[int] = None,
     ) -> None:
         async with self._pushers_id_gen.get_next() as stream_id:
             await self.db_pool.simple_upsert(
                 table="pushers",
                 keyvalues={"app_id": app_id, "pushkey": pushkey, "user_name": user_id},
                 values={
-                    "access_token": access_token,
                     "kind": kind,
                     "app_display_name": app_display_name,
                     "device_display_name": device_display_name,
@@ -600,6 +682,10 @@ class PusherStore(PusherWorkerStore, PusherBackgroundUpdatesStore):
                     "id": stream_id,
                     "enabled": enabled,
                     "device_id": device_id,
+                    # XXX(quenting): We're only really persisting the access token ID
+                    # when updating an existing pusher. This is in case the
+                    # 'set_device_id_for_pushers' background update hasn't finished yet.
+                    "access_token": access_token_id,
                 },
                 desc="add_pusher",
             )

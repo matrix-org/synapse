@@ -11,6 +11,117 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""
+The Federation Sender is responsible for sending Persistent Data Units (PDUs)
+and Ephemeral Data Units (EDUs) to other homeservers using
+the `/send` Federation API.
+
+
+## How do PDUs get sent?
+
+The Federation Sender is made aware of new PDUs due to `FederationSender.notify_new_events`.
+When the sender is notified about a newly-persisted PDU that originates from this homeserver
+and is not an out-of-band event, we pass the PDU to the `_PerDestinationQueue` for each
+remote homeserver that is in the room at that point in the DAG.
+
+
+### Per-Destination Queues
+
+There is one `PerDestinationQueue` per 'destination' homeserver.
+The `PerDestinationQueue` maintains the following information about the destination:
+
+- whether the destination is currently in [catch-up mode (see below)](#catch-up-mode);
+- a queue of PDUs to be sent to the destination; and
+- a queue of EDUs to be sent to the destination (not considered in this section).
+
+Upon a new PDU being enqueued, `attempt_new_transaction` is called to start a new
+transaction if there is not already one in progress.
+
+
+### Transactions and the Transaction Transmission Loop
+
+Each federation HTTP request to the `/send` endpoint is referred to as a 'transaction'.
+The body of the HTTP request contains a list of PDUs and EDUs to send to the destination.
+
+The *Transaction Transmission Loop* (`_transaction_transmission_loop`) is responsible
+for emptying the queued PDUs (and EDUs) from a `PerDestinationQueue` by sending
+them to the destination.
+
+There can only be one transaction in flight for a given destination at any time.
+(Other than preventing us from overloading the destination, this also makes it easier to
+reason about because we process events sequentially for each destination.
+This is useful for *Catch-Up Mode*, described later.)
+
+The loop continues so long as there is anything to send. At each iteration of the loop, we:
+
+- dequeue up to 50 PDUs (and up to 100 EDUs).
+- make the `/send` request to the destination homeserver with the dequeued PDUs and EDUs.
+- if successful, make note of the fact that we succeeded in transmitting PDUs up to
+  the given `stream_ordering` of the latest PDU by
+- if unsuccessful, back off from the remote homeserver for some time.
+  If we have been unsuccessful for too long (when the backoff interval grows to exceed 1 hour),
+  the in-memory queues are emptied and we enter [*Catch-Up Mode*, described below](#catch-up-mode).
+
+
+### Catch-Up Mode
+
+When the `PerDestinationQueue` has the catch-up flag set, the *Catch-Up Transmission Loop*
+(`_catch_up_transmission_loop`) is used in lieu of the regular `_transaction_transmission_loop`.
+(Only once the catch-up mode has been exited can the regular transaction transmission behaviour
+be resumed.)
+
+*Catch-Up Mode*, entered upon Synapse startup or once a homeserver has fallen behind due to
+connection problems, is responsible for sending PDUs that have been missed by the destination
+homeserver. (PDUs can be missed because the `PerDestinationQueue` is volatile — i.e. resets
+on startup — and it does not hold PDUs forever if `/send` requests to the destination fail.)
+
+The catch-up mechanism makes use of the `last_successful_stream_ordering` column in the
+`destinations` table (which gives the `stream_ordering` of the most recent successfully
+sent PDU) and the `stream_ordering` column in the `destination_rooms` table (which gives,
+for each room, the `stream_ordering` of the most recent PDU that needs to be sent to this
+destination).
+
+Each iteration of the loop pulls out 50 `destination_rooms` entries with the oldest
+`stream_ordering`s that are greater than the `last_successful_stream_ordering`.
+In other words, from the set of latest PDUs in each room to be sent to the destination,
+the 50 oldest such PDUs are pulled out.
+
+These PDUs could, in principle, now be directly sent to the destination. However, as an
+optimisation intended to prevent overloading destination homeservers, we instead attempt
+to send the latest forward extremities so long as the destination homeserver is still
+eligible to receive those.
+This reduces load on the destination **in aggregate** because all Synapse homeservers
+will behave according to this principle and therefore avoid sending lots of different PDUs
+at different points in the DAG to a recovering homeserver.
+*This optimisation is not currently valid in rooms which are partial-state on this homeserver,
+since we are unable to determine whether the destination homeserver is eligible to receive
+the latest forward extremities unless this homeserver sent those PDUs — in this case, we
+just send the latest PDUs originating from this server and skip this optimisation.*
+
+Whilst PDUs are sent through this mechanism, the position of `last_successful_stream_ordering`
+is advanced as normal.
+Once there are no longer any rooms containing outstanding PDUs to be sent to the destination
+*that are not already in the `PerDestinationQueue` because they arrived since Catch-Up Mode
+was enabled*, Catch-Up Mode is exited and we return to `_transaction_transmission_loop`.
+
+
+#### A note on failures and back-offs
+
+If a remote server is unreachable over federation, we back off from that server,
+with an exponentially-increasing retry interval.
+We automatically retry after the retry interval expires (roughly, the logic to do so
+being triggered every minute).
+
+If the backoff grows too large (> 1 hour), the in-memory queue is emptied (to prevent
+unbounded growth) and Catch-Up Mode is entered.
+
+It is worth noting that the back-off for a remote server is cleared once an inbound
+request from that remote server is received (see `notify_remote_server_up`).
+At this point, the transaction transmission loop is also started up, to proactively
+send missed PDUs and EDUs to the destination (i.e. you don't need to wait for a new PDU
+or EDU, destined for that destination, to be created in order to send out missed PDUs and
+EDUs).
+"""
 
 import abc
 import logging
@@ -32,12 +143,14 @@ from prometheus_client import Counter
 from typing_extensions import Literal
 
 from twisted.internet import defer
-from twisted.internet.interfaces import IDelayedCall
 
 import synapse.metrics
 from synapse.api.presence import UserPresenceState
 from synapse.events import EventBase
-from synapse.federation.sender.per_destination_queue import PerDestinationQueue
+from synapse.federation.sender.per_destination_queue import (
+    CATCHUP_RETRY_INTERVAL,
+    PerDestinationQueue,
+)
 from synapse.federation.sender.transaction_manager import TransactionManager
 from synapse.federation.units import Edu
 from synapse.logging.context import make_deferred_yieldable, run_in_background
@@ -51,9 +164,10 @@ from synapse.metrics.background_process_metrics import (
     run_as_background_process,
     wrap_as_background_process,
 )
-from synapse.types import JsonDict, ReadReceipt, RoomStreamToken
+from synapse.types import JsonDict, ReadReceipt, RoomStreamToken, StrCollection
 from synapse.util import Clock
 from synapse.util.metrics import Measure
+from synapse.util.retryutils import filter_destinations_by_retry_limiter
 
 if TYPE_CHECKING:
     from synapse.events.presence_router import PresenceRouter
@@ -71,14 +185,18 @@ sent_pdus_destination_dist_total = Counter(
     "Total number of PDUs queued for sending across all destinations",
 )
 
-# Time (in s) after Synapse's startup that we will begin to wake up destinations
-# that have catch-up outstanding.
-CATCH_UP_STARTUP_DELAY_SEC = 15
+# Time (in s) to wait before trying to wake up destinations that have
+# catch-up outstanding. This will also be the delay applied at startup
+# before trying the same.
+# Please note that rate limiting still applies, so while the loop is
+# executed every X seconds the destinations may not be wake up because
+# they are being rate limited following previous attempt failures.
+WAKEUP_RETRY_PERIOD_SEC = 60
 
 # Time (in s) to wait in between waking up each destination, i.e. one destination
-# will be woken up every <x> seconds after Synapse's startup until we have woken
-# every destination has outstanding catch-up.
-CATCH_UP_STARTUP_INTERVAL_SEC = 5
+# will be woken up every <x> seconds until we have woken every destination
+# has outstanding catch-up.
+WAKEUP_INTERVAL_BETWEEN_DESTINATIONS_SEC = 5
 
 
 class AbstractFederationSender(metaclass=abc.ABCMeta):
@@ -99,7 +217,7 @@ class AbstractFederationSender(metaclass=abc.ABCMeta):
         raise NotImplementedError()
 
     @abc.abstractmethod
-    def send_presence_to_destinations(
+    async def send_presence_to_destinations(
         self, states: Iterable[UserPresenceState], destinations: Iterable[str]
     ) -> None:
         """Send the given presence states to the given destinations.
@@ -128,9 +246,11 @@ class AbstractFederationSender(metaclass=abc.ABCMeta):
         raise NotImplementedError()
 
     @abc.abstractmethod
-    def send_device_messages(self, destination: str, immediate: bool = True) -> None:
+    async def send_device_messages(
+        self, destinations: StrCollection, immediate: bool = True
+    ) -> None:
         """Tells the sender that a new device message is ready to be sent to the
-        destination. The `immediate` flag specifies whether the messages should
+        destinations. The `immediate` flag specifies whether the messages should
         be tried to be sent immediately, or whether it can be delayed for a
         short while (to aid performance).
         """
@@ -249,6 +369,7 @@ class FederationSender(AbstractFederationSender):
 
         self.clock = hs.get_clock()
         self.is_mine_id = hs.is_mine_id
+        self.is_mine_server_name = hs.is_mine_server_name
 
         self._presence_router: Optional["PresenceRouter"] = None
         self._transaction_manager = TransactionManager(hs)
@@ -301,12 +422,10 @@ class FederationSender(AbstractFederationSender):
             / hs.config.ratelimiting.federation_rr_transactions_per_room_per_second
         )
 
-        # wake up destinations that have outstanding PDUs to be caught up
-        self._catchup_after_startup_timer: Optional[
-            IDelayedCall
-        ] = self.clock.call_later(
-            CATCH_UP_STARTUP_DELAY_SEC,
+        # Regularly wake up destinations that have outstanding PDUs to be caught up
+        self.clock.looping_call(
             run_as_background_process,
+            WAKEUP_RETRY_PERIOD_SEC * 1000.0,
             "wake_destinations_needing_catchup",
             self._wake_destinations_needing_catchup,
         )
@@ -603,6 +722,13 @@ class FederationSender(AbstractFederationSender):
             pdu.internal_metadata.stream_ordering,
         )
 
+        destinations = await filter_destinations_by_retry_limiter(
+            destinations,
+            clock=self.clock,
+            store=self.store,
+            retry_due_within_ms=CATCHUP_RETRY_INTERVAL,
+        )
+
         for destination in destinations:
             self._get_per_destination_queue(destination).send_pdu(pdu)
 
@@ -650,12 +776,20 @@ class FederationSender(AbstractFederationSender):
         domains_set = await self._storage_controllers.state.get_current_hosts_in_room_or_partial_state_approximation(
             room_id
         )
-        domains = [
+        domains: StrCollection = [
             d
             for d in domains_set
-            if d != self.server_name
+            if not self.is_mine_server_name(d)
             and self._federation_shard_config.should_handle(self._instance_name, d)
         ]
+
+        domains = await filter_destinations_by_retry_limiter(
+            domains,
+            clock=self.clock,
+            store=self.store,
+            retry_due_within_ms=CATCHUP_RETRY_INTERVAL,
+        )
+
         if not domains:
             return
 
@@ -703,7 +837,7 @@ class FederationSender(AbstractFederationSender):
         for queue in queues:
             queue.flush_read_receipts_for_room(room_id)
 
-    def send_presence_to_destinations(
+    async def send_presence_to_destinations(
         self, states: Iterable[UserPresenceState], destinations: Iterable[str]
     ) -> None:
         """Send the given presence states to the given destinations.
@@ -718,12 +852,19 @@ class FederationSender(AbstractFederationSender):
         for state in states:
             assert self.is_mine_id(state.user_id)
 
+        destinations = await filter_destinations_by_retry_limiter(
+            [
+                d
+                for d in destinations
+                if self._federation_shard_config.should_handle(self._instance_name, d)
+            ],
+            clock=self.clock,
+            store=self.store,
+            retry_due_within_ms=CATCHUP_RETRY_INTERVAL,
+        )
+
         for destination in destinations:
-            if destination == self.server_name:
-                continue
-            if not self._federation_shard_config.should_handle(
-                self._instance_name, destination
-            ):
+            if self.is_mine_server_name(destination):
                 continue
 
             self._get_per_destination_queue(destination).send_presence(
@@ -747,7 +888,7 @@ class FederationSender(AbstractFederationSender):
             content: content of EDU
             key: clobbering key for this edu
         """
-        if destination == self.server_name:
+        if self.is_mine_server_name(destination):
             logger.info("Not sending EDU to ourselves")
             return
 
@@ -783,21 +924,29 @@ class FederationSender(AbstractFederationSender):
         else:
             queue.send_edu(edu)
 
-    def send_device_messages(self, destination: str, immediate: bool = False) -> None:
-        if destination == self.server_name:
-            logger.warning("Not sending device update to ourselves")
-            return
+    async def send_device_messages(
+        self, destinations: StrCollection, immediate: bool = True
+    ) -> None:
+        destinations = await filter_destinations_by_retry_limiter(
+            [
+                destination
+                for destination in destinations
+                if self._federation_shard_config.should_handle(
+                    self._instance_name, destination
+                )
+                and not self.is_mine_server_name(destination)
+            ],
+            clock=self.clock,
+            store=self.store,
+            retry_due_within_ms=CATCHUP_RETRY_INTERVAL,
+        )
 
-        if not self._federation_shard_config.should_handle(
-            self._instance_name, destination
-        ):
-            return
-
-        if immediate:
-            self._get_per_destination_queue(destination).attempt_new_transaction()
-        else:
-            self._get_per_destination_queue(destination).mark_new_data()
-            self._destination_wakeup_queue.add_to_queue(destination)
+        for destination in destinations:
+            if immediate:
+                self._get_per_destination_queue(destination).attempt_new_transaction()
+            else:
+                self._get_per_destination_queue(destination).mark_new_data()
+                self._destination_wakeup_queue.add_to_queue(destination)
 
     def wake_destination(self, destination: str) -> None:
         """Called when we want to retry sending transactions to a remote.
@@ -806,7 +955,7 @@ class FederationSender(AbstractFederationSender):
         might have come back.
         """
 
-        if destination == self.server_name:
+        if self.is_mine_server_name(destination):
             logger.warning("Not waking up ourselves")
             return
 
@@ -852,7 +1001,6 @@ class FederationSender(AbstractFederationSender):
 
             if not destinations_to_wake:
                 # finished waking all destinations!
-                self._catchup_after_startup_timer = None
                 break
 
             last_processed = destinations_to_wake[-1]
@@ -869,4 +1017,4 @@ class FederationSender(AbstractFederationSender):
                     last_processed,
                 )
                 self.wake_destination(destination)
-                await self.clock.sleep(CATCH_UP_STARTUP_INTERVAL_SEC)
+                await self.clock.sleep(WAKEUP_INTERVAL_BETWEEN_DESTINATIONS_SEC)

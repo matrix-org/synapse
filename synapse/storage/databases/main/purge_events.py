@@ -89,6 +89,11 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
         # furthermore, we might already have the table from a previous (failed)
         # purge attempt, so let's drop the table first.
 
+        if isinstance(self.database_engine, PostgresEngine):
+            # Disable statement timeouts for this transaction; purging rooms can
+            # take a while!
+            txn.execute("SET LOCAL statement_timeout = 0")
+
         txn.execute("DROP TABLE IF EXISTS events_to_purge")
 
         txn.execute(
@@ -249,12 +254,11 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
         # Mark all state and own events as outliers
         logger.info("[purge] marking remaining events as outliers")
         txn.execute(
-            "UPDATE events SET outlier = ?"
+            "UPDATE events SET outlier = TRUE"
             " WHERE event_id IN ("
-            "    SELECT event_id FROM events_to_purge "
-            "    WHERE NOT should_delete"
-            ")",
-            (True,),
+            "   SELECT event_id FROM events_to_purge "
+            "   WHERE NOT should_delete"
+            ")"
         )
 
         # synapse tries to take out an exclusive lock on room_depth whenever it
@@ -308,6 +312,8 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
 
         logger.info("[purge] done")
 
+        self._invalidate_caches_for_room_events_and_stream(txn, room_id)
+
         return referenced_state_groups
 
     async def purge_room(self, room_id: str) -> List[int]:
@@ -325,6 +331,7 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
         # We then run the same purge a second time without this isolation level to
         # purge any of those rows which were added during the first.
 
+        logger.info("[purge] Starting initial main purge of [1/2]")
         state_groups_to_delete = await self.db_pool.runInteraction(
             "purge_room",
             self._purge_room_txn,
@@ -332,6 +339,7 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
             isolation_level=IsolationLevel.READ_COMMITTED,
         )
 
+        logger.info("[purge] Starting secondary main purge of [2/2]")
         state_groups_to_delete.extend(
             await self.db_pool.runInteraction(
                 "purge_room",
@@ -339,6 +347,7 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
                 room_id=room_id,
             ),
         )
+        logger.info("[purge] Done with main purge")
 
         return state_groups_to_delete
 
@@ -376,7 +385,7 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
         )
         referenced_chain_id_tuples = list(txn)
 
-        logger.info("[purge] removing events from event_auth_chain_links")
+        logger.info("[purge] removing from event_auth_chain_links")
         txn.executemany(
             """
             DELETE FROM event_auth_chain_links WHERE
@@ -399,7 +408,7 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
             "rejections",
             "state_events",
         ):
-            logger.info("[purge] removing %s from %s", room_id, table)
+            logger.info("[purge] removing from %s", table)
 
             txn.execute(
                 """
@@ -425,14 +434,16 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
             "partial_state_events",
             "partial_state_rooms_servers",
             "partial_state_rooms",
+            # Note: the _membership(s) tables have foreign keys to the `events` table
+            # so must be deleted first.
+            "local_current_membership",
+            "room_memberships",
             "events",
             "federation_inbound_events_staging",
-            "local_current_membership",
             "receipts_graph",
             "receipts_linearized",
             "room_aliases",
             "room_depth",
-            "room_memberships",
             "room_stats_state",
             "room_stats_current",
             "room_stats_earliest_token",
@@ -444,17 +455,13 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
             "e2e_room_keys",
             "event_push_summary",
             "pusher_throttle",
-            "insertion_events",
-            "insertion_event_extremities",
-            "insertion_event_edges",
-            "batch_events",
             "room_account_data",
             "room_tags",
             # "rooms" happens last, to keep the foreign keys in the other tables
             # happy
             "rooms",
         ):
-            logger.info("[purge] removing %s from %s", room_id, table)
+            logger.info("[purge] removing from %s", table)
             txn.execute("DELETE FROM %s WHERE room_id=?" % (table,), (room_id,))
 
         # Other tables we do NOT need to clear out:
@@ -480,12 +487,6 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
         #       index on them. In any case we should be clearing out 'stream' tables
         #       periodically anyway (#5888)
 
-        # TODO: we could probably usefully do a bunch more cache invalidation here
-
-        # XXX: as with purge_history, this is racy, but no worse than other races
-        #   that already exist.
-        self._invalidate_cache_and_stream(txn, self.have_seen_event, (room_id,))
-
-        logger.info("[purge] done")
+        self._invalidate_caches_for_room_and_stream(txn, room_id)
 
         return state_groups

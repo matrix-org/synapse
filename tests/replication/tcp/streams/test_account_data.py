@@ -37,11 +37,6 @@ class AccountDataStreamTestCase(BaseStreamTestCase):
         # also one global update
         self.get_success(store.add_account_data_for_user("test_user", "m.global", {}))
 
-        # tell the notifier to catch up to avoid duplicate rows.
-        # workaround for https://github.com/matrix-org/synapse/issues/7360
-        # FIXME remove this when the above is fixed
-        self.replicate()
-
         # check we're testing what we think we are: no rows should yet have been
         # received
         self.assertEqual([], self.test_handler.received_rdata_rows)

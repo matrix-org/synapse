@@ -15,10 +15,11 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, List, Optional, Tuple, cast
+from typing import TYPE_CHECKING, List, Optional, Tuple, Union, cast
 
 from synapse.api.constants import Direction
 from synapse.config.homeserver import HomeServerConfig
+from synapse.storage._base import make_in_list_sql_clause
 from synapse.storage.database import (
     DatabasePool,
     LoggingDatabaseConnection,
@@ -43,6 +44,7 @@ from .event_federation import EventFederationStore
 from .event_push_actions import EventPushActionsStore
 from .events_bg_updates import EventsBackgroundUpdatesStore
 from .events_forward_extremities import EventForwardExtremitiesStore
+from .experimental_features import ExperimentalFeaturesStore
 from .filtering import FilteringWorkerStore
 from .keys import KeyStore
 from .lock import LockStore
@@ -60,7 +62,6 @@ from .registration import RegistrationStore
 from .rejections import RejectionsStore
 from .relations import RelationsStore
 from .room import RoomStore
-from .room_batch import RoomBatchStore
 from .roommember import RoomMemberStore
 from .search import SearchStore
 from .session import SessionStore
@@ -69,6 +70,7 @@ from .state import StateStore
 from .stats import StatsStore
 from .stream import StreamWorkerStore
 from .tags import TagsStore
+from .task_scheduler import TaskSchedulerWorkerStore
 from .transactions import TransactionWorkerStore
 from .ui_auth import UIAuthStore
 from .user_directory import UserDirectoryStore
@@ -82,10 +84,10 @@ logger = logging.getLogger(__name__)
 
 class DataStore(
     EventsBackgroundUpdatesStore,
+    ExperimentalFeaturesStore,
     DeviceStore,
     RoomMemberStore,
     RoomStore,
-    RoomBatchStore,
     RegistrationStore,
     ProfileStore,
     PresenceStore,
@@ -126,6 +128,7 @@ class DataStore(
     CacheInvalidationWorkerStore,
     LockStore,
     SessionStore,
+    TaskSchedulerWorkerStore,
 ):
     def __init__(
         self,
@@ -139,26 +142,6 @@ class DataStore(
 
         super().__init__(database, db_conn, hs)
 
-    async def get_users(self) -> List[JsonDict]:
-        """Function to retrieve a list of users in users table.
-
-        Returns:
-            A list of dictionaries representing users.
-        """
-        return await self.db_pool.simple_select_list(
-            table="users",
-            keyvalues={},
-            retcols=[
-                "name",
-                "password_hash",
-                "is_guest",
-                "admin",
-                "user_type",
-                "deactivated",
-            ],
-            desc="get_users",
-        )
-
     async def get_users_paginate(
         self,
         start: int,
@@ -167,9 +150,12 @@ class DataStore(
         name: Optional[str] = None,
         guests: bool = True,
         deactivated: bool = False,
+        admins: Optional[bool] = None,
         order_by: str = UserSortOrder.NAME.value,
         direction: Direction = Direction.FORWARDS,
         approved: bool = True,
+        not_user_types: Optional[List[str]] = None,
+        locked: bool = False,
     ) -> Tuple[List[JsonDict], int]:
         """Function to retrieve a paginated list of users from
         users list. This will return a json list of users and the
@@ -182,9 +168,14 @@ class DataStore(
             name: search for local part of user_id or display name
             guests: whether to in include guest users
             deactivated: whether to include deactivated users
+            admins: Optional flag to filter admins. If true, only admins are queried.
+                    if false, admins are excluded from the query. When it is
+                    none (the default), both admins and none-admins are queried.
             order_by: the sort order of the returned list
             direction: sort ascending or descending
             approved: whether to include approved users
+            not_user_types: list of user types to exclude
+            locked: whether to include locked users
         Returns:
             A tuple of a list of mappings from user to information and a count of total users.
         """
@@ -193,7 +184,7 @@ class DataStore(
             txn: LoggingTransaction,
         ) -> Tuple[List[JsonDict], int]:
             filters = []
-            args = [self.hs.config.server.server_name]
+            args: list = []
 
             # Set ordering
             order_by_column = UserSortOrder(order_by).value
@@ -217,17 +208,64 @@ class DataStore(
             if not deactivated:
                 filters.append("deactivated = 0")
 
+            if not locked:
+                filters.append("locked IS FALSE")
+
+            if admins is not None:
+                if admins:
+                    filters.append("admin = 1")
+                else:
+                    filters.append("admin = 0")
+
             if not approved:
                 # We ignore NULL values for the approved flag because these should only
                 # be already existing users that we consider as already approved.
                 filters.append("approved IS FALSE")
 
+            if not_user_types:
+                if len(not_user_types) == 1 and not_user_types[0] == "":
+                    # Only exclude NULL type users
+                    filters.append("user_type IS NOT NULL")
+                else:
+                    not_user_types_has_empty = False
+                    not_user_types_without_empty = []
+
+                    for not_user_type in not_user_types:
+                        if not_user_type == "":
+                            not_user_types_has_empty = True
+                        else:
+                            not_user_types_without_empty.append(not_user_type)
+
+                    not_user_type_clause, not_user_type_args = make_in_list_sql_clause(
+                        self.database_engine,
+                        "u.user_type",
+                        not_user_types_without_empty,
+                    )
+
+                    if not_user_types_has_empty:
+                        # NULL values should be excluded.
+                        # They evaluate to false > nothing to do here.
+                        filters.append("NOT %s" % (not_user_type_clause))
+                    else:
+                        # NULL values should *not* be excluded.
+                        # Add a special predicate to the query.
+                        filters.append(
+                            "(NOT %s OR %s IS NULL)"
+                            % (not_user_type_clause, "u.user_type")
+                        )
+
+                    args.extend(not_user_type_args)
+
             where_clause = "WHERE " + " AND ".join(filters) if len(filters) > 0 else ""
 
             sql_base = f"""
                 FROM users as u
-                LEFT JOIN profiles AS p ON u.name = '@' || p.user_id || ':' || ?
+                LEFT JOIN profiles AS p ON u.name = p.full_user_id
                 LEFT JOIN erased_users AS eu ON u.name = eu.user_id
+                LEFT JOIN (
+                    SELECT user_id, MAX(last_seen) AS last_seen_ts
+                    FROM user_ips GROUP BY user_id
+                ) ls ON u.name = ls.user_id
                 {where_clause}
                 """
             sql = "SELECT COUNT(*) as total_users " + sql_base
@@ -237,7 +275,7 @@ class DataStore(
             sql = f"""
                 SELECT name, user_type, is_guest, admin, deactivated, shadow_banned,
                 displayname, avatar_url, creation_ts * 1000 as creation_ts, approved,
-                eu.user_id is not null as erased
+                eu.user_id is not null as erased, last_seen_ts, locked
                 {sql_base}
                 ORDER BY {order_by_column} {order}, u.name ASC
                 LIMIT ? OFFSET ?
@@ -258,7 +296,11 @@ class DataStore(
             "get_users_paginate_txn", get_users_paginate_txn
         )
 
-    async def search_users(self, term: str) -> Optional[List[JsonDict]]:
+    async def search_users(
+        self, term: str
+    ) -> List[
+        Tuple[str, Optional[str], Union[int, bool], Union[int, bool], Optional[str]]
+    ]:
         """Function to search users list for one or more users with
         the matched term.
 
@@ -266,15 +308,37 @@ class DataStore(
             term: search term
 
         Returns:
-            A list of dictionaries or None.
+            A list of tuples of name, password_hash, is_guest, admin, user_type or None.
         """
-        return await self.db_pool.simple_search_list(
-            table="users",
-            term=term,
-            col="name",
-            retcols=["name", "password_hash", "is_guest", "admin", "user_type"],
-            desc="search_users",
-        )
+
+        def search_users(
+            txn: LoggingTransaction,
+        ) -> List[
+            Tuple[str, Optional[str], Union[int, bool], Union[int, bool], Optional[str]]
+        ]:
+            search_term = "%%" + term + "%%"
+
+            sql = """
+            SELECT name, password_hash, is_guest, admin, user_type
+            FROM users
+            WHERE name LIKE ?
+            """
+            txn.execute(sql, (search_term,))
+
+            return cast(
+                List[
+                    Tuple[
+                        str,
+                        Optional[str],
+                        Union[int, bool],
+                        Union[int, bool],
+                        Optional[str],
+                    ]
+                ],
+                txn.fetchall(),
+            )
+
+        return await self.db_pool.runInteraction("search_users", search_users)
 
 
 def check_database_before_upgrade(

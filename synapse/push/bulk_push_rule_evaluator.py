@@ -120,9 +120,6 @@ class BulkPushRuleEvaluator:
         self.should_calculate_push_rules = self.hs.config.push.enable_push
 
         self._related_event_match_enabled = self.hs.config.experimental.msc3664_enabled
-        self._intentional_mentions_enabled = (
-            self.hs.config.experimental.msc3952_intentional_mentions
-        )
 
         self.room_push_rule_cache_metrics = register_cache(
             "cache",
@@ -134,7 +131,7 @@ class BulkPushRuleEvaluator:
     async def _get_rules_for_event(
         self,
         event: EventBase,
-    ) -> Dict[str, FilteredPushRules]:
+    ) -> Mapping[str, FilteredPushRules]:
         """Get the push rules for all users who may need to be notified about
         the event.
 
@@ -273,10 +270,7 @@ class BulkPushRuleEvaluator:
                     related_event_id, allow_none=True
                 )
                 if related_event is not None:
-                    related_events[relation_type] = _flatten_dict(
-                        related_event,
-                        msc3873_escape_event_match_key=self.hs.config.experimental.msc3873_escape_event_match_key,
-                    )
+                    related_events[relation_type] = _flatten_dict(related_event)
 
             reply_event_id = (
                 event.content.get("m.relates_to", {})
@@ -291,10 +285,7 @@ class BulkPushRuleEvaluator:
                 )
 
                 if related_event is not None:
-                    related_events["m.in_reply_to"] = _flatten_dict(
-                        related_event,
-                        msc3873_escape_event_match_key=self.hs.config.experimental.msc3873_escape_event_match_key,
-                    )
+                    related_events["m.in_reply_to"] = _flatten_dict(related_event)
 
                     # indicate that this is from a fallback relation.
                     if relation_type == "m.thread" and event.content.get(
@@ -331,7 +322,7 @@ class BulkPushRuleEvaluator:
     ) -> None:
         if (
             not event.internal_metadata.is_notifiable()
-            or event.internal_metadata.is_historical()
+            or event.room_id in self.hs.config.server.rooms_to_exclude_from_sync
         ):
             # Push rules for events that aren't notifiable can't be processed by this and
             # we want to skip push notification actions for historical messages
@@ -384,27 +375,21 @@ class BulkPushRuleEvaluator:
         # _get_power_levels_and_sender_level in its call to get_user_power_level
         # (even for room V10.)
         notification_levels = power_levels.get("notifications", {})
-        if not event.room_version.msc3667_int_only_power_levels:
+        if not event.room_version.enforce_int_power_levels:
             keys = list(notification_levels.keys())
             for key in keys:
                 level = notification_levels.get(key, SENTINEL)
-                if level is not SENTINEL and type(level) is not int:
+                if level is not SENTINEL and type(level) is not int:  # noqa: E721
                     try:
                         notification_levels[key] = int(level)
                     except (TypeError, ValueError):
                         del notification_levels[key]
 
         # Pull out any user and room mentions.
-        has_mentions = (
-            self._intentional_mentions_enabled
-            and EventContentFields.MSC3952_MENTIONS in event.content
-        )
+        has_mentions = EventContentFields.MENTIONS in event.content
 
         evaluator = PushRuleEvaluator(
-            _flatten_dict(
-                event,
-                msc3873_escape_event_match_key=self.hs.config.experimental.msc3873_escape_event_match_key,
-            ),
+            _flatten_dict(event),
             has_mentions,
             room_member_count,
             sender_power_level,
@@ -413,8 +398,6 @@ class BulkPushRuleEvaluator:
             self._related_event_match_enabled,
             event.room_version.msc3931_push_features,
             self.hs.config.experimental.msc1767_enabled,  # MSC3931 flag
-            self.hs.config.experimental.msc3758_exact_event_match,
-            self.hs.config.experimental.msc3966_exact_event_property_contains,
         )
 
         users = rules_by_user.keys()
@@ -489,15 +472,17 @@ StateGroup = Union[object, int]
 
 
 def _is_simple_value(value: Any) -> bool:
-    return isinstance(value, (bool, str)) or type(value) is int or value is None
+    return (
+        isinstance(value, (bool, str))
+        or type(value) is int  # noqa: E721
+        or value is None
+    )
 
 
 def _flatten_dict(
     d: Union[EventBase, Mapping[str, Any]],
     prefix: Optional[List[str]] = None,
     result: Optional[Dict[str, JsonValue]] = None,
-    *,
-    msc3873_escape_event_match_key: bool = False,
 ) -> Dict[str, JsonValue]:
     """
     Given a JSON dictionary (or event) which might contain sub dictionaries,
@@ -526,11 +511,10 @@ def _flatten_dict(
     if result is None:
         result = {}
     for key, value in d.items():
-        if msc3873_escape_event_match_key:
-            # Escape periods in the key with a backslash (and backslashes with an
-            # extra backslash). This is since a period is used as a separator between
-            # nested fields.
-            key = key.replace("\\", "\\\\").replace(".", "\\.")
+        # Escape periods in the key with a backslash (and backslashes with an
+        # extra backslash). This is since a period is used as a separator between
+        # nested fields.
+        key = key.replace("\\", "\\\\").replace(".", "\\.")
 
         if _is_simple_value(value):
             result[".".join(prefix + [key])] = value
@@ -538,12 +522,7 @@ def _flatten_dict(
             result[".".join(prefix + [key])] = [v for v in value if _is_simple_value(v)]
         elif isinstance(value, Mapping):
             # do not set `room_version` due to recursion considerations below
-            _flatten_dict(
-                value,
-                prefix=(prefix + [key]),
-                result=result,
-                msc3873_escape_event_match_key=msc3873_escape_event_match_key,
-            )
+            _flatten_dict(value, prefix=(prefix + [key]), result=result)
 
     # `room_version` should only ever be set when looking at the top level of an event
     if (

@@ -14,7 +14,7 @@
 
 import logging
 from enum import Enum
-from typing import TYPE_CHECKING, Iterable, List, Optional, Tuple, cast
+from typing import TYPE_CHECKING, Iterable, List, Mapping, Optional, Tuple, cast
 
 import attr
 from canonicaljson import encode_canonical_json
@@ -28,8 +28,8 @@ from synapse.storage.database import (
     LoggingTransaction,
 )
 from synapse.storage.databases.main.cache import CacheInvalidationWorkerStore
-from synapse.types import JsonDict
-from synapse.util.caches.descriptors import cached
+from synapse.types import JsonDict, StrCollection
+from synapse.util.caches.descriptors import cached, cachedList
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -205,6 +205,36 @@ class TransactionWorkerStore(CacheInvalidationWorkerStore):
         else:
             return None
 
+    @cachedList(
+        cached_method_name="get_destination_retry_timings", list_name="destinations"
+    )
+    async def get_destination_retry_timings_batch(
+        self, destinations: StrCollection
+    ) -> Mapping[str, Optional[DestinationRetryTimings]]:
+        rows = cast(
+            List[Tuple[str, Optional[int], Optional[int], Optional[int]]],
+            await self.db_pool.simple_select_many_batch(
+                table="destinations",
+                iterable=destinations,
+                column="destination",
+                retcols=(
+                    "destination",
+                    "failure_ts",
+                    "retry_last_ts",
+                    "retry_interval",
+                ),
+                desc="get_destination_retry_timings_batch",
+            ),
+        )
+
+        return {
+            destination: DestinationRetryTimings(
+                failure_ts, retry_last_ts, retry_interval
+            )
+            for destination, failure_ts, retry_last_ts, retry_interval in rows
+            if retry_last_ts and failure_ts and retry_interval
+        }
+
     async def set_destination_retry_timings(
         self,
         destination: str,
@@ -224,7 +254,7 @@ class TransactionWorkerStore(CacheInvalidationWorkerStore):
 
         await self.db_pool.runInteraction(
             "set_destination_retry_timings",
-            self._set_destination_retry_timings_native,
+            self._set_destination_retry_timings_txn,
             destination,
             failure_ts,
             retry_last_ts,
@@ -232,7 +262,7 @@ class TransactionWorkerStore(CacheInvalidationWorkerStore):
             db_autocommit=True,  # Safe as it's a single upsert
         )
 
-    def _set_destination_retry_timings_native(
+    def _set_destination_retry_timings_txn(
         self,
         txn: LoggingTransaction,
         destination: str,
@@ -256,63 +286,13 @@ class TransactionWorkerStore(CacheInvalidationWorkerStore):
                     retry_interval = EXCLUDED.retry_interval
                 WHERE
                     EXCLUDED.retry_interval = 0
+                    OR EXCLUDED.retry_last_ts = 0
                     OR destinations.retry_interval IS NULL
                     OR destinations.retry_interval < EXCLUDED.retry_interval
+                    OR destinations.retry_last_ts < EXCLUDED.retry_last_ts
         """
 
         txn.execute(sql, (destination, failure_ts, retry_last_ts, retry_interval))
-
-        self._invalidate_cache_and_stream(
-            txn, self.get_destination_retry_timings, (destination,)
-        )
-
-    def _set_destination_retry_timings_emulated(
-        self,
-        txn: LoggingTransaction,
-        destination: str,
-        failure_ts: Optional[int],
-        retry_last_ts: int,
-        retry_interval: int,
-    ) -> None:
-        self.database_engine.lock_table(txn, "destinations")
-
-        # We need to be careful here as the data may have changed from under us
-        # due to a worker setting the timings.
-
-        prev_row = self.db_pool.simple_select_one_txn(
-            txn,
-            table="destinations",
-            keyvalues={"destination": destination},
-            retcols=("failure_ts", "retry_last_ts", "retry_interval"),
-            allow_none=True,
-        )
-
-        if not prev_row:
-            self.db_pool.simple_insert_txn(
-                txn,
-                table="destinations",
-                values={
-                    "destination": destination,
-                    "failure_ts": failure_ts,
-                    "retry_last_ts": retry_last_ts,
-                    "retry_interval": retry_interval,
-                },
-            )
-        elif (
-            retry_interval == 0
-            or prev_row["retry_interval"] is None
-            or prev_row["retry_interval"] < retry_interval
-        ):
-            self.db_pool.simple_update_one_txn(
-                txn,
-                "destinations",
-                keyvalues={"destination": destination},
-                updatevalues={
-                    "failure_ts": failure_ts,
-                    "retry_last_ts": retry_last_ts,
-                    "retry_interval": retry_interval,
-                },
-            )
 
         self._invalidate_cache_and_stream(
             txn, self.get_destination_retry_timings, (destination,)
@@ -556,7 +536,7 @@ class TransactionWorkerStore(CacheInvalidationWorkerStore):
         start: int,
         limit: int,
         direction: Direction = Direction.FORWARDS,
-    ) -> Tuple[List[JsonDict], int]:
+    ) -> Tuple[List[Tuple[str, int]], int]:
         """Function to retrieve a paginated list of destination's rooms.
         This will return a json list of rooms and the
         total number of rooms.
@@ -567,12 +547,14 @@ class TransactionWorkerStore(CacheInvalidationWorkerStore):
             limit: number of rows to retrieve
             direction: sort ascending or descending by room_id
         Returns:
-            A tuple of a dict of rooms and a count of total rooms.
+            A tuple of a list of room tuples and a count of total rooms.
+
+            Each room tuple is room_id, stream_ordering.
         """
 
         def get_destination_rooms_paginate_txn(
             txn: LoggingTransaction,
-        ) -> Tuple[List[JsonDict], int]:
+        ) -> Tuple[List[Tuple[str, int]], int]:
             if direction == Direction.BACKWARDS:
                 order = "DESC"
             else:
@@ -586,14 +568,17 @@ class TransactionWorkerStore(CacheInvalidationWorkerStore):
             txn.execute(sql, [destination])
             count = cast(Tuple[int], txn.fetchone())[0]
 
-            rooms = self.db_pool.simple_select_list_paginate_txn(
-                txn=txn,
-                table="destination_rooms",
-                orderby="room_id",
-                start=start,
-                limit=limit,
-                retcols=("room_id", "stream_ordering"),
-                order_direction=order,
+            rooms = cast(
+                List[Tuple[str, int]],
+                self.db_pool.simple_select_list_paginate_txn(
+                    txn=txn,
+                    table="destination_rooms",
+                    orderby="room_id",
+                    start=start,
+                    limit=limit,
+                    retcols=("room_id", "stream_ordering"),
+                    order_direction=order,
+                ),
             )
             return rooms, count
 

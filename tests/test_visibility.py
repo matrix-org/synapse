@@ -31,7 +31,7 @@ TEST_ROOM_ID = "!TEST:ROOM"
 
 class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
     def setUp(self) -> None:
-        super(FilterEventsForServerTestCase, self).setUp()
+        super().setUp()
         self.event_creation_handler = self.hs.get_event_creation_handler()
         self.event_builder_factory = self.hs.get_event_builder_factory()
         self._storage_controllers = self.hs.get_storage_controllers()
@@ -51,24 +51,30 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
 
         # before we do that, we persist some other events to act as state.
         self._inject_visibility("@admin:hs", "joined")
-        for i in range(0, 10):
+        for i in range(10):
             self._inject_room_member("@resident%i:hs" % i)
 
         events_to_filter = []
 
-        for i in range(0, 10):
+        for i in range(10):
             user = "@user%i:%s" % (i, "test_server" if i == 5 else "other_server")
             evt = self._inject_room_member(user, extra_content={"a": "b"})
             events_to_filter.append(evt)
 
         filtered = self.get_success(
             filter_events_for_server(
-                self._storage_controllers, "test_server", "hs", events_to_filter
+                self._storage_controllers,
+                "test_server",
+                "hs",
+                events_to_filter,
+                redact=True,
+                filter_out_erased_senders=True,
+                filter_out_remote_partial_state_events=True,
             )
         )
 
         # the result should be 5 redacted events, and 5 unredacted events.
-        for i in range(0, 5):
+        for i in range(5):
             self.assertEqual(events_to_filter[i].event_id, filtered[i].event_id)
             self.assertNotIn("a", filtered[i].content)
 
@@ -85,7 +91,13 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
         self.assertEqual(
             self.get_success(
                 filter_events_for_server(
-                    self._storage_controllers, "remote_hs", "hs", [outlier]
+                    self._storage_controllers,
+                    "remote_hs",
+                    "hs",
+                    [outlier],
+                    redact=True,
+                    filter_out_erased_senders=True,
+                    filter_out_remote_partial_state_events=True,
                 )
             ),
             [outlier],
@@ -96,7 +108,13 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
 
         filtered = self.get_success(
             filter_events_for_server(
-                self._storage_controllers, "remote_hs", "local_hs", [outlier, evt]
+                self._storage_controllers,
+                "remote_hs",
+                "local_hs",
+                [outlier, evt],
+                redact=True,
+                filter_out_erased_senders=True,
+                filter_out_remote_partial_state_events=True,
             )
         )
         self.assertEqual(len(filtered), 2, f"expected 2 results, got: {filtered}")
@@ -108,7 +126,13 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
         # be redacted)
         filtered = self.get_success(
             filter_events_for_server(
-                self._storage_controllers, "other_server", "local_hs", [outlier, evt]
+                self._storage_controllers,
+                "other_server",
+                "local_hs",
+                [outlier, evt],
+                redact=True,
+                filter_out_erased_senders=True,
+                filter_out_remote_partial_state_events=True,
             )
         )
         self.assertEqual(filtered[0], outlier)
@@ -143,11 +167,17 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
         # ... and the filtering happens.
         filtered = self.get_success(
             filter_events_for_server(
-                self._storage_controllers, "test_server", "local_hs", events_to_filter
+                self._storage_controllers,
+                "test_server",
+                "local_hs",
+                events_to_filter,
+                redact=True,
+                filter_out_erased_senders=True,
+                filter_out_remote_partial_state_events=True,
             )
         )
 
-        for i in range(0, len(events_to_filter)):
+        for i in range(len(events_to_filter)):
             self.assertEqual(
                 events_to_filter[i].event_id,
                 filtered[i].event_id,

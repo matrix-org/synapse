@@ -16,7 +16,6 @@ import logging
 import urllib.parse
 from typing import (
     TYPE_CHECKING,
-    Any,
     Dict,
     Iterable,
     List,
@@ -24,13 +23,15 @@ from typing import (
     Optional,
     Sequence,
     Tuple,
+    TypeVar,
+    Union,
 )
 
 from prometheus_client import Counter
-from typing_extensions import TypeGuard
+from typing_extensions import ParamSpec, TypeGuard
 
 from synapse.api.constants import EventTypes, Membership, ThirdPartyEntityKind
-from synapse.api.errors import CodeMessageException
+from synapse.api.errors import CodeMessageException, HttpResponseException
 from synapse.appservice import (
     ApplicationService,
     TransactionOneTimeKeysCount,
@@ -38,8 +39,9 @@ from synapse.appservice import (
 )
 from synapse.events import EventBase
 from synapse.events.utils import SerializeEventConfig, serialize_event
-from synapse.http.client import SimpleHttpClient
-from synapse.types import DeviceListUpdates, JsonDict, ThirdPartyInstanceID
+from synapse.http.client import SimpleHttpClient, is_unknown_endpoint
+from synapse.logging import opentracing
+from synapse.types import DeviceListUpdates, JsonDict, JsonMapping, ThirdPartyInstanceID
 from synapse.util.caches.response_cache import ResponseCache
 
 if TYPE_CHECKING:
@@ -77,8 +79,10 @@ sent_todevice_counter = Counter(
 
 HOUR_IN_MS = 60 * 60 * 1000
 
+APP_SERVICE_PREFIX = "/_matrix/app/v1"
 
-APP_SERVICE_PREFIX = "/_matrix/app/unstable"
+P = ParamSpec("P")
+R = TypeVar("R")
 
 
 def _is_valid_3pe_metadata(info: JsonDict) -> bool:
@@ -116,10 +120,22 @@ class ApplicationServiceApi(SimpleHttpClient):
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
         self.clock = hs.get_clock()
+        self.config = hs.config.appservice
 
         self.protocol_meta_cache: ResponseCache[Tuple[str, str]] = ResponseCache(
             hs.get_clock(), "as_protocol_meta", timeout_ms=HOUR_IN_MS
         )
+
+    def _get_headers(self, service: "ApplicationService") -> Dict[bytes, List[bytes]]:
+        """This makes sure we have always the auth header and opentracing headers set."""
+
+        # This is also ensured before in the functions. However this is needed to please
+        # the typechecks.
+        assert service.hs_token is not None
+
+        headers = {b"Authorization": [b"Bearer " + service.hs_token.encode("ascii")]}
+        opentracing.inject_header_dict(headers, check_destination=False)
+        return headers
 
     async def query_user(self, service: "ApplicationService", user_id: str) -> bool:
         if service.url is None:
@@ -128,21 +144,24 @@ class ApplicationServiceApi(SimpleHttpClient):
         # This is required by the configuration.
         assert service.hs_token is not None
 
-        uri = service.url + ("/users/%s" % urllib.parse.quote(user_id))
         try:
+            args = None
+            if self.config.use_appservice_legacy_authorization:
+                args = {"access_token": service.hs_token}
+
             response = await self.get_json(
-                uri,
-                {"access_token": service.hs_token},
-                headers={"Authorization": [f"Bearer {service.hs_token}"]},
+                f"{service.url}{APP_SERVICE_PREFIX}/users/{urllib.parse.quote(user_id)}",
+                args,
+                headers=self._get_headers(service),
             )
             if response is not None:  # just an empty json object
                 return True
         except CodeMessageException as e:
             if e.code == 404:
                 return False
-            logger.warning("query_user to %s received %s", uri, e.code)
+            logger.warning("query_user to %s received %s", service.url, e.code)
         except Exception as ex:
-            logger.warning("query_user to %s threw exception %s", uri, ex)
+            logger.warning("query_user to %s threw exception %s", service.url, ex)
         return False
 
     async def query_alias(self, service: "ApplicationService", alias: str) -> bool:
@@ -152,21 +171,24 @@ class ApplicationServiceApi(SimpleHttpClient):
         # This is required by the configuration.
         assert service.hs_token is not None
 
-        uri = service.url + ("/rooms/%s" % urllib.parse.quote(alias))
         try:
+            args = None
+            if self.config.use_appservice_legacy_authorization:
+                args = {"access_token": service.hs_token}
+
             response = await self.get_json(
-                uri,
-                {"access_token": service.hs_token},
-                headers={"Authorization": [f"Bearer {service.hs_token}"]},
+                f"{service.url}{APP_SERVICE_PREFIX}/rooms/{urllib.parse.quote(alias)}",
+                args,
+                headers=self._get_headers(service),
             )
             if response is not None:  # just an empty json object
                 return True
         except CodeMessageException as e:
-            logger.warning("query_alias to %s received %s", uri, e.code)
+            logger.warning("query_alias to %s received %s", service.url, e.code)
             if e.code == 404:
                 return False
         except Exception as ex:
-            logger.warning("query_alias to %s threw exception %s", uri, ex)
+            logger.warning("query_alias to %s threw exception %s", service.url, ex)
         return False
 
     async def query_3pe(
@@ -188,25 +210,24 @@ class ApplicationServiceApi(SimpleHttpClient):
         # This is required by the configuration.
         assert service.hs_token is not None
 
-        uri = "%s%s/thirdparty/%s/%s" % (
-            service.url,
-            APP_SERVICE_PREFIX,
-            kind,
-            urllib.parse.quote(protocol),
-        )
         try:
-            args: Mapping[Any, Any] = {
-                **fields,
-                b"access_token": service.hs_token,
-            }
+            args: Mapping[bytes, Union[List[bytes], str]] = fields
+            if self.config.use_appservice_legacy_authorization:
+                args = {
+                    **fields,
+                    b"access_token": service.hs_token,
+                }
+
             response = await self.get_json(
-                uri,
+                f"{service.url}{APP_SERVICE_PREFIX}/thirdparty/{kind}/{urllib.parse.quote(protocol)}",
                 args=args,
-                headers={"Authorization": [f"Bearer {service.hs_token}"]},
+                headers=self._get_headers(service),
             )
             if not isinstance(response, list):
                 logger.warning(
-                    "query_3pe to %s returned an invalid response %r", uri, response
+                    "query_3pe to %s returned an invalid response %r",
+                    service.url,
+                    response,
                 )
                 return []
 
@@ -216,12 +237,12 @@ class ApplicationServiceApi(SimpleHttpClient):
                     ret.append(r)
                 else:
                     logger.warning(
-                        "query_3pe to %s returned an invalid result %r", uri, r
+                        "query_3pe to %s returned an invalid result %r", service.url, r
                     )
 
             return ret
         except Exception as ex:
-            logger.warning("query_3pe to %s threw exception %s", uri, ex)
+            logger.warning("query_3pe to %s threw exception %s", service.url, ex)
             return []
 
     async def get_3pe_protocol(
@@ -233,21 +254,21 @@ class ApplicationServiceApi(SimpleHttpClient):
         async def _get() -> Optional[JsonDict]:
             # This is required by the configuration.
             assert service.hs_token is not None
-            uri = "%s%s/thirdparty/protocol/%s" % (
-                service.url,
-                APP_SERVICE_PREFIX,
-                urllib.parse.quote(protocol),
-            )
             try:
+                args = None
+                if self.config.use_appservice_legacy_authorization:
+                    args = {"access_token": service.hs_token}
+
                 info = await self.get_json(
-                    uri,
-                    {"access_token": service.hs_token},
-                    headers={"Authorization": [f"Bearer {service.hs_token}"]},
+                    f"{service.url}{APP_SERVICE_PREFIX}/thirdparty/protocol/{urllib.parse.quote(protocol)}",
+                    args,
+                    headers=self._get_headers(service),
                 )
 
                 if not _is_valid_3pe_metadata(info):
                     logger.warning(
-                        "query_3pe_protocol to %s did not return a valid result", uri
+                        "query_3pe_protocol to %s did not return a valid result",
+                        service.url,
                     )
                     return None
 
@@ -260,18 +281,33 @@ class ApplicationServiceApi(SimpleHttpClient):
 
                 return info
             except Exception as ex:
-                logger.warning("query_3pe_protocol to %s threw exception %s", uri, ex)
+                logger.warning(
+                    "query_3pe_protocol to %s threw exception %s", service.url, ex
+                )
                 return None
 
         key = (service.id, protocol)
         return await self.protocol_meta_cache.wrap(key, _get)
 
+    async def ping(self, service: "ApplicationService", txn_id: Optional[str]) -> None:
+        # The caller should check that url is set
+        assert service.url is not None, "ping called without URL being set"
+
+        # This is required by the configuration.
+        assert service.hs_token is not None
+
+        await self.post_json_get_json(
+            uri=f"{service.url}{APP_SERVICE_PREFIX}/ping",
+            post_json={"transaction_id": txn_id},
+            headers=self._get_headers(service),
+        )
+
     async def push_bulk(
         self,
         service: "ApplicationService",
         events: Sequence[EventBase],
-        ephemeral: List[JsonDict],
-        to_device_messages: List[JsonDict],
+        ephemeral: List[JsonMapping],
+        to_device_messages: List[JsonMapping],
         one_time_keys_count: TransactionOneTimeKeysCount,
         unused_fallback_keys: TransactionUnusedFallbackKeys,
         device_list_summary: DeviceListUpdates,
@@ -305,8 +341,6 @@ class ApplicationServiceApi(SimpleHttpClient):
             )
             txn_id = 0
 
-        uri = service.url + ("/transactions/%s" % urllib.parse.quote(str(txn_id)))
-
         # Never send ephemeral events to appservices that do not support it
         body: JsonDict = {"events": serialized_events}
         if service.supports_ephemeral:
@@ -338,16 +372,20 @@ class ApplicationServiceApi(SimpleHttpClient):
                 }
 
         try:
+            args = None
+            if self.config.use_appservice_legacy_authorization:
+                args = {"access_token": service.hs_token}
+
             await self.put_json(
-                uri=uri,
+                f"{service.url}{APP_SERVICE_PREFIX}/transactions/{urllib.parse.quote(str(txn_id))}",
                 json_body=body,
-                args={"access_token": service.hs_token},
-                headers={"Authorization": [f"Bearer {service.hs_token}"]},
+                args=args,
+                headers=self._get_headers(service),
             )
             if logger.isEnabledFor(logging.DEBUG):
                 logger.debug(
                     "push_bulk to %s succeeded! events=%s",
-                    uri,
+                    service.url,
                     [event.get("event_id") for event in events],
                 )
             sent_transactions_counter.labels(service.id).inc()
@@ -358,7 +396,7 @@ class ApplicationServiceApi(SimpleHttpClient):
         except CodeMessageException as e:
             logger.warning(
                 "push_bulk to %s received code=%s msg=%s",
-                uri,
+                service.url,
                 e.code,
                 e.msg,
                 exc_info=logger.isEnabledFor(logging.DEBUG),
@@ -366,7 +404,7 @@ class ApplicationServiceApi(SimpleHttpClient):
         except Exception as ex:
             logger.warning(
                 "push_bulk to %s threw exception(%s) %s args=%s",
-                uri,
+                service.url,
                 type(ex).__name__,
                 ex,
                 ex.args,
@@ -374,6 +412,121 @@ class ApplicationServiceApi(SimpleHttpClient):
             )
         failed_transactions_counter.labels(service.id).inc()
         return False
+
+    async def claim_client_keys(
+        self, service: "ApplicationService", query: List[Tuple[str, str, str, int]]
+    ) -> Tuple[
+        Dict[str, Dict[str, Dict[str, JsonDict]]], List[Tuple[str, str, str, int]]
+    ]:
+        """Claim one time keys from an application service.
+
+        Note that any error (including a timeout) is treated as the application
+        service having no information.
+
+        Args:
+            service: The application service to query.
+            query: An iterable of tuples of (user ID, device ID, algorithm).
+
+        Returns:
+            A tuple of:
+                A map of user ID -> a map device ID -> a map of key ID -> JSON dict.
+
+                A copy of the input which has not been fulfilled because the
+                appservice doesn't support this endpoint or has not returned
+                data for that tuple.
+        """
+        if service.url is None:
+            return {}, query
+
+        # This is required by the configuration.
+        assert service.hs_token is not None
+
+        # Create the expected payload shape.
+        body: Dict[str, Dict[str, List[str]]] = {}
+        for user_id, device, algorithm, count in query:
+            body.setdefault(user_id, {}).setdefault(device, []).extend(
+                [algorithm] * count
+            )
+
+        uri = f"{service.url}/_matrix/app/unstable/org.matrix.msc3983/keys/claim"
+        try:
+            response = await self.post_json_get_json(
+                uri,
+                body,
+                headers=self._get_headers(service),
+            )
+        except HttpResponseException as e:
+            # The appservice doesn't support this endpoint.
+            if is_unknown_endpoint(e):
+                return {}, query
+            logger.warning("claim_keys to %s received %s", uri, e.code)
+            return {}, query
+        except Exception as ex:
+            logger.warning("claim_keys to %s threw exception %s", uri, ex)
+            return {}, query
+
+        # Check if the appservice fulfilled all of the queried user/device/algorithms
+        # or if some are still missing.
+        #
+        # TODO This places a lot of faith in the response shape being correct.
+        missing = []
+        for user_id, device, algorithm, count in query:
+            # Count the number of keys in the response for this algorithm by
+            # checking which key IDs start with the algorithm. This uses that
+            # True == 1 in Python to generate a count.
+            response_count = sum(
+                key_id.startswith(f"{algorithm}:")
+                for key_id in response.get(user_id, {}).get(device, {})
+            )
+            count -= response_count
+            # If the appservice responds with fewer keys than requested, then
+            # consider the request unfulfilled.
+            if count > 0:
+                missing.append((user_id, device, algorithm, count))
+
+        return response, missing
+
+    async def query_keys(
+        self, service: "ApplicationService", query: Dict[str, List[str]]
+    ) -> Dict[str, Dict[str, Dict[str, JsonDict]]]:
+        """Query the application service for keys.
+
+        Note that any error (including a timeout) is treated as the application
+        service having no information.
+
+        Args:
+            service: The application service to query.
+            query: An iterable of tuples of (user ID, device ID, algorithm).
+
+        Returns:
+            A map of device_keys/master_keys/self_signing_keys/user_signing_keys:
+
+            device_keys is a map of user ID -> a map device ID -> device info.
+        """
+        if service.url is None:
+            return {}
+
+        # This is required by the configuration.
+        assert service.hs_token is not None
+
+        uri = f"{service.url}/_matrix/app/unstable/org.matrix.msc3984/keys/query"
+        try:
+            response = await self.post_json_get_json(
+                uri,
+                query,
+                headers=self._get_headers(service),
+            )
+        except HttpResponseException as e:
+            # The appservice doesn't support this endpoint.
+            if is_unknown_endpoint(e):
+                return {}
+            logger.warning("query_keys to %s received %s", uri, e.code)
+            return {}
+        except Exception as ex:
+            logger.warning("query_keys to %s threw exception %s", uri, ex)
+            return {}
+
+        return response
 
     def _serialize(
         self, service: "ApplicationService", events: Iterable[EventBase]

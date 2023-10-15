@@ -17,6 +17,7 @@ from twisted.test.proto_helpers import MemoryReactor
 from synapse.api.errors import Codes
 from synapse.rest.client import filter
 from synapse.server import HomeServer
+from synapse.types import UserID
 from synapse.util import Clock
 
 from tests import unittest
@@ -45,7 +46,9 @@ class FilterTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 200)
         self.assertEqual(channel.json_body, {"filter_id": "0"})
         filter = self.get_success(
-            self.store.get_user_filter(user_localpart="apple", filter_id=0)
+            self.store.get_user_filter(
+                user_id=UserID.from_string(FilterTestCase.user_id), filter_id=0
+            )
         )
         self.pump()
         self.assertEqual(filter, self.EXAMPLE_FILTER)
@@ -62,21 +65,22 @@ class FilterTestCase(unittest.HomeserverTestCase):
 
     def test_add_filter_non_local_user(self) -> None:
         _is_mine = self.hs.is_mine
-        self.hs.is_mine = lambda target_user: False  # type: ignore[assignment]
+        self.hs.is_mine = lambda target_user: False  # type: ignore[method-assign]
         channel = self.make_request(
             "POST",
             "/_matrix/client/r0/user/%s/filter" % (self.user_id),
             self.EXAMPLE_FILTER_JSON,
         )
 
-        self.hs.is_mine = _is_mine  # type: ignore[assignment]
+        self.hs.is_mine = _is_mine  # type: ignore[method-assign]
         self.assertEqual(channel.code, 403)
         self.assertEqual(channel.json_body["errcode"], Codes.FORBIDDEN)
 
     def test_get_filter(self) -> None:
         filter_id = self.get_success(
             self.filtering.add_user_filter(
-                user_localpart="apple", user_filter=self.EXAMPLE_FILTER
+                user_id=UserID.from_string("@apple:test"),
+                user_filter=self.EXAMPLE_FILTER,
             )
         )
         self.reactor.advance(1)

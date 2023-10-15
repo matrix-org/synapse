@@ -22,14 +22,26 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  check_repo:
+    # Prevent this workflow from running on any fork of Synapse other than matrix-org/synapse, as it is
+    # only useful to the Synapse core team.
+    # All other workflow steps depend on this one, thus if 'should_run_workflow' is not 'true', the rest
+    # of the workflow will be skipped as well.
+    runs-on: ubuntu-latest
+    outputs:
+      should_run_workflow: ${{ steps.check_condition.outputs.should_run_workflow }}
+    steps:
+      - id: check_condition
+        run: echo "should_run_workflow=${{ github.repository == 'matrix-org/synapse' }}" >> "$GITHUB_OUTPUT"
+
   mypy:
+    needs: check_repo
+    if: needs.check_repo.outputs.should_run_workflow == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@e12eda571dc9a5ee5d58eecf4738ec291c66f295
-        with:
-          toolchain: stable
+        uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
       # The dev dependencies aren't exposed in the wheel metadata (at least with current
@@ -45,10 +57,12 @@ jobs:
       # `pip install matrix-synapse[all]` as closely as possible.
       - run: poetry update --no-dev
       - run: poetry run pip list > after.txt && (diff -u before.txt after.txt || true)
-      - name: Remove warn_unused_ignores from mypy config
-        run: sed '/warn_unused_ignores = True/d' -i mypy.ini
+      - name: Remove unhelpful options from mypy config
+        run: sed -e '/warn_unused_ignores = True/d' -e '/warn_redundant_casts = True/d' -i mypy.ini
       - run: poetry run mypy
   trial:
+    needs: check_repo
+    if: needs.check_repo.outputs.should_run_workflow == 'true'
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -58,12 +72,10 @@ jobs:
             postgres-version: "14"
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@e12eda571dc9a5ee5d58eecf4738ec291c66f295
-        with:
-          toolchain: stable
+        uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
       - run: sudo apt-get -qq install xmlsec1
@@ -109,6 +121,8 @@ jobs:
 
 
   sytest:
+    needs: check_repo
+    if: needs.check_repo.outputs.should_run_workflow == 'true'
     runs-on: ubuntu-latest
     container:
       image: matrixdotorg/sytest-synapse:testing
@@ -131,12 +145,10 @@ jobs:
       BLACKLIST: ${{ matrix.workers && 'synapse-blacklist-with-workers' }}
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@e12eda571dc9a5ee5d58eecf4738ec291c66f295
-        with:
-          toolchain: stable
+        uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
       - name: Ensure sytest runs `pip install`
@@ -162,7 +174,8 @@ jobs:
 
 
   complement:
-    if: "${{ !failure() && !cancelled() }}"
+    needs: check_repo
+    if: "!failure() && !cancelled() && needs.check_repo.outputs.should_run_workflow == 'true'"
     runs-on: ubuntu-latest
 
     strategy:
@@ -179,10 +192,12 @@ jobs:
             database: Postgres
 
     steps:
-      - name: Run actions/checkout@v3 for synapse
-        uses: actions/checkout@v3
+      - name: Run actions/checkout@v4 for synapse
+        uses: actions/checkout@v4
         with:
           path: synapse
+
+      - uses: actions/setup-go@v4
 
       - name: Prepare Complement's Prerequisites
         run: synapse/.ci/scripts/setup_complement_prerequisites.sh
@@ -196,7 +211,7 @@ jobs:
   # Open an issue if the build fails, so we know about it.
   # Only do this if we're not experimenting with this action in a PR.
   open-issue:
-    if: "failure() && github.event_name != 'push' && github.event_name != 'pull_request'"
+    if: "failure() && github.event_name != 'push' && github.event_name != 'pull_request' && needs.check_repo.outputs.should_run_workflow == 'true'"
     needs:
       # TODO: should mypy be included here? It feels more brittle than the others.
       - mypy
@@ -207,7 +222,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: JasonEtco/create-an-issue@e27dddc79c92bc6e4562f268fffa5ed752639abd # v2.9.1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

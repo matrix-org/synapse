@@ -15,12 +15,16 @@
 import unittest as stdlib_unittest
 from typing import Any, List, Mapping, Optional
 
+import attr
+from parameterized import parameterized
+
 from synapse.api.constants import EventContentFields
 from synapse.api.room_versions import RoomVersions
 from synapse.events import EventBase, make_event_from_dict
 from synapse.events.utils import (
     PowerLevelsContent,
     SerializeEventConfig,
+    _split_field,
     copy_and_fixup_power_levels_contents,
     maybe_upsert_event_field,
     prune_event,
@@ -136,11 +140,16 @@ class PruneEventTestCase(stdlib_unittest.TestCase):
             },
         )
 
-        # As of MSC2176 we now redact the membership and prev_states keys.
+        # As of room versions we now redact the membership, prev_states, and origin keys.
         self.run_test(
-            {"type": "A", "prev_state": "prev_state", "membership": "join"},
+            {
+                "type": "A",
+                "prev_state": "prev_state",
+                "membership": "join",
+                "origin": "example.com",
+            },
             {"type": "A", "content": {}, "signatures": {}, "unsigned": {}},
-            room_version=RoomVersions.MSC2176,
+            room_version=RoomVersions.V11,
         )
 
     def test_unsigned(self) -> None:
@@ -216,16 +225,21 @@ class PruneEventTestCase(stdlib_unittest.TestCase):
             },
         )
 
-        # After MSC2176, create events get nothing redacted.
+        # After MSC2176, create events should preserve field `content`
         self.run_test(
-            {"type": "m.room.create", "content": {"not_a_real_key": True}},
+            {
+                "type": "m.room.create",
+                "content": {"not_a_real_key": True},
+                "origin": "some_homeserver",
+                "nonsense_field": "some_random_garbage",
+            },
             {
                 "type": "m.room.create",
                 "content": {"not_a_real_key": True},
                 "signatures": {},
                 "unsigned": {},
             },
-            room_version=RoomVersions.MSC2176,
+            room_version=RoomVersions.V11,
         )
 
     def test_power_levels(self) -> None:
@@ -275,7 +289,7 @@ class PruneEventTestCase(stdlib_unittest.TestCase):
                 "signatures": {},
                 "unsigned": {},
             },
-            room_version=RoomVersions.MSC2176,
+            room_version=RoomVersions.V11,
         )
 
     def test_alias_event(self) -> None:
@@ -311,7 +325,11 @@ class PruneEventTestCase(stdlib_unittest.TestCase):
         """Redaction events have no special behaviour until MSC2174/MSC2176."""
 
         self.run_test(
-            {"type": "m.room.redaction", "content": {"redacts": "$test2:domain"}},
+            {
+                "type": "m.room.redaction",
+                "content": {"redacts": "$test2:domain"},
+                "redacts": "$test2:domain",
+            },
             {
                 "type": "m.room.redaction",
                 "content": {},
@@ -323,14 +341,18 @@ class PruneEventTestCase(stdlib_unittest.TestCase):
 
         # After MSC2174, redaction events keep the redacts content key.
         self.run_test(
-            {"type": "m.room.redaction", "content": {"redacts": "$test2:domain"}},
+            {
+                "type": "m.room.redaction",
+                "content": {"redacts": "$test2:domain"},
+                "redacts": "$test2:domain",
+            },
             {
                 "type": "m.room.redaction",
                 "content": {"redacts": "$test2:domain"},
                 "signatures": {},
                 "unsigned": {},
             },
-            room_version=RoomVersions.MSC2176,
+            room_version=RoomVersions.V11,
         )
 
     def test_join_rules(self) -> None:
@@ -377,7 +399,7 @@ class PruneEventTestCase(stdlib_unittest.TestCase):
         )
 
     def test_member(self) -> None:
-        """Member events have changed behavior starting with MSC3375."""
+        """Member events have changed behavior in MSC3375 and MSC3821."""
         self.run_test(
             {
                 "type": "m.room.member",
@@ -418,6 +440,167 @@ class PruneEventTestCase(stdlib_unittest.TestCase):
                 "unsigned": {},
             },
             room_version=RoomVersions.V9,
+        )
+
+        # After MSC3821, the signed key under third_party_invite is protected
+        # from redaction.
+        THIRD_PARTY_INVITE = {
+            "display_name": "alice",
+            "signed": {
+                "mxid": "@alice:example.org",
+                "signatures": {
+                    "magic.forest": {
+                        "ed25519:3": "fQpGIW1Snz+pwLZu6sTy2aHy/DYWWTspTJRPyNp0PKkymfIsNffysMl6ObMMFdIJhk6g6pwlIqZ54rxo8SLmAg"
+                    }
+                },
+                "token": "abc123",
+            },
+        }
+
+        self.run_test(
+            {
+                "type": "m.room.member",
+                "content": {
+                    "membership": "invite",
+                    "third_party_invite": THIRD_PARTY_INVITE,
+                    "other_key": "stripped",
+                },
+            },
+            {
+                "type": "m.room.member",
+                "content": {
+                    "membership": "invite",
+                    "third_party_invite": {"signed": THIRD_PARTY_INVITE["signed"]},
+                },
+                "signatures": {},
+                "unsigned": {},
+            },
+            room_version=RoomVersions.V11,
+        )
+
+        # Ensure this doesn't break if an invalid field is sent.
+        self.run_test(
+            {
+                "type": "m.room.member",
+                "content": {
+                    "membership": "invite",
+                    "third_party_invite": {},
+                    "other_key": "stripped",
+                },
+            },
+            {
+                "type": "m.room.member",
+                "content": {"membership": "invite", "third_party_invite": {}},
+                "signatures": {},
+                "unsigned": {},
+            },
+            room_version=RoomVersions.V11,
+        )
+
+        self.run_test(
+            {
+                "type": "m.room.member",
+                "content": {
+                    "membership": "invite",
+                    "third_party_invite": "stripped",
+                    "other_key": "stripped",
+                },
+            },
+            {
+                "type": "m.room.member",
+                "content": {"membership": "invite"},
+                "signatures": {},
+                "unsigned": {},
+            },
+            room_version=RoomVersions.V11,
+        )
+
+    def test_relations(self) -> None:
+        """Event relations get redacted until MSC3389."""
+        # Normally the m._relates_to field is redacted.
+        self.run_test(
+            {
+                "type": "m.room.message",
+                "content": {
+                    "body": "foo",
+                    "m.relates_to": {
+                        "rel_type": "rel_type",
+                        "event_id": "$parent:domain",
+                        "other": "stripped",
+                    },
+                },
+            },
+            {
+                "type": "m.room.message",
+                "content": {},
+                "signatures": {},
+                "unsigned": {},
+            },
+            room_version=RoomVersions.V10,
+        )
+
+        # Create a new room version.
+        msc3389_room_ver = attr.evolve(
+            RoomVersions.V10, msc3389_relation_redactions=True
+        )
+
+        self.run_test(
+            {
+                "type": "m.room.message",
+                "content": {
+                    "body": "foo",
+                    "m.relates_to": {
+                        "rel_type": "rel_type",
+                        "event_id": "$parent:domain",
+                        "other": "stripped",
+                    },
+                },
+            },
+            {
+                "type": "m.room.message",
+                "content": {
+                    "m.relates_to": {
+                        "rel_type": "rel_type",
+                        "event_id": "$parent:domain",
+                    },
+                },
+                "signatures": {},
+                "unsigned": {},
+            },
+            room_version=msc3389_room_ver,
+        )
+
+        # If the field is not an object, redact it.
+        self.run_test(
+            {
+                "type": "m.room.message",
+                "content": {
+                    "body": "foo",
+                    "m.relates_to": "stripped",
+                },
+            },
+            {
+                "type": "m.room.message",
+                "content": {},
+                "signatures": {},
+                "unsigned": {},
+            },
+            room_version=msc3389_room_ver,
+        )
+
+        # If the m.relates_to property would be empty, redact it.
+        self.run_test(
+            {
+                "type": "m.room.message",
+                "content": {"body": "foo", "m.relates_to": {"foo": "stripped"}},
+            },
+            {
+                "type": "m.room.message",
+                "content": {},
+                "signatures": {},
+                "unsigned": {},
+            },
+            room_version=msc3389_room_ver,
         )
 
 
@@ -616,3 +799,40 @@ class CopyPowerLevelsContentTestCase(stdlib_unittest.TestCase):
     def test_invalid_nesting_raises_type_error(self) -> None:
         with self.assertRaises(TypeError):
             copy_and_fixup_power_levels_contents({"a": {"b": {"c": 1}}})  # type: ignore[dict-item]
+
+
+class SplitFieldTestCase(stdlib_unittest.TestCase):
+    @parameterized.expand(
+        [
+            # A field with no dots.
+            ["m", ["m"]],
+            # Simple dotted fields.
+            ["m.foo", ["m", "foo"]],
+            ["m.foo.bar", ["m", "foo", "bar"]],
+            # Backslash is used as an escape character.
+            [r"m\.foo", ["m.foo"]],
+            [r"m\\.foo", ["m\\", "foo"]],
+            [r"m\\\.foo", [r"m\.foo"]],
+            [r"m\\\\.foo", ["m\\\\", "foo"]],
+            [r"m\foo", [r"m\foo"]],
+            [r"m\\foo", [r"m\foo"]],
+            [r"m\\\foo", [r"m\\foo"]],
+            [r"m\\\\foo", [r"m\\foo"]],
+            # Ensure that escapes at the end don't cause issues.
+            ["m.foo\\", ["m", "foo\\"]],
+            ["m.foo\\", ["m", "foo\\"]],
+            [r"m.foo\.", ["m", "foo."]],
+            [r"m.foo\\.", ["m", "foo\\", ""]],
+            [r"m.foo\\\.", ["m", r"foo\."]],
+            # Empty parts (corresponding to properties which are an empty string) are allowed.
+            [".m", ["", "m"]],
+            ["..m", ["", "", "m"]],
+            ["m.", ["m", ""]],
+            ["m..", ["m", "", ""]],
+            ["m..foo", ["m", "", "foo"]],
+            # Invalid escape sequences.
+            [r"\m", [r"\m"]],
+        ]
+    )
+    def test_split_field(self, input: str, expected: str) -> None:
+        self.assertEqual(_split_field(input), expected)

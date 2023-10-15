@@ -33,7 +33,7 @@ from synapse.api.errors import (
     RequestSendFailed,
     SynapseError,
 )
-from synapse.types import JsonDict, ThirdPartyInstanceID
+from synapse.types import JsonDict, JsonMapping, ThirdPartyInstanceID
 from synapse.util.caches.descriptors import _CacheContext, cached
 from synapse.util.caches.response_cache import ResponseCache
 
@@ -256,7 +256,7 @@ class RoomListHandler:
         cache_context: _CacheContext,
         with_alias: bool = True,
         allow_private: bool = False,
-    ) -> Optional[JsonDict]:
+    ) -> Optional[JsonMapping]:
         """Returns the entry for a room
 
         Args:

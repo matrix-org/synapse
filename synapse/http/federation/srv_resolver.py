@@ -22,7 +22,7 @@ import attr
 
 from twisted.internet.error import ConnectError
 from twisted.names import client, dns
-from twisted.names.error import DNSNameError, DomainError
+from twisted.names.error import DNSNameError, DNSNotImplementedError, DomainError
 
 from synapse.logging.context import make_deferred_yieldable
 
@@ -144,6 +144,9 @@ class SrvResolver:
         except DNSNameError:
             # TODO: cache this. We can get the SOA out of the exception, and use
             # the negative-TTL value.
+            return []
+        except DNSNotImplementedError:
+            # For .onion homeservers this is unavailable, just fallback to host:8448
             return []
         except DomainError as e:
             # We failed to resolve the name (other than a NameError)

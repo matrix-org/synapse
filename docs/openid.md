@@ -569,7 +569,7 @@ You should receive a response similar to the following. Make sure to save it.
 {"client_id":"someclientid_123","client_secret":"someclientsecret_123","id":"12345","name":"my_synapse_app","redirect_uri":"https://[synapse_public_baseurl]/_synapse/client/oidc/callback","website":null,"vapid_key":"somerandomvapidkey_123"}
 ```
 
-As the Synapse login mechanism needs an attribute to uniquely identify users, and Mastodon's endpoint does not return a `sub` property, an alternative `subject_claim` has to be set. Your Synapse configuration should include the following:
+As the Synapse login mechanism needs an attribute to uniquely identify users, and Mastodon's endpoint does not return a `sub` property, an alternative `subject_template` has to be set. Your Synapse configuration should include the following:
 
 ```yaml
 oidc_providers:
@@ -585,7 +585,9 @@ oidc_providers:
     scopes: ["read"]
     user_mapping_provider:
       config:
-        subject_claim: "id"
+        subject_template: "{{ user.id }}"
+        localpart_template: "{{ user.username }}"
+        display_name_template: "{{ user.display_name }}"
 ```
 
 Note that the fields `client_id` and `client_secret` are taken from the CURL response above.

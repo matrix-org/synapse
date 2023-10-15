@@ -137,6 +137,10 @@ class ContentRepositoryConfig(Config):
         self.max_image_pixels = self.parse_size(config.get("max_image_pixels", "32M"))
         self.max_spider_size = self.parse_size(config.get("max_spider_size", "10M"))
 
+        self.prevent_media_downloads_from = config.get(
+            "prevent_media_downloads_from", []
+        )
+
         self.media_store_path = self.ensure_directory(
             config.get("media_store_path", "media_store")
         )
@@ -220,20 +224,20 @@ class ContentRepositoryConfig(Config):
                 if "http" in proxy_env or "https" in proxy_env:
                     logger.warning("".join(HTTP_PROXY_SET_WARNING))
 
-            # we always blacklist '0.0.0.0' and '::', which are supposed to be
+            # we always block '0.0.0.0' and '::', which are supposed to be
             # unroutable addresses.
-            self.url_preview_ip_range_blacklist = generate_ip_set(
+            self.url_preview_ip_range_blocklist = generate_ip_set(
                 config["url_preview_ip_range_blacklist"],
                 ["0.0.0.0", "::"],
                 config_path=("url_preview_ip_range_blacklist",),
             )
 
-            self.url_preview_ip_range_whitelist = generate_ip_set(
+            self.url_preview_ip_range_allowlist = generate_ip_set(
                 config.get("url_preview_ip_range_whitelist", ()),
                 config_path=("url_preview_ip_range_whitelist",),
             )
 
-            self.url_preview_url_blacklist = config.get("url_preview_url_blacklist", ())
+            self.url_preview_url_blocklist = config.get("url_preview_url_blacklist", ())
 
             self.url_preview_accept_language = config.get(
                 "url_preview_accept_language"

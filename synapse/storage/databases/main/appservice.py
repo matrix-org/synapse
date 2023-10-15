@@ -14,17 +14,7 @@
 # limitations under the License.
 import logging
 import re
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Dict,
-    List,
-    Optional,
-    Pattern,
-    Sequence,
-    Tuple,
-    cast,
-)
+from typing import TYPE_CHECKING, List, Optional, Pattern, Sequence, Tuple, cast
 
 from synapse.appservice import (
     ApplicationService,
@@ -45,7 +35,7 @@ from synapse.storage.databases.main.events_worker import EventsWorkerStore
 from synapse.storage.databases.main.roommember import RoomMemberWorkerStore
 from synapse.storage.types import Cursor
 from synapse.storage.util.sequence import build_sequence_generator
-from synapse.types import DeviceListUpdates, JsonDict
+from synapse.types import DeviceListUpdates, JsonMapping
 from synapse.util import json_encoder
 from synapse.util.caches.descriptors import _CacheContext, cached
 
@@ -268,8 +258,8 @@ class ApplicationServiceTransactionWorkerStore(
         self,
         service: ApplicationService,
         events: Sequence[EventBase],
-        ephemeral: List[JsonDict],
-        to_device_messages: List[JsonDict],
+        ephemeral: List[JsonMapping],
+        to_device_messages: List[JsonMapping],
         one_time_keys_count: TransactionOneTimeKeysCount,
         unused_fallback_keys: TransactionUnusedFallbackKeys,
         device_list_summary: DeviceListUpdates,
@@ -353,21 +343,15 @@ class ApplicationServiceTransactionWorkerStore(
 
         def _get_oldest_unsent_txn(
             txn: LoggingTransaction,
-        ) -> Optional[Dict[str, Any]]:
+        ) -> Optional[Tuple[int, str]]:
             # Monotonically increasing txn ids, so just select the smallest
             # one in the txns table (we delete them when they are sent)
             txn.execute(
-                "SELECT * FROM application_services_txns WHERE as_id=?"
+                "SELECT txn_id, event_ids FROM application_services_txns WHERE as_id=?"
                 " ORDER BY txn_id ASC LIMIT 1",
                 (service.id,),
             )
-            rows = self.db_pool.cursor_to_dict(txn)
-            if not rows:
-                return None
-
-            entry = rows[0]
-
-            return entry
+            return cast(Optional[Tuple[int, str]], txn.fetchone())
 
         entry = await self.db_pool.runInteraction(
             "get_oldest_unsent_appservice_txn", _get_oldest_unsent_txn
@@ -376,8 +360,9 @@ class ApplicationServiceTransactionWorkerStore(
         if not entry:
             return None
 
-        event_ids = db_to_json(entry["event_ids"])
+        txn_id, event_ids_str = entry
 
+        event_ids = db_to_json(event_ids_str)
         events = await self.get_events_as_list(event_ids)
 
         # TODO: to-device messages, one-time key counts, device list summaries and unused
@@ -385,7 +370,7 @@ class ApplicationServiceTransactionWorkerStore(
         #       We likely want to populate those for reliability.
         return AppServiceTransaction(
             service=service,
-            id=entry["txn_id"],
+            id=txn_id,
             events=events,
             ephemeral=[],
             to_device_messages=[],

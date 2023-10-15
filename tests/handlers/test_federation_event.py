@@ -35,7 +35,7 @@ from synapse.types import JsonDict
 from synapse.util import Clock
 
 from tests import unittest
-from tests.test_utils import event_injection, make_awaitable
+from tests.test_utils import event_injection
 
 
 class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
@@ -50,6 +50,10 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
         self.mock_federation_transport_client = mock.Mock(
             spec=["get_room_state_ids", "get_room_state", "get_event", "backfill"]
         )
+        self.mock_federation_transport_client.get_room_state_ids = mock.AsyncMock()
+        self.mock_federation_transport_client.get_room_state = mock.AsyncMock()
+        self.mock_federation_transport_client.get_event = mock.AsyncMock()
+        self.mock_federation_transport_client.backfill = mock.AsyncMock()
         return super().setup_test_homeserver(
             federation_transport_client=self.mock_federation_transport_client
         )
@@ -198,20 +202,14 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
         )
 
         # we expect an outbound request to /state_ids, so stub that out
-        self.mock_federation_transport_client.get_room_state_ids.return_value = (
-            make_awaitable(
-                {
-                    "pdu_ids": [e.event_id for e in state_at_prev_event],
-                    "auth_chain_ids": [],
-                }
-            )
-        )
+        self.mock_federation_transport_client.get_room_state_ids.return_value = {
+            "pdu_ids": [e.event_id for e in state_at_prev_event],
+            "auth_chain_ids": [],
+        }
 
         # we also expect an outbound request to /state
         self.mock_federation_transport_client.get_room_state.return_value = (
-            make_awaitable(
-                StateRequestResponse(auth_events=[], state=state_at_prev_event)
-            )
+            StateRequestResponse(auth_events=[], state=state_at_prev_event)
         )
 
         # we have to bump the clock a bit, to keep the retry logic in
@@ -273,26 +271,23 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
         room_version = self.get_success(main_store.get_room_version(room_id))
 
         # We expect an outbound request to /state_ids, so stub that out
-        self.mock_federation_transport_client.get_room_state_ids.return_value = make_awaitable(
-            {
-                # Mimic the other server not knowing about the state at all.
-                # We want to cause Synapse to throw an error (`Unable to get
-                # missing prev_event $fake_prev_event`) and fail to backfill
-                # the pulled event.
-                "pdu_ids": [],
-                "auth_chain_ids": [],
-            }
-        )
+        self.mock_federation_transport_client.get_room_state_ids.return_value = {
+            # Mimic the other server not knowing about the state at all.
+            # We want to cause Synapse to throw an error (`Unable to get
+            # missing prev_event $fake_prev_event`) and fail to backfill
+            # the pulled event.
+            "pdu_ids": [],
+            "auth_chain_ids": [],
+        }
+
         # We also expect an outbound request to /state
-        self.mock_federation_transport_client.get_room_state.return_value = make_awaitable(
-            StateRequestResponse(
-                # Mimic the other server not knowing about the state at all.
-                # We want to cause Synapse to throw an error (`Unable to get
-                # missing prev_event $fake_prev_event`) and fail to backfill
-                # the pulled event.
-                auth_events=[],
-                state=[],
-            )
+        self.mock_federation_transport_client.get_room_state.return_value = StateRequestResponse(
+            # Mimic the other server not knowing about the state at all.
+            # We want to cause Synapse to throw an error (`Unable to get
+            # missing prev_event $fake_prev_event`) and fail to backfill
+            # the pulled event.
+            auth_events=[],
+            state=[],
         )
 
         pulled_event = make_event_from_dict(
@@ -545,25 +540,23 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
         )
 
         # We expect an outbound request to /backfill, so stub that out
-        self.mock_federation_transport_client.backfill.return_value = make_awaitable(
-            {
-                "origin": self.OTHER_SERVER_NAME,
-                "origin_server_ts": 123,
-                "pdus": [
-                    # This is one of the important aspects of this test: we include
-                    # `pulled_event_without_signatures` so it fails the signature check
-                    # when we filter down the backfill response down to events which
-                    # have valid signatures in
-                    # `_check_sigs_and_hash_for_pulled_events_and_fetch`
-                    pulled_event_without_signatures.get_pdu_json(),
-                    # Then later when we process this valid signature event, when we
-                    # fetch the missing `prev_event`s, we want to make sure that we
-                    # backoff and don't try and fetch `pulled_event_without_signatures`
-                    # again since we know it just had an invalid signature.
-                    pulled_event.get_pdu_json(),
-                ],
-            }
-        )
+        self.mock_federation_transport_client.backfill.return_value = {
+            "origin": self.OTHER_SERVER_NAME,
+            "origin_server_ts": 123,
+            "pdus": [
+                # This is one of the important aspects of this test: we include
+                # `pulled_event_without_signatures` so it fails the signature check
+                # when we filter down the backfill response down to events which
+                # have valid signatures in
+                # `_check_sigs_and_hash_for_pulled_events_and_fetch`
+                pulled_event_without_signatures.get_pdu_json(),
+                # Then later when we process this valid signature event, when we
+                # fetch the missing `prev_event`s, we want to make sure that we
+                # backoff and don't try and fetch `pulled_event_without_signatures`
+                # again since we know it just had an invalid signature.
+                pulled_event.get_pdu_json(),
+            ],
+        }
 
         # Keep track of the count and make sure we don't make any of these requests
         event_endpoint_requested_count = 0
@@ -663,6 +656,99 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
             # StoreError: 404: No row found
             StoreError,
         )
+
+    def test_backfill_process_previously_failed_pull_attempt_event_in_the_background(
+        self,
+    ) -> None:
+        """
+        Sanity check that events are still processed even if it is in the background
+        for events that already have failed pull attempts.
+        """
+        OTHER_USER = f"@user:{self.OTHER_SERVER_NAME}"
+        main_store = self.hs.get_datastores().main
+
+        # Create the room
+        user_id = self.register_user("kermit", "test")
+        tok = self.login("kermit", "test")
+        room_id = self.helper.create_room_as(room_creator=user_id, tok=tok)
+        room_version = self.get_success(main_store.get_room_version(room_id))
+
+        # Allow the remote user to send state events
+        self.helper.send_state(
+            room_id,
+            "m.room.power_levels",
+            {"events_default": 0, "state_default": 0},
+            tok=tok,
+        )
+
+        # Add the remote user to the room
+        member_event = self.get_success(
+            event_injection.inject_member_event(self.hs, room_id, OTHER_USER, "join")
+        )
+
+        initial_state_map = self.get_success(
+            main_store.get_partial_current_state_ids(room_id)
+        )
+
+        auth_event_ids = [
+            initial_state_map[("m.room.create", "")],
+            initial_state_map[("m.room.power_levels", "")],
+            member_event.event_id,
+        ]
+
+        # Create a regular event that should process
+        pulled_event = make_event_from_dict(
+            self.add_hashes_and_signatures_from_other_server(
+                {
+                    "type": "test_regular_type",
+                    "room_id": room_id,
+                    "sender": OTHER_USER,
+                    "prev_events": [
+                        member_event.event_id,
+                    ],
+                    "auth_events": auth_event_ids,
+                    "origin_server_ts": 1,
+                    "depth": 12,
+                    "content": {"body": "pulled_event"},
+                }
+            ),
+            room_version,
+        )
+
+        # Record a failed pull attempt for this event which will cause us to backfill it
+        # in the background from here on out.
+        self.get_success(
+            main_store.record_event_failed_pull_attempt(
+                room_id, pulled_event.event_id, "fake cause"
+            )
+        )
+
+        # We expect an outbound request to /backfill, so stub that out
+        self.mock_federation_transport_client.backfill.return_value = {
+            "origin": self.OTHER_SERVER_NAME,
+            "origin_server_ts": 123,
+            "pdus": [
+                pulled_event.get_pdu_json(),
+            ],
+        }
+
+        # The function under test: try to backfill and process the pulled event
+        with LoggingContext("test"):
+            self.get_success(
+                self.hs.get_federation_event_handler().backfill(
+                    self.OTHER_SERVER_NAME,
+                    room_id,
+                    limit=1,
+                    extremities=["$some_extremity"],
+                )
+            )
+
+        # Ensure `run_as_background_process(...)` has a chance to run (essentially
+        # `wait_for_background_processes()`)
+        self.reactor.pump((0.1,))
+
+        # Make sure we processed and persisted the pulled event
+        self.get_success(main_store.get_event(pulled_event.event_id, allow_none=False))
 
     def test_process_pulled_event_with_rejected_missing_state(self) -> None:
         """Ensure that we correctly handle pulled events with missing state containing a

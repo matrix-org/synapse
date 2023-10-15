@@ -27,8 +27,8 @@ from twisted.web.iweb import UNKNOWN_LENGTH
 
 from synapse.api.errors import SynapseError
 from synapse.http.client import (
-    BlacklistingAgentWrapper,
-    BlacklistingReactorWrapper,
+    BlocklistingAgentWrapper,
+    BlocklistingReactorWrapper,
     BodyExceededMaxSize,
     _DiscardBodyWithMaxSizeProtocol,
     read_body_with_max_size,
@@ -140,7 +140,7 @@ class ReadBodyWithMaxSizeTests(TestCase):
         self.assertEqual(result.getvalue(), b"")
 
 
-class BlacklistingAgentTest(TestCase):
+class BlocklistingAgentTest(TestCase):
     def setUp(self) -> None:
         self.reactor, self.clock = get_clock()
 
@@ -157,16 +157,16 @@ class BlacklistingAgentTest(TestCase):
             self.reactor.lookups[domain.decode()] = ip.decode()
             self.reactor.lookups[ip.decode()] = ip.decode()
 
-        self.ip_whitelist = IPSet([self.allowed_ip.decode()])
-        self.ip_blacklist = IPSet(["5.0.0.0/8"])
+        self.ip_allowlist = IPSet([self.allowed_ip.decode()])
+        self.ip_blocklist = IPSet(["5.0.0.0/8"])
 
     def test_reactor(self) -> None:
-        """Apply the blacklisting reactor and ensure it properly blocks connections to particular domains and IPs."""
+        """Apply the blocklisting reactor and ensure it properly blocks connections to particular domains and IPs."""
         agent = Agent(
-            BlacklistingReactorWrapper(
+            BlocklistingReactorWrapper(
                 self.reactor,
-                ip_whitelist=self.ip_whitelist,
-                ip_blacklist=self.ip_blacklist,
+                ip_allowlist=self.ip_allowlist,
+                ip_blocklist=self.ip_blocklist,
             ),
         )
 
@@ -207,11 +207,11 @@ class BlacklistingAgentTest(TestCase):
             self.assertEqual(response.code, 200)
 
     def test_agent(self) -> None:
-        """Apply the blacklisting agent and ensure it properly blocks connections to particular IPs."""
-        agent = BlacklistingAgentWrapper(
+        """Apply the blocklisting agent and ensure it properly blocks connections to particular IPs."""
+        agent = BlocklistingAgentWrapper(
             Agent(self.reactor),
-            ip_whitelist=self.ip_whitelist,
-            ip_blacklist=self.ip_blacklist,
+            ip_blocklist=self.ip_blocklist,
+            ip_allowlist=self.ip_allowlist,
         )
 
         # The unsafe IPs should be rejected.

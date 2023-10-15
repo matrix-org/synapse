@@ -11,8 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Any, Dict
-from unittest.mock import Mock
+from typing import Any, Dict, Optional
+from unittest.mock import AsyncMock, Mock
 
 from twisted.internet import defer
 from twisted.test.proto_helpers import MemoryReactor
@@ -21,18 +21,18 @@ from synapse.api.constants import EduTypes, EventTypes
 from synapse.api.errors import NotFoundError
 from synapse.events import EventBase
 from synapse.federation.units import Transaction
+from synapse.handlers.device import DeviceHandler
 from synapse.handlers.presence import UserPresenceState
 from synapse.handlers.push_rules import InvalidRuleException
 from synapse.module_api import ModuleApi
 from synapse.rest import admin
 from synapse.rest.client import login, notifications, presence, profile, room
 from synapse.server import HomeServer
-from synapse.types import JsonDict, create_requester
+from synapse.types import JsonDict, UserID, create_requester
 from synapse.util import Clock
 
 from tests.events.test_presence_router import send_presence_update, sync_presence
 from tests.replication._base import BaseMultiWorkerStreamTestCase
-from tests.test_utils import simple_async_mock
 from tests.test_utils.event_injection import inject_member_event
 from tests.unittest import HomeserverTestCase, override_config
 
@@ -69,7 +69,7 @@ class ModuleApiTestCase(BaseModuleApiTestCase):
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         # Mock out the calls over federation.
         self.fed_transport_client = Mock(spec=["send_transaction"])
-        self.fed_transport_client.send_transaction = simple_async_mock({})
+        self.fed_transport_client.send_transaction = AsyncMock(return_value={})
 
         return self.setup_test_homeserver(
             federation_transport_client=self.fed_transport_client,
@@ -94,15 +94,17 @@ class ModuleApiTestCase(BaseModuleApiTestCase):
         self.assertEqual(len(emails), 1)
 
         email = emails[0]
-        self.assertEqual(email["medium"], "email")
-        self.assertEqual(email["address"], "bob@bobinator.bob")
+        self.assertEqual(email.medium, "email")
+        self.assertEqual(email.address, "bob@bobinator.bob")
 
         # Should these be 0?
-        self.assertEqual(email["validated_at"], 0)
-        self.assertEqual(email["added_at"], 0)
+        self.assertEqual(email.validated_at, 0)
+        self.assertEqual(email.added_at, 0)
 
         # Check that the displayname was assigned
-        displayname = self.get_success(self.store.get_profile_displayname("bob"))
+        displayname = self.get_success(
+            self.store.get_profile_displayname(UserID.from_string("@bob:test"))
+        )
         self.assertEqual(displayname, "Bobberino")
 
     def test_can_register_admin_user(self) -> None:
@@ -231,7 +233,7 @@ class ModuleApiTestCase(BaseModuleApiTestCase):
     def test_sending_events_into_room(self) -> None:
         """Tests that a module can send events into a room"""
         # Mock out create_and_send_nonmember_event to check whether events are being sent
-        self.event_creation_handler.create_and_send_nonmember_event = Mock(  # type: ignore[assignment]
+        self.event_creation_handler.create_and_send_nonmember_event = Mock(  # type: ignore[method-assign]
             spec=[],
             side_effect=self.event_creation_handler.create_and_send_nonmember_event,
         )
@@ -576,10 +578,8 @@ class ModuleApiTestCase(BaseModuleApiTestCase):
         """Test that the module API can join a remote room."""
         # Necessary to fake a remote join.
         fake_stream_id = 1
-        mocked_remote_join = simple_async_mock(
-            return_value=("fake-event-id", fake_stream_id)
-        )
-        self.hs.get_room_member_handler()._remote_join = mocked_remote_join  # type: ignore[assignment]
+        mocked_remote_join = AsyncMock(return_value=("fake-event-id", fake_stream_id))
+        self.hs.get_room_member_handler()._remote_join = mocked_remote_join  # type: ignore[method-assign]
         fake_remote_host = f"{self.module_api.server_name}-remote"
 
         # Given that the join is to be faked, we expect the relevant join event not to
@@ -754,7 +754,7 @@ class ModuleApiTestCase(BaseModuleApiTestCase):
         self.assertEqual(channel.json_body["creator"], user_id)
 
         # Check room alias.
-        self.assertEquals(room_alias, f"#foo-bar:{self.module_api.server_name}")
+        self.assertEqual(room_alias, f"#foo-bar:{self.module_api.server_name}")
 
         # Let's try a room with no alias.
         room_id, room_alias = self.get_success(
@@ -773,6 +773,54 @@ class ModuleApiTestCase(BaseModuleApiTestCase):
         # Check room alias.
         self.assertIsNone(room_alias)
 
+    def test_on_logged_out(self) -> None:
+        """Test that on_logged_out module hook is properly called when logging out
+        a device, and that related pushers are still available at this time.
+        """
+        device_id = "AAAAAAA"
+        user_id = self.register_user("test_on_logged_out", "secret")
+        self.login("test_on_logged_out", "secret", device_id)
+
+        self.get_success(
+            self.hs.get_pusherpool().add_or_update_pusher(
+                user_id=user_id,
+                device_id=device_id,
+                kind="http",
+                app_id="m.http",
+                app_display_name="HTTP Push Notifications",
+                device_display_name="pushy push",
+                pushkey="a@example.com",
+                lang=None,
+                data={"url": "http://example.com/_matrix/push/v1/notify"},
+            )
+        )
+
+        # Setup a callback counting the number of pushers.
+        number_of_pushers_in_callback: Optional[int] = None
+
+        async def _on_logged_out_mock(
+            user_id: str, device_id: Optional[str], access_token: str
+        ) -> None:
+            nonlocal number_of_pushers_in_callback
+            number_of_pushers_in_callback = len(
+                self.hs.get_pusherpool().pushers[user_id].values()
+            )
+
+        self.module_api.register_password_auth_provider_callbacks(
+            on_logged_out=_on_logged_out_mock
+        )
+
+        # Delete the device.
+        device_handler = self.hs.get_device_handler()
+        assert isinstance(device_handler, DeviceHandler)
+        self.get_success(device_handler.delete_devices(user_id, [device_id]))
+
+        # Check that the callback was called and the pushers still existed.
+        self.assertEqual(number_of_pushers_in_callback, 1)
+
+        # Ensure the pushers were deleted after the callback.
+        self.assertEqual(len(self.hs.get_pusherpool().pushers[user_id].values()), 0)
+
 
 class ModuleApiWorkerTestCase(BaseModuleApiTestCase, BaseMultiWorkerStreamTestCase):
     """For testing ModuleApi functionality in a multi-worker setup"""
@@ -788,6 +836,7 @@ class ModuleApiWorkerTestCase(BaseModuleApiTestCase, BaseMultiWorkerStreamTestCa
         conf = super().default_config()
         conf["stream_writers"] = {"presence": ["presence_writer"]}
         conf["instance_map"] = {
+            "main": {"host": "testserv", "port": 8765},
             "presence_writer": {"host": "testserv", "port": 1001},
         }
         return conf

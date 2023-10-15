@@ -16,13 +16,21 @@ import logging
 import os
 import re
 from collections import Counter
-from typing import Collection, Generator, Iterable, List, Optional, TextIO, Tuple
+from typing import (
+    Collection,
+    Counter as CounterType,
+    Generator,
+    Iterable,
+    List,
+    Optional,
+    TextIO,
+    Tuple,
+)
 
 import attr
-from typing_extensions import Counter as CounterType
 
 from synapse.config.homeserver import HomeServerConfig
-from synapse.storage.database import LoggingDatabaseConnection
+from synapse.storage.database import LoggingDatabaseConnection, LoggingTransaction
 from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine, Sqlite3Engine
 from synapse.storage.schema import SCHEMA_COMPAT_VERSION, SCHEMA_VERSION
 from synapse.storage.types import Cursor
@@ -168,7 +176,9 @@ def prepare_database(
 
 
 def _setup_new_database(
-    cur: Cursor, database_engine: BaseDatabaseEngine, databases: Collection[str]
+    cur: LoggingTransaction,
+    database_engine: BaseDatabaseEngine,
+    databases: Collection[str],
 ) -> None:
     """Sets up the physical database by finding a base set of "full schemas" and
     then applying any necessary deltas, including schemas from the given data
@@ -289,7 +299,7 @@ def _setup_new_database(
 
 
 def _upgrade_existing_database(
-    cur: Cursor,
+    cur: LoggingTransaction,
     current_schema_state: _SchemaState,
     database_engine: BaseDatabaseEngine,
     config: Optional[HomeServerConfig],

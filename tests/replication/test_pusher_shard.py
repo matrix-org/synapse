@@ -51,12 +51,12 @@ class PusherShardTestCase(BaseMultiWorkerStreamTestCase):
             self.hs.get_datastores().main.get_user_by_access_token(access_token)
         )
         assert user_dict is not None
-        token_id = user_dict.token_id
+        device_id = user_dict.device_id
 
         self.get_success(
             self.hs.get_pusherpool().add_or_update_pusher(
                 user_id=user_id,
-                access_token=token_id,
+                device_id=device_id,
                 kind="http",
                 app_id="m.http",
                 app_display_name="HTTP Push Notifications",
@@ -93,7 +93,7 @@ class PusherShardTestCase(BaseMultiWorkerStreamTestCase):
         self.make_worker_hs(
             "synapse.app.generic_worker",
             {"worker_name": "pusher1", "pusher_instances": ["pusher1"]},
-            proxied_blacklisted_http_client=http_client_mock,
+            proxied_blocklisted_http_client=http_client_mock,
         )
 
         event_id = self._create_pusher_and_send_msg("user")
@@ -126,7 +126,7 @@ class PusherShardTestCase(BaseMultiWorkerStreamTestCase):
                 "worker_name": "pusher1",
                 "pusher_instances": ["pusher1", "pusher2"],
             },
-            proxied_blacklisted_http_client=http_client_mock1,
+            proxied_blocklisted_http_client=http_client_mock1,
         )
 
         http_client_mock2 = Mock(spec_set=["post_json_get_json"])
@@ -140,7 +140,7 @@ class PusherShardTestCase(BaseMultiWorkerStreamTestCase):
                 "worker_name": "pusher2",
                 "pusher_instances": ["pusher1", "pusher2"],
             },
-            proxied_blacklisted_http_client=http_client_mock2,
+            proxied_blocklisted_http_client=http_client_mock2,
         )
 
         # We choose a user name that we know should go to pusher1.

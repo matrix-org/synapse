@@ -13,15 +13,18 @@
 # limitations under the License.
 
 import sys
+from typing import cast
+
+from synapse.types import ISynapseReactor
 
 try:
     from twisted.internet.epollreactor import EPollReactor as Reactor
 except ImportError:
-    from twisted.internet.pollreactor import PollReactor as Reactor
+    from twisted.internet.pollreactor import PollReactor as Reactor  # type: ignore[assignment]
 from twisted.internet.main import installReactor
 
 
-def make_reactor():
+def make_reactor() -> ISynapseReactor:
     """
     Instantiate and install a Twisted reactor suitable for testing (i.e. not the
     default global one).
@@ -32,4 +35,4 @@ def make_reactor():
         del sys.modules["twisted.internet.reactor"]
     installReactor(reactor)
 
-    return reactor
+    return cast(ISynapseReactor, reactor)

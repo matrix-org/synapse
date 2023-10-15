@@ -46,8 +46,7 @@ class FilteredPushRules:
         msc1767_enabled: bool,
         msc3381_polls_enabled: bool,
         msc3664_enabled: bool,
-        msc3952_intentional_mentions: bool,
-        msc3958_suppress_edits_enabled: bool,
+        msc4028_push_encrypted_events: bool,
     ): ...
     def rules(self) -> Collection[Tuple[PushRule, bool]]: ...
 
@@ -65,8 +64,6 @@ class PushRuleEvaluator:
         related_event_match_enabled: bool,
         room_version_feature_flags: Tuple[str, ...],
         msc3931_enabled: bool,
-        msc3758_exact_event_match: bool,
-        msc3966_exact_event_property_contains: bool,
     ): ...
     def run(
         self,

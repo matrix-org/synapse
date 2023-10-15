@@ -172,6 +172,7 @@ class RelationsWorkerStore(SQLBaseStore):
         direction: Direction = Direction.BACKWARDS,
         from_token: Optional[StreamToken] = None,
         to_token: Optional[StreamToken] = None,
+        recurse: bool = False,
     ) -> Tuple[Sequence[_RelatedEvent], Optional[StreamToken]]:
         """Get a list of relations for an event, ordered by topological ordering.
 
@@ -186,6 +187,7 @@ class RelationsWorkerStore(SQLBaseStore):
                 oldest first (forwards).
             from_token: Fetch rows from the given token, or from the start if None.
             to_token: Fetch rows up to the given token, or up to the end if None.
+            recurse: Whether to recursively find relations.
 
         Returns:
             A tuple of:
@@ -200,8 +202,8 @@ class RelationsWorkerStore(SQLBaseStore):
         # Ensure bad limits aren't being passed in.
         assert limit >= 0
 
-        where_clause = ["relates_to_id = ?", "room_id = ?"]
-        where_args: List[Union[str, int]] = [event.event_id, room_id]
+        where_clause = ["room_id = ?"]
+        where_args: List[Union[str, int]] = [room_id]
         is_redacted = event.internal_metadata.is_redacted()
 
         if relation_type is not None:
@@ -229,23 +231,52 @@ class RelationsWorkerStore(SQLBaseStore):
         if pagination_clause:
             where_clause.append(pagination_clause)
 
-        sql = """
-            SELECT event_id, relation_type, sender, topological_ordering, stream_ordering
-            FROM event_relations
-            INNER JOIN events USING (event_id)
-            WHERE %s
-            ORDER BY topological_ordering %s, stream_ordering %s
-            LIMIT ?
-        """ % (
-            " AND ".join(where_clause),
-            order,
-            order,
-        )
+        # If a recursive query is requested then the filters are applied after
+        # recursively following relationships from the requested event to children
+        # up to 3-relations deep.
+        #
+        # If no recursion is needed then the event_relations table is queried
+        # for direct children of the requested event.
+        if recurse:
+            sql = """
+                WITH RECURSIVE related_events AS (
+                    SELECT event_id, relation_type, relates_to_id, 0 AS depth
+                    FROM event_relations
+                    WHERE relates_to_id = ?
+                    UNION SELECT e.event_id, e.relation_type, e.relates_to_id, depth + 1
+                    FROM event_relations e
+                    INNER JOIN related_events r ON r.event_id = e.relates_to_id
+                    WHERE depth <= 3
+                )
+                SELECT event_id, relation_type, sender, topological_ordering, stream_ordering
+                FROM related_events
+                INNER JOIN events USING (event_id)
+                WHERE %s
+                ORDER BY topological_ordering %s, stream_ordering %s
+                LIMIT ?;
+            """ % (
+                " AND ".join(where_clause),
+                order,
+                order,
+            )
+        else:
+            sql = """
+                SELECT event_id, relation_type, sender, topological_ordering, stream_ordering
+                FROM event_relations
+                INNER JOIN events USING (event_id)
+                WHERE relates_to_id = ? AND %s
+                ORDER BY topological_ordering %s, stream_ordering %s
+                LIMIT ?
+            """ % (
+                " AND ".join(where_clause),
+                order,
+                order,
+            )
 
         def _get_recent_references_for_event_txn(
             txn: LoggingTransaction,
         ) -> Tuple[List[_RelatedEvent], Optional[StreamToken]]:
-            txn.execute(sql, where_args + [limit + 1])
+            txn.execute(sql, [event.event_id] + where_args + [limit + 1])
 
             events = []
             topo_orderings: List[int] = []
@@ -318,11 +349,44 @@ class RelationsWorkerStore(SQLBaseStore):
         def get_all_relation_ids_for_event_with_types_txn(
             txn: LoggingTransaction,
         ) -> List[str]:
-            rows = self.db_pool.simple_select_many_txn(
+            rows = cast(
+                List[Tuple[str]],
+                self.db_pool.simple_select_many_txn(
+                    txn=txn,
+                    table="event_relations",
+                    column="relation_type",
+                    iterable=relation_types,
+                    keyvalues={"relates_to_id": event_id},
+                    retcols=["event_id"],
+                ),
+            )
+
+            return [row[0] for row in rows]
+
+        return await self.db_pool.runInteraction(
+            desc="get_all_relation_ids_for_event_with_types",
+            func=get_all_relation_ids_for_event_with_types_txn,
+        )
+
+    async def get_all_relations_for_event(
+        self,
+        event_id: str,
+    ) -> List[str]:
+        """Get the event IDs of all events that have a relation to the given event.
+
+        Args:
+            event_id: The event for which to look for related events.
+
+        Returns:
+            A list of the IDs of the events that relate to the given event.
+        """
+
+        def get_all_relation_ids_for_event_txn(
+            txn: LoggingTransaction,
+        ) -> List[str]:
+            rows = self.db_pool.simple_select_list_txn(
                 txn=txn,
                 table="event_relations",
-                column="relation_type",
-                iterable=relation_types,
                 keyvalues={"relates_to_id": event_id},
                 retcols=["event_id"],
             )
@@ -330,8 +394,8 @@ class RelationsWorkerStore(SQLBaseStore):
             return [row["event_id"] for row in rows]
 
         return await self.db_pool.runInteraction(
-            desc="get_all_relation_ids_for_event_with_types",
-            func=get_all_relation_ids_for_event_with_types_txn,
+            desc="get_all_relation_ids_for_event",
+            func=get_all_relation_ids_for_event_txn,
         )
 
     async def event_includes_relation(self, event_id: str) -> bool:
@@ -397,14 +461,14 @@ class RelationsWorkerStore(SQLBaseStore):
         )
         return result is not None
 
-    @cached()
+    @cached()  # type: ignore[synapse-@cached-mutable]
     async def get_references_for_event(self, event_id: str) -> List[JsonDict]:
         raise NotImplementedError()
 
     @cachedList(cached_method_name="get_references_for_event", list_name="event_ids")
     async def get_references_for_events(
         self, event_ids: Collection[str]
-    ) -> Mapping[str, Optional[List[_RelatedEvent]]]:
+    ) -> Mapping[str, Optional[Sequence[_RelatedEvent]]]:
         """Get a list of references to the given events.
 
         Args:
@@ -451,14 +515,15 @@ class RelationsWorkerStore(SQLBaseStore):
             "_get_references_for_events_txn", _get_references_for_events_txn
         )
 
-    @cached()
+    @cached()  # type: ignore[synapse-@cached-mutable]
     def get_applicable_edit(self, event_id: str) -> Optional[EventBase]:
         raise NotImplementedError()
 
-    @cachedList(cached_method_name="get_applicable_edit", list_name="event_ids")
+    # TODO: This returns a mutable object, which is generally bad.
+    @cachedList(cached_method_name="get_applicable_edit", list_name="event_ids")  # type: ignore[synapse-@cached-mutable]
     async def get_applicable_edits(
         self, event_ids: Collection[str]
-    ) -> Dict[str, Optional[EventBase]]:
+    ) -> Mapping[str, Optional[EventBase]]:
         """Get the most recent edit (if any) that has happened for the given
         events.
 
@@ -472,12 +537,11 @@ class RelationsWorkerStore(SQLBaseStore):
             the event will map to None.
         """
 
-        # We only allow edits for `m.room.message` events that have the same sender
-        # and event type. We can't assert these things during regular event auth so
-        # we have to do the checks post hoc.
+        # We only allow edits for events that have the same sender and event type.
+        # We can't assert these things during regular event auth so we have to do
+        # the checks post hoc.
 
-        # Fetches latest edit that has the same type and sender as the
-        # original, and is an `m.room.message`.
+        # Fetches latest edit that has the same type and sender as the original.
         if isinstance(self.database_engine, PostgresEngine):
             # The `DISTINCT ON` clause will pick the *first* row it encounters,
             # so ordering by origin server ts + event ID desc will ensure we get
@@ -493,7 +557,6 @@ class RelationsWorkerStore(SQLBaseStore):
                 WHERE
                     %s
                     AND relation_type = ?
-                    AND edit.type = 'm.room.message'
                 ORDER by original.event_id DESC, edit.origin_server_ts DESC, edit.event_id DESC
             """
         else:
@@ -512,7 +575,6 @@ class RelationsWorkerStore(SQLBaseStore):
                 WHERE
                     %s
                     AND relation_type = ?
-                    AND edit.type = 'm.room.message'
                 ORDER by edit.origin_server_ts, edit.event_id
             """
 
@@ -540,14 +602,15 @@ class RelationsWorkerStore(SQLBaseStore):
             for original_event_id in event_ids
         }
 
-    @cached()
+    @cached()  # type: ignore[synapse-@cached-mutable]
     def get_thread_summary(self, event_id: str) -> Optional[Tuple[int, EventBase]]:
         raise NotImplementedError()
 
-    @cachedList(cached_method_name="get_thread_summary", list_name="event_ids")
+    # TODO: This returns a mutable object, which is generally bad.
+    @cachedList(cached_method_name="get_thread_summary", list_name="event_ids")  # type: ignore[synapse-@cached-mutable]
     async def get_thread_summaries(
         self, event_ids: Collection[str]
-    ) -> Dict[str, Optional[Tuple[int, EventBase]]]:
+    ) -> Mapping[str, Optional[Tuple[int, EventBase]]]:
         """Get the number of threaded replies and the latest reply (if any) for the given events.
 
         Args:
@@ -721,7 +784,7 @@ class RelationsWorkerStore(SQLBaseStore):
     @cachedList(cached_method_name="get_thread_participated", list_name="event_ids")
     async def get_threads_participated(
         self, event_ids: Collection[str], user_id: str
-    ) -> Dict[str, bool]:
+    ) -> Mapping[str, bool]:
         """Get whether the requesting user participated in the given threads.
 
         This is separate from get_thread_summaries since that can be cached across
@@ -873,7 +936,7 @@ class RelationsWorkerStore(SQLBaseStore):
         room_id: str,
         limit: int = 5,
         from_token: Optional[ThreadsNextBatch] = None,
-    ) -> Tuple[List[str], Optional[ThreadsNextBatch]]:
+    ) -> Tuple[Sequence[str], Optional[ThreadsNextBatch]]:
         """Get a list of thread IDs, ordered by topological ordering of their
         latest reply.
 
@@ -968,7 +1031,7 @@ class RelationsWorkerStore(SQLBaseStore):
         # relation.
         sql = """
             WITH RECURSIVE related_events AS (
-                SELECT event_id, relates_to_id, relation_type, 0 depth
+                SELECT event_id, relates_to_id, relation_type, 0 AS depth
                 FROM event_relations
                 WHERE event_id = ?
                 UNION SELECT e.event_id, e.relates_to_id, e.relation_type, depth + 1
@@ -1028,7 +1091,7 @@ class RelationsWorkerStore(SQLBaseStore):
         sql = """
         SELECT relates_to_id FROM event_relations WHERE relates_to_id = COALESCE((
             WITH RECURSIVE related_events AS (
-                SELECT event_id, relates_to_id, relation_type, 0 depth
+                SELECT event_id, relates_to_id, relation_type, 0 AS depth
                 FROM event_relations
                 WHERE event_id = ?
                 UNION SELECT e.event_id, e.relates_to_id, e.relation_type, depth + 1

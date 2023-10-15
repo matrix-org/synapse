@@ -37,7 +37,6 @@ import attr
 from typing_extensions import Literal
 
 from twisted.test.proto_helpers import MemoryReactorClock
-from twisted.web.resource import Resource
 from twisted.web.server import Site
 
 from synapse.api.constants import Membership
@@ -45,7 +44,7 @@ from synapse.api.errors import Codes
 from synapse.server import HomeServer
 from synapse.types import JsonDict
 
-from tests.server import FakeChannel, FakeSite, make_request
+from tests.server import FakeChannel, make_request
 from tests.test_utils.html_parsers import TestHtmlParser
 from tests.test_utils.oidc import FakeAuthorizationGrant, FakeOidcServer
 
@@ -558,7 +557,6 @@ class RestHelper:
 
     def upload_media(
         self,
-        resource: Resource,
         image_data: bytes,
         tok: str,
         filename: str = "test.png",
@@ -576,7 +574,7 @@ class RestHelper:
         path = "/_matrix/media/r0/upload?filename=%s" % (filename,)
         channel = make_request(
             self.reactor,
-            FakeSite(resource, self.reactor),
+            self.site,
             "POST",
             path,
             content=image_data,

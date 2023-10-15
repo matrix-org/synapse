@@ -1,5 +1,6 @@
-from typing import Callable, List, Optional, Tuple
-from unittest.mock import Mock
+from typing import Callable, Collection, List, Optional, Tuple
+from unittest import mock
+from unittest.mock import AsyncMock, Mock
 
 from twisted.test.proto_helpers import MemoryReactor
 
@@ -18,7 +19,7 @@ from synapse.types import JsonDict
 from synapse.util import Clock
 from synapse.util.retryutils import NotRetryingDestination
 
-from tests.test_utils import event_injection, make_awaitable
+from tests.test_utils import event_injection
 from tests.unittest import FederatingHomeserverTestCase
 
 
@@ -49,8 +50,8 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
         # This mock is crucial for destination_rooms to be populated.
         # TODO: this seems to no longer be the case---tests pass with this mock
         # commented out.
-        state_storage_controller.get_current_hosts_in_room = Mock(  # type: ignore[assignment]
-            return_value=make_awaitable({"test", "host2"})
+        state_storage_controller.get_current_hosts_in_room = AsyncMock(  # type: ignore[method-assign]
+            return_value={"test", "host2"}
         )
 
         # whenever send_transaction is called, record the pdu data
@@ -430,28 +431,24 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
         # ACT: call _wake_destinations_needing_catchup
 
         # patch wake_destination to just count the destinations instead
-        woken = []
+        woken = set()
 
         def wake_destination_track(destination: str) -> None:
-            woken.append(destination)
+            woken.add(destination)
 
-        self.federation_sender.wake_destination = wake_destination_track  # type: ignore[assignment]
+        self.federation_sender.wake_destination = wake_destination_track  # type: ignore[method-assign]
 
-        # cancel the pre-existing timer for _wake_destinations_needing_catchup
-        # this is because we are calling it manually rather than waiting for it
-        # to be called automatically
-        assert self.federation_sender._catchup_after_startup_timer is not None
-        self.federation_sender._catchup_after_startup_timer.cancel()
-
-        self.get_success(
-            self.federation_sender._wake_destinations_needing_catchup(), by=5.0
-        )
+        # We wait quite long so that all dests can be woken up, since there is a delay
+        # between them.
+        self.pump(by=5.0)
 
         # ASSERT (_wake_destinations_needing_catchup):
         # - all remotes are woken up, save for zzzerver
         self.assertNotIn("zzzerver", woken)
-        # - all destinations are woken exactly once; they appear once in woken.
-        self.assertCountEqual(woken, server_names[:-1])
+        # - all destinations are woken, potentially more than once, since the
+        # wake up is called regularly and we don't ack in this test that a transaction
+        # has been successfully sent.
+        self.assertCountEqual(woken, set(server_names[:-1]))
 
     def test_not_latest_event(self) -> None:
         """Test that we send the latest event in the room even if its not ours."""
@@ -500,3 +497,87 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
         self.assertEqual(len(sent_pdus), 1)
         self.assertEqual(sent_pdus[0].event_id, event_2.event_id)
         self.assertFalse(per_dest_queue._catching_up)
+
+    def test_catch_up_is_not_blocked_by_remote_event_in_partial_state_room(
+        self,
+    ) -> None:
+        """Detects (part of?) https://github.com/matrix-org/synapse/issues/15220."""
+        # ARRANGE:
+        # - a local user (u1)
+        # - a room which contains u1 and two remote users, @u2:host2 and @u3:other
+        # - events in that room such that
+        #   - history visibility is restricted
+        #   - u1 sent message events e1 and e2
+        #   - afterwards, u3 sent a remote event e3
+        # - catchup to begin for host2; last successfully sent event was e1
+        per_dest_queue, sent_pdus = self.make_fake_destination_queue()
+
+        self.register_user("u1", "you the one")
+        u1_token = self.login("u1", "you the one")
+        room = self.helper.create_room_as("u1", tok=u1_token)
+        self.helper.send_state(
+            room_id=room,
+            event_type="m.room.history_visibility",
+            body={"history_visibility": "joined"},
+            tok=u1_token,
+        )
+        self.get_success(
+            event_injection.inject_member_event(self.hs, room, "@u2:host2", "join")
+        )
+        self.get_success(
+            event_injection.inject_member_event(self.hs, room, "@u3:other", "join")
+        )
+
+        # create some events
+        event_id_1 = self.helper.send(room, "hello", tok=u1_token)["event_id"]
+        event_id_2 = self.helper.send(room, "world", tok=u1_token)["event_id"]
+        # pretend that u3 changes their displayname
+        event_id_3 = self.get_success(
+            event_injection.inject_member_event(self.hs, room, "@u3:other", "join")
+        ).event_id
+
+        # destination_rooms should already be populated, but let us pretend that we already
+        # sent (successfully) up to and including event id 1
+        event_1 = self.get_success(self.hs.get_datastores().main.get_event(event_id_1))
+        assert event_1.internal_metadata.stream_ordering is not None
+        self.get_success(
+            self.hs.get_datastores().main.set_destination_last_successful_stream_ordering(
+                "host2", event_1.internal_metadata.stream_ordering
+            )
+        )
+
+        # also fetch event 2 so we can compare its stream ordering to the sender's
+        # last_successful_stream_ordering later
+        event_2 = self.get_success(self.hs.get_datastores().main.get_event(event_id_2))
+
+        # Mock event 3 as having partial state
+        self.get_success(
+            event_injection.mark_event_as_partial_state(self.hs, event_id_3, room)
+        )
+
+        # Fail the test if we block on full state for event 3.
+        async def mock_await_full_state(event_ids: Collection[str]) -> None:
+            if event_id_3 in event_ids:
+                raise AssertionError("Tried to await full state for event_id_3")
+
+        # ACT
+        with mock.patch.object(
+            self.hs.get_storage_controllers().state._partial_state_events_tracker,
+            "await_full_state",
+            mock_await_full_state,
+        ):
+            self.get_success(per_dest_queue._catch_up_transmission_loop())
+
+        # ASSERT
+        # We should have:
+        # - not sent event 3: it's not ours, and the room is partial stated
+        # - fallen back to sending event 2: it's the most recent event in the room
+        #   we tried to send to host2
+        # - completed catch-up
+        self.assertEqual(len(sent_pdus), 1)
+        self.assertEqual(sent_pdus[0].event_id, event_id_2)
+        self.assertFalse(per_dest_queue._catching_up)
+        self.assertEqual(
+            per_dest_queue._last_successful_stream_ordering,
+            event_2.internal_metadata.stream_ordering,
+        )

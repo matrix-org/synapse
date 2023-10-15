@@ -75,7 +75,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(channel.code, 200, msg=channel.result)
         det_data = {"user_id": user_id, "home_server": self.hs.hostname}
-        self.assertDictContainsSubset(det_data, channel.json_body)
+        self.assertLessEqual(det_data.items(), channel.json_body.items())
 
     def test_POST_appservice_registration_no_type(self) -> None:
         as_token = "i_am_an_app_service"
@@ -136,7 +136,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
             "device_id": device_id,
         }
         self.assertEqual(channel.code, 200, msg=channel.result)
-        self.assertDictContainsSubset(det_data, channel.json_body)
+        self.assertLessEqual(det_data.items(), channel.json_body.items())
 
     @override_config({"enable_registration": False})
     def test_POST_disabled_registration(self) -> None:
@@ -157,7 +157,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
 
         det_data = {"home_server": self.hs.hostname, "device_id": "guest_device"}
         self.assertEqual(channel.code, 200, msg=channel.result)
-        self.assertDictContainsSubset(det_data, channel.json_body)
+        self.assertLessEqual(det_data.items(), channel.json_body.items())
 
     def test_POST_disabled_guest_registration(self) -> None:
         self.hs.config.registration.allow_guest_access = False
@@ -169,7 +169,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
 
     @override_config({"rc_registration": {"per_second": 0.17, "burst_count": 5}})
     def test_POST_ratelimiting_guest(self) -> None:
-        for i in range(0, 6):
+        for i in range(6):
             url = self.url + b"?kind=guest"
             channel = self.make_request(b"POST", url, b"{}")
 
@@ -187,7 +187,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
 
     @override_config({"rc_registration": {"per_second": 0.17, "burst_count": 5}})
     def test_POST_ratelimiting(self) -> None:
-        for i in range(0, 6):
+        for i in range(6):
             request_data = {
                 "username": "kermit" + str(i),
                 "password": "monkey",
@@ -267,7 +267,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
             "device_id": device_id,
         }
         self.assertEqual(channel.code, 200, msg=channel.result)
-        self.assertDictContainsSubset(det_data, channel.json_body)
+        self.assertLessEqual(det_data.items(), channel.json_body.items())
 
         # Check the `completed` counter has been incremented and pending is 0
         res = self.get_success(
@@ -1223,7 +1223,7 @@ class RegistrationTokenValidityRestServletTestCase(unittest.HomeserverTestCase):
     def test_GET_ratelimiting(self) -> None:
         token = "1234"
 
-        for i in range(0, 6):
+        for i in range(6):
             channel = self.make_request(
                 b"GET",
                 f"{self.url}?token={token}",

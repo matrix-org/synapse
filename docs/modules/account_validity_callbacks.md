@@ -43,15 +43,15 @@ represented by their Matrix user ID.
 
 If multiple modules implement this callback, Synapse runs them all in order.
 
-### `on_sso_login`
+### `on_user_login`
 
 _First introduced in Synapse < TODO >
 
 ```python
-async def on_sso_login(user: str) -> None
+async def on_sson_user_logino_login(user_id: str, auth_provider_type: LoginType, auth_provider_id: str) -> None
 ```
 
-Called after successfully login or registration of a user using SSO for cases when module needs to perform extra operations after SSO auth.
+Called after successfully login or registration of a user for cases when module needs to perform extra operations after auth.
 represented by their Matrix user ID.
 
 If multiple modules implement this callback, Synapse runs them all in order.
