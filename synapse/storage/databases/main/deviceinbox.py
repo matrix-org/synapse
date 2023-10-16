@@ -450,7 +450,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
         user_id: str,
         device_id: Optional[str],
         up_to_stream_id: int,
-        limit: int,
+        limit: Optional[int] = None,
     ) -> int:
         """
         Args:
@@ -479,13 +479,14 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                 return 0
 
         def delete_messages_for_device_txn(txn: LoggingTransaction) -> int:
+            limit_statement = "" if limit is None else f"LIMIT {limit}"
             sql = f"""
                 DELETE FROM device_inbox WHERE user_id = ? AND device_id = ? AND stream_id <= (
                   SELECT MAX(stream_id) FROM (
                     SELECT stream_id FROM device_inbox
                     WHERE user_id = ? AND device_id = ? AND stream_id <= ?
                     ORDER BY stream_id
-                    LIMIT {limit}
+                    {limit_statement}
                   ) AS q1
                 )
                 """
