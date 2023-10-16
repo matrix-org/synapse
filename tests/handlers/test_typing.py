@@ -174,7 +174,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             return_value=1
         )
 
-        self.datastore.get_partial_current_state_deltas = Mock(return_value=(0, None))  # type: ignore[method-assign]
+        self.datastore.get_partial_current_state_deltas = Mock(return_value=(0, []))  # type: ignore[method-assign]
 
         self.datastore.get_to_device_stream_token = Mock(  # type: ignore[method-assign]
             return_value=0
