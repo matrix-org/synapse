@@ -146,7 +146,7 @@ class PurgeHistoryRestServlet(RestServlet):
             # RoomStreamToken expects [int] not Optional[int]
             assert event.internal_metadata.stream_ordering is not None
             room_token = RoomStreamToken(
-                event.depth, event.internal_metadata.stream_ordering
+                topological=event.depth, stream=event.internal_metadata.stream_ordering
             )
             token = await room_token.to_string(self.store)
 

@@ -53,6 +53,13 @@ class EndToEndRoomKeyBackgroundStore(SQLBaseStore):
     ):
         super().__init__(database, db_conn, hs)
 
+        self.db_pool.updates.register_background_index_update(
+            update_name="e2e_room_keys_index_room_id",
+            index_name="e2e_room_keys_room_id",
+            table="e2e_room_keys",
+            columns=("room_id",),
+        )
+
         self.db_pool.updates.register_background_update_handler(
             "delete_e2e_backup_keys_for_deactivated_users",
             self._delete_e2e_backup_keys_for_deactivated_users,
@@ -208,7 +215,7 @@ class EndToEndRoomKeyStore(EndToEndRoomKeyBackgroundStore):
                     "message": "Set room key",
                     "room_id": room_id,
                     "session_id": session_id,
-                    StreamKeyType.ROOM: room_key,
+                    StreamKeyType.ROOM.value: room_key,
                 }
             )
 

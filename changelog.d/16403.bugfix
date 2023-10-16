@@ -1,0 +1,1 @@
+Remove legacy unspecced `knock_state_events` field returned in some responses.

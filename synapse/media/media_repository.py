@@ -48,6 +48,7 @@ from synapse.media.filepath import MediaFilePaths
 from synapse.media.media_storage import MediaStorage
 from synapse.media.storage_provider import StorageProviderWrapper
 from synapse.media.thumbnailer import Thumbnailer, ThumbnailError
+from synapse.media.url_previewer import UrlPreviewer
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.types import UserID
 from synapse.util.async_helpers import Linearizer
@@ -114,7 +115,7 @@ class MediaRepository:
             )
             storage_providers.append(provider)
 
-        self.media_storage = MediaStorage(
+        self.media_storage: MediaStorage = MediaStorage(
             self.hs, self.primary_base_path, self.filepaths, storage_providers
         )
 
@@ -141,6 +142,13 @@ class MediaRepository:
                 self._start_apply_media_retention_rules,
                 MEDIA_RETENTION_CHECK_PERIOD_MS,
             )
+
+        if hs.config.media.url_preview_enabled:
+            self.url_previewer: Optional[UrlPreviewer] = UrlPreviewer(
+                hs, self, self.media_storage
+            )
+        else:
+            self.url_previewer = None
 
     def _start_update_recently_accessed(self) -> Deferred:
         return run_as_background_process(
@@ -616,6 +624,7 @@ class MediaRepository:
                         height=t_height,
                         method=t_method,
                         type=t_type,
+                        length=t_byte_source.tell(),
                     ),
                 )
 
@@ -686,6 +695,7 @@ class MediaRepository:
                         height=t_height,
                         method=t_method,
                         type=t_type,
+                        length=t_byte_source.tell(),
                     ),
                 )
 
@@ -831,6 +841,7 @@ class MediaRepository:
                         height=t_height,
                         method=t_method,
                         type=t_type,
+                        length=t_byte_source.tell(),
                     ),
                 )
 

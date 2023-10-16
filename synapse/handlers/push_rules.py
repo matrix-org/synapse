@@ -19,7 +19,7 @@ from synapse.api.errors import SynapseError, UnrecognizedRequestError
 from synapse.push.clientformat import format_push_rules_for_user
 from synapse.storage.push_rule import RuleNotFoundException
 from synapse.synapse_rust.push import get_base_rule_ids
-from synapse.types import JsonDict, UserID
+from synapse.types import JsonDict, StreamKeyType, UserID
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -114,7 +114,9 @@ class PushRulesHandler:
             user_id: the user ID the change is for.
         """
         stream_id = self._main_store.get_max_push_rules_stream_id()
-        self._notifier.on_new_event("push_rules_key", stream_id, users=[user_id])
+        self._notifier.on_new_event(
+            StreamKeyType.PUSH_RULES, stream_id, users=[user_id]
+        )
 
     async def push_rules_for_user(
         self, user: UserID

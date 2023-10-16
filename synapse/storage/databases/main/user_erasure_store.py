@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Iterable, Mapping
+from typing import Iterable, List, Mapping, Tuple, cast
 
 from synapse.storage.database import LoggingTransaction
 from synapse.storage.databases.main import CacheInvalidationWorkerStore
@@ -50,14 +50,17 @@ class UserErasureWorkerStore(CacheInvalidationWorkerStore):
         Returns:
             for each user, whether the user has requested erasure.
         """
-        rows = await self.db_pool.simple_select_many_batch(
-            table="erased_users",
-            column="user_id",
-            iterable=user_ids,
-            retcols=("user_id",),
-            desc="are_users_erased",
+        rows = cast(
+            List[Tuple[str]],
+            await self.db_pool.simple_select_many_batch(
+                table="erased_users",
+                column="user_id",
+                iterable=user_ids,
+                retcols=("user_id",),
+                desc="are_users_erased",
+            ),
         )
-        erased_users = {row["user_id"] for row in rows}
+        erased_users = {row[0] for row in rows}
 
         return {u: u in erased_users for u in user_ids}
 

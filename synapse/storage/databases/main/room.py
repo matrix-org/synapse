@@ -831,7 +831,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
 
         def get_retention_policy_for_room_txn(
             txn: LoggingTransaction,
-        ) -> List[Dict[str, Optional[int]]]:
+        ) -> Optional[Tuple[Optional[int], Optional[int]]]:
             txn.execute(
                 """
                 SELECT min_lifetime, max_lifetime FROM room_retention
@@ -841,7 +841,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
                 (room_id,),
             )
 
-            return self.db_pool.cursor_to_dict(txn)
+            return cast(Optional[Tuple[Optional[int], Optional[int]]], txn.fetchone())
 
         ret = await self.db_pool.runInteraction(
             "get_retention_policy_for_room",
@@ -856,8 +856,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
                 max_lifetime=self.config.retention.retention_default_max_lifetime,
             )
 
-        min_lifetime = ret[0]["min_lifetime"]
-        max_lifetime = ret[0]["max_lifetime"]
+        min_lifetime, max_lifetime = ret
 
         # If one of the room's policy's attributes isn't defined, use the matching
         # attribute from the default policy.
@@ -1162,14 +1161,13 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
 
             txn.execute(sql, args)
 
-            rows = self.db_pool.cursor_to_dict(txn)
-            rooms_dict = {}
-
-            for row in rows:
-                rooms_dict[row["room_id"]] = RetentionPolicy(
-                    min_lifetime=row["min_lifetime"],
-                    max_lifetime=row["max_lifetime"],
+            rooms_dict = {
+                room_id: RetentionPolicy(
+                    min_lifetime=min_lifetime,
+                    max_lifetime=max_lifetime,
                 )
+                for room_id, min_lifetime, max_lifetime in txn
+            }
 
             if include_null:
                 # If required, do a second query that retrieves all of the rooms we know
@@ -1178,13 +1176,11 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
 
                 txn.execute(sql)
 
-                rows = self.db_pool.cursor_to_dict(txn)
-
                 # If a room isn't already in the dict (i.e. it doesn't have a retention
                 # policy in its state), add it with a null policy.
-                for row in rows:
-                    if row["room_id"] not in rooms_dict:
-                        rooms_dict[row["room_id"]] = RetentionPolicy()
+                for (room_id,) in txn:
+                    if room_id not in rooms_dict:
+                        rooms_dict[room_id] = RetentionPolicy()
 
             return rooms_dict
 
@@ -1300,14 +1296,17 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         complete.
         """
 
-        rows: List[Dict[str, str]] = await self.db_pool.simple_select_many_batch(
-            table="partial_state_rooms",
-            column="room_id",
-            iterable=room_ids,
-            retcols=("room_id",),
-            desc="is_partial_state_room_batched",
+        rows = cast(
+            List[Tuple[str]],
+            await self.db_pool.simple_select_many_batch(
+                table="partial_state_rooms",
+                column="room_id",
+                iterable=room_ids,
+                retcols=("room_id",),
+                desc="is_partial_state_room_batched",
+            ),
         )
-        partial_state_rooms = {row_dict["room_id"] for row_dict in rows}
+        partial_state_rooms = {row[0] for row in rows}
         return {room_id: room_id in partial_state_rooms for room_id in room_ids}
 
     async def get_join_event_id_and_device_lists_stream_id_for_partial_state(
@@ -1703,24 +1702,24 @@ class RoomBackgroundUpdateStore(SQLBaseStore):
                 (last_room, batch_size),
             )
 
-            rows = self.db_pool.cursor_to_dict(txn)
+            rows = txn.fetchall()
 
             if not rows:
                 return True
 
-            for row in rows:
-                if not row["json"]:
+            for room_id, event_id, json in rows:
+                if not json:
                     retention_policy = {}
                 else:
-                    ev = db_to_json(row["json"])
+                    ev = db_to_json(json)
                     retention_policy = ev["content"]
 
                 self.db_pool.simple_insert_txn(
                     txn=txn,
                     table="room_retention",
                     values={
-                        "room_id": row["room_id"],
-                        "event_id": row["event_id"],
+                        "room_id": room_id,
+                        "event_id": event_id,
                         "min_lifetime": retention_policy.get("min_lifetime"),
                         "max_lifetime": retention_policy.get("max_lifetime"),
                     },
@@ -1729,7 +1728,7 @@ class RoomBackgroundUpdateStore(SQLBaseStore):
             logger.info("Inserted %d rows into room_retention", len(rows))
 
             self.db_pool.updates._background_update_progress_txn(
-                txn, "insert_room_retention", {"room_id": rows[-1]["room_id"]}
+                txn, "insert_room_retention", {"room_id": rows[-1][0]}
             )
 
             if batch_size > len(rows):
