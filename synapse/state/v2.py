@@ -38,7 +38,6 @@ from synapse.api.errors import AuthError
 from synapse.api.room_versions import RoomVersion
 from synapse.events import EventBase
 from synapse.types import MutableStateMap, StateMap, StrCollection
-from synapse.util.metrics import Measure
 
 logger = logging.getLogger(__name__)
 
@@ -105,118 +104,106 @@ async def resolve_events_with_store(
     Returns:
         A map from (type, state_key) to event_id.
     """
-    with Measure(clock, "rei_state_res:rews2_a"):  # TODO temporary (rei)
-        logger.debug("Computing conflicted state")
 
-        # We use event_map as a cache, so if its None we need to initialize it
-        if event_map is None:
-            event_map = {}
+    logger.debug("Computing conflicted state")
 
-        # First split up the un/conflicted state
-        unconflicted_state, conflicted_state = _seperate(state_sets)
+    # We use event_map as a cache, so if its None we need to initialize it
+    if event_map is None:
+        event_map = {}
 
-        if not conflicted_state:
-            return unconflicted_state
+    # First split up the un/conflicted state
+    unconflicted_state, conflicted_state = _seperate(state_sets)
 
-        logger.debug("%d conflicted state entries", len(conflicted_state))
-        logger.debug("Calculating auth chain difference")
+    if not conflicted_state:
+        return unconflicted_state
 
-        # Also fetch all auth events that appear in only some of the state sets'
-        # auth chains.
-        auth_diff = await _get_auth_chain_difference(
-            room_id, state_sets, event_map, state_res_store
+    logger.debug("%d conflicted state entries", len(conflicted_state))
+    logger.debug("Calculating auth chain difference")
+
+    # Also fetch all auth events that appear in only some of the state sets'
+    # auth chains.
+    auth_diff = await _get_auth_chain_difference(
+        room_id, state_sets, event_map, state_res_store
+    )
+
+    full_conflicted_set = set(
+        itertools.chain(
+            itertools.chain.from_iterable(conflicted_state.values()), auth_diff
         )
+    )
 
-    with Measure(clock, "rei_state_res:rews2_b"):  # TODO temporary (rei)
-        full_conflicted_set = set(
-            itertools.chain(
-                itertools.chain.from_iterable(conflicted_state.values()), auth_diff
-            )
-        )
+    events = await state_res_store.get_events(
+        [eid for eid in full_conflicted_set if eid not in event_map],
+        allow_rejected=True,
+    )
+    event_map.update(events)
 
-        events = await state_res_store.get_events(
-            [eid for eid in full_conflicted_set if eid not in event_map],
-            allow_rejected=True,
-        )
-        event_map.update(events)
-
-    with Measure(clock, "rei_state_res:rews2_c"):  # TODO temporary (rei)
-        # everything in the event map should be in the right room
-        for event in event_map.values():
-            if event.room_id != room_id:
-                raise Exception(
-                    "Attempting to state-resolve for room %s with event %s which is in %s"
-                    % (
-                        room_id,
-                        event.event_id,
-                        event.room_id,
-                    )
+    # everything in the event map should be in the right room
+    for event in event_map.values():
+        if event.room_id != room_id:
+            raise Exception(
+                "Attempting to state-resolve for room %s with event %s which is in %s"
+                % (
+                    room_id,
+                    event.event_id,
+                    event.room_id,
                 )
+            )
 
-        full_conflicted_set = {eid for eid in full_conflicted_set if eid in event_map}
+    full_conflicted_set = {eid for eid in full_conflicted_set if eid in event_map}
 
-        logger.debug("%d full_conflicted_set entries", len(full_conflicted_set))
+    logger.debug("%d full_conflicted_set entries", len(full_conflicted_set))
 
-        # Get and sort all the power events (kicks/bans/etc)
-        power_events = (
-            eid for eid in full_conflicted_set if _is_power_event(event_map[eid])
-        )
+    # Get and sort all the power events (kicks/bans/etc)
+    power_events = (
+        eid for eid in full_conflicted_set if _is_power_event(event_map[eid])
+    )
 
-    with Measure(clock, "rei_state_res:rews2_d"):  # TODO temporary (rei)
-        sorted_power_events = await _reverse_topological_power_sort(
-            clock,
-            room_id,
-            power_events,
-            event_map,
-            state_res_store,
-            full_conflicted_set,
-        )
+    sorted_power_events = await _reverse_topological_power_sort(
+        clock, room_id, power_events, event_map, state_res_store, full_conflicted_set
+    )
 
-        logger.debug("sorted %d power events", len(sorted_power_events))
+    logger.debug("sorted %d power events", len(sorted_power_events))
 
-    with Measure(clock, "rei_state_res:rews2_e"):  # TODO temporary (rei)
-        # Now sequentially auth each one
-        resolved_state = await _iterative_auth_checks(
-            clock,
-            room_id,
-            room_version,
-            sorted_power_events,
-            unconflicted_state,
-            event_map,
-            state_res_store,
-        )
+    # Now sequentially auth each one
+    resolved_state = await _iterative_auth_checks(
+        clock,
+        room_id,
+        room_version,
+        sorted_power_events,
+        unconflicted_state,
+        event_map,
+        state_res_store,
+    )
 
-        logger.debug("resolved power events")
+    logger.debug("resolved power events")
 
-    with Measure(clock, "rei_state_res:rews2_f"):  # TODO temporary (rei)
-        # OK, so we've now resolved the power events. Now sort the remaining
-        # events using the mainline of the resolved power level.
+    # OK, so we've now resolved the power events. Now sort the remaining
+    # events using the mainline of the resolved power level.
 
-        set_power_events = set(sorted_power_events)
-        leftover_events = [
-            ev_id for ev_id in full_conflicted_set if ev_id not in set_power_events
-        ]
+    set_power_events = set(sorted_power_events)
+    leftover_events = [
+        ev_id for ev_id in full_conflicted_set if ev_id not in set_power_events
+    ]
 
-        logger.debug("sorting %d remaining events", len(leftover_events))
+    logger.debug("sorting %d remaining events", len(leftover_events))
 
-    with Measure(clock, "rei_state_res:rews2_g"):  # TODO temporary (rei)
-        pl = resolved_state.get((EventTypes.PowerLevels, ""), None)
-        leftover_events = await _mainline_sort(
-            clock, room_id, leftover_events, pl, event_map, state_res_store
-        )
+    pl = resolved_state.get((EventTypes.PowerLevels, ""), None)
+    leftover_events = await _mainline_sort(
+        clock, room_id, leftover_events, pl, event_map, state_res_store
+    )
 
-    with Measure(clock, "rei_state_res:rews2_h"):  # TODO temporary (rei)
-        logger.debug("resolving remaining events")
+    logger.debug("resolving remaining events")
 
-        resolved_state = await _iterative_auth_checks(
-            clock,
-            room_id,
-            room_version,
-            leftover_events,
-            resolved_state,
-            event_map,
-            state_res_store,
-        )
+    resolved_state = await _iterative_auth_checks(
+        clock,
+        room_id,
+        room_version,
+        leftover_events,
+        resolved_state,
+        event_map,
+        state_res_store,
+    )
 
     logger.debug("resolved")
 
