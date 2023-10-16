@@ -657,8 +657,6 @@ class ReplicationCommandHandler:
         self, conn: IReplicationConnection, cmd: RemoteServerUpCommand
     ) -> None:
         """Called when get a new REMOTE_SERVER_UP command."""
-        self._replication_data_handler.on_remote_server_up(cmd.data)
-
         self._notifier.notify_remote_server_up(cmd.data)
 
     def on_LOCK_RELEASED(
