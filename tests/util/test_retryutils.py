@@ -113,7 +113,7 @@ class RetryLimiterTestCase(HomeserverTestCase):
         new_timings = self.get_success(store.get_destination_retry_timings("test_dest"))
         self.assertIsNone(new_timings)
 
-    def test_notifier_replcation(self) -> None:
+    def test_notifier_replication(self) -> None:
         """Ensure the notifier/replication client is called only when expected."""
         store = self.hs.get_datastores().main
 
