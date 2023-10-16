@@ -237,6 +237,9 @@ class RetryDestinationLimiter:
             else:
                 valid_err_code = False
 
+        # Store whether the destination had previously been failing.
+        previously_failing = bool(self.failure_ts)
+
         if success:
             # We connected successfully.
             if not self.retry_interval:
@@ -291,13 +294,15 @@ class RetryDestinationLimiter:
                     self.retry_interval,
                 )
 
-                if self.notifier:
-                    # Inform the relevant places that the remote server is back up.
-                    self.notifier.notify_remote_server_up(self.destination)
+                # If the server was previously failing, but is no longer.
+                if previously_failing:
+                    if self.notifier:
+                        # Inform the relevant places that the remote server is back up.
+                        self.notifier.notify_remote_server_up(self.destination)
 
-                if self.replication_client:
-                    # Inform other workers that the remote server is up.
-                    self.replication_client.send_remote_server_up(self.destination)
+                    if self.replication_client:
+                        # Inform other workers that the remote server is up.
+                        self.replication_client.send_remote_server_up(self.destination)
 
             except Exception:
                 logger.exception("Failed to store destination_retry_timings")
