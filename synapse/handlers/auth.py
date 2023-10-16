@@ -212,7 +212,7 @@ class AuthHandler:
         self._password_enabled_for_reauth = hs.config.auth.password_enabled_for_reauth
         self._password_localdb_enabled = hs.config.auth.password_localdb_enabled
         self._third_party_rules = hs.get_module_api_callbacks().third_party_event_rules
-        self._account_validity_handler = hs.get_module_api_callbacks().account_validity
+        self._account_validity_handler = hs.get_account_validity_handler()
 
         # Ratelimiter for failed auth during UIA. Uses same ratelimit config
         # as per `rc_login.failed_attempts`.

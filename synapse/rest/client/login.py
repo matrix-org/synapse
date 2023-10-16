@@ -115,7 +115,7 @@ class LoginRestServlet(RestServlet):
         self.registration_handler = hs.get_registration_handler()
         self._sso_handler = hs.get_sso_handler()
         self._spam_checker = hs.get_module_api_callbacks().spam_checker
-        self._account_validity_handler = hs.get_module_api_callbacks().account_validity
+        self._account_validity_handler = hs.get_account_validity_handler()
 
         self._well_known_builder = WellKnownBuilder(hs)
         self._address_ratelimiter = Ratelimiter(
