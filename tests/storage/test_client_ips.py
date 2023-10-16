@@ -24,7 +24,10 @@ import synapse.rest.admin
 from synapse.http.site import XForwardedForRequest
 from synapse.rest.client import login
 from synapse.server import HomeServer
-from synapse.storage.databases.main.client_ips import LAST_SEEN_GRANULARITY
+from synapse.storage.databases.main.client_ips import (
+    LAST_SEEN_GRANULARITY,
+    DeviceLastConnectionInfo,
+)
 from synapse.types import UserID
 from synapse.util import Clock
 
@@ -66,14 +69,14 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
 
         r = result[(user_id, device_id)]
         self.assertLessEqual(
-            {
-                "user_id": user_id,
-                "device_id": device_id,
-                "ip": "ip",
-                "user_agent": "user_agent",
-                "last_seen": 12345678000,
-            }.items(),
-            r.items(),
+            DeviceLastConnectionInfo(
+                user_id=user_id,
+                device_id=device_id,
+                ip="ip",
+                user_agent="user_agent",
+                last_seen=12345678000,
+            ),
+            r,
         )
 
     def test_insert_new_client_ip_none_device_id(self) -> None:
@@ -201,13 +204,13 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
         self.assertEqual(
             result,
             {
-                (user_id, device_id): {
-                    "user_id": user_id,
-                    "device_id": device_id,
-                    "ip": "ip",
-                    "user_agent": "user_agent",
-                    "last_seen": 12345678000,
-                },
+                (user_id, device_id): DeviceLastConnectionInfo(
+                    user_id=user_id,
+                    device_id=device_id,
+                    ip="ip",
+                    user_agent="user_agent",
+                    last_seen=12345678000,
+                ),
             },
         )
 
@@ -292,20 +295,20 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
         self.assertEqual(
             result,
             {
-                (user_id, device_id_1): {
-                    "user_id": user_id,
-                    "device_id": device_id_1,
-                    "ip": "ip_1",
-                    "user_agent": "user_agent_1",
-                    "last_seen": 12345678000,
-                },
-                (user_id, device_id_2): {
-                    "user_id": user_id,
-                    "device_id": device_id_2,
-                    "ip": "ip_2",
-                    "user_agent": "user_agent_3",
-                    "last_seen": 12345688000 + LAST_SEEN_GRANULARITY,
-                },
+                (user_id, device_id_1): DeviceLastConnectionInfo(
+                    user_id=user_id,
+                    device_id=device_id_1,
+                    ip="ip_1",
+                    user_agent="user_agent_1",
+                    last_seen=12345678000,
+                ),
+                (user_id, device_id_2): DeviceLastConnectionInfo(
+                    user_id=user_id,
+                    device_id=device_id_2,
+                    ip="ip_2",
+                    user_agent="user_agent_3",
+                    last_seen=12345688000 + LAST_SEEN_GRANULARITY,
+                ),
             },
         )
 
@@ -527,14 +530,14 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
 
         r = result[(user_id, device_id)]
         self.assertLessEqual(
-            {
-                "user_id": user_id,
-                "device_id": device_id,
-                "ip": None,
-                "user_agent": None,
-                "last_seen": None,
-            }.items(),
-            r.items(),
+            DeviceLastConnectionInfo(
+                user_id=user_id,
+                device_id=device_id,
+                ip=None,
+                user_agent=None,
+                last_seen=None,
+            ),
+            r,
         )
 
         # Register the background update to run again.
@@ -562,14 +565,14 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
 
         r = result[(user_id, device_id)]
         self.assertLessEqual(
-            {
-                "user_id": user_id,
-                "device_id": device_id,
-                "ip": "ip",
-                "user_agent": "user_agent",
-                "last_seen": 0,
-            }.items(),
-            r.items(),
+            DeviceLastConnectionInfo(
+                user_id=user_id,
+                device_id=device_id,
+                ip="ip",
+                user_agent="user_agent",
+                last_seen=0,
+            ),
+            r,
         )
 
     def test_old_user_ips_pruned(self) -> None:
@@ -641,14 +644,14 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
 
         r = result2[(user_id, device_id)]
         self.assertLessEqual(
-            {
-                "user_id": user_id,
-                "device_id": device_id,
-                "ip": "ip",
-                "user_agent": "user_agent",
-                "last_seen": 0,
-            }.items(),
-            r.items(),
+            DeviceLastConnectionInfo(
+                user_id=user_id,
+                device_id=device_id,
+                ip="ip",
+                user_agent="user_agent",
+                last_seen=0,
+            ),
+            r,
         )
 
     def test_invalid_user_agents_are_ignored(self) -> None:
@@ -778,12 +781,12 @@ class ClientIpAuthTestCase(unittest.HomeserverTestCase):
         )
         r = result[(self.user_id, device_id)]
         self.assertLessEqual(
-            {
-                "user_id": self.user_id,
-                "device_id": device_id,
-                "ip": expected_ip,
-                "user_agent": "Mozzila pizza",
-                "last_seen": 123456100,
-            }.items(),
-            r.items(),
+            DeviceLastConnectionInfo(
+                user_id=self.user_id,
+                device_id=device_id,
+                ip=expected_ip,
+                user_agent="Mozzila pizza",
+                last_seen=123456100,
+            ),
+            r,
         )
