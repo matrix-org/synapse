@@ -170,10 +170,10 @@ class RetryDestinationLimiter:
                 database in milliseconds, or zero if the last request was
                 successful.
             backoff_on_404: Back off if we get a 404
-
             backoff_on_failure: set to False if we should not increase the
                 retry interval on a failure.
-
+            notifier: A notifier used to mark servers as up.
+            replication_client A replication client used to mark servers as up.
             backoff_on_all_error_codes: Whether we should back off on any
                 error code.
         """
@@ -296,11 +296,7 @@ class RetryDestinationLimiter:
                     self.notifier.notify_remote_server_up(self.destination)
 
                 if self.replication_client:
-                    # If we're on a worker we try and inform master about this. The
-                    # replication client doesn't hook into the notifier to avoid
-                    # infinite loops where we send a `REMOTE_SERVER_UP` command to
-                    # master, which then echoes it back to us which in turn pokes
-                    # the notifier.
+                    # Inform other workers that the remote server is up.
                     self.replication_client.send_remote_server_up(self.destination)
 
             except Exception:
