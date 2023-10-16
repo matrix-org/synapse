@@ -141,7 +141,8 @@ class RetryLimiterTestCase(HomeserverTestCase):
         notifier.notify_remote_server_up.assert_not_called()
         replication_client.send_remote_server_up.assert_not_called()
 
-        # Attempt again, but return an error. This will cause new retry timings.
+        # Attempt again, but return an error. This will cause new retry timings, but
+        # should not trigger server up notifications.
         self.pump(1)
         try:
             with limiter:
@@ -156,7 +157,22 @@ class RetryLimiterTestCase(HomeserverTestCase):
         notifier.notify_remote_server_up.assert_not_called()
         replication_client.send_remote_server_up.assert_not_called()
 
-        # One more attempt, successfully this time.
+        # A second failing request should be treated as the above.
+        self.pump(1)
+        try:
+            with limiter:
+                raise AssertionError("argh")
+        except AssertionError:
+            pass
+        self.pump()
+
+        new_timings = self.get_success(store.get_destination_retry_timings("test_dest"))
+        # The exact retry timings are tested separately.
+        self.assertIsNotNone(new_timings)
+        notifier.notify_remote_server_up.assert_not_called()
+        replication_client.send_remote_server_up.assert_not_called()
+
+        # A final successful attempt should generate a server up notification.
         self.pump(1)
         with limiter:
             pass

@@ -237,7 +237,7 @@ class RetryDestinationLimiter:
             else:
                 valid_err_code = False
 
-        # Store whether the destination had previously been failing.
+        # Whether previous requests to the destination had been failing.
         previously_failing = bool(self.failure_ts)
 
         if success:
@@ -285,6 +285,9 @@ class RetryDestinationLimiter:
             if self.failure_ts is None:
                 self.failure_ts = retry_last_ts
 
+        # Whether the current request to the destination had been failing.
+        currently_failing = bool(self.failure_ts)
+
         async def store_retry_timings() -> None:
             try:
                 await self.store.set_destination_retry_timings(
@@ -295,7 +298,7 @@ class RetryDestinationLimiter:
                 )
 
                 # If the server was previously failing, but is no longer.
-                if previously_failing:
+                if previously_failing and not currently_failing:
                     if self.notifier:
                         # Inform the relevant places that the remote server is back up.
                         self.notifier.notify_remote_server_up(self.destination)
