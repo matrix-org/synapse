@@ -160,7 +160,9 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
             prefilled_cache=device_list_federation_prefill,
         )
 
-        if hs.config.worker.run_background_tasks:
+        # vdh,rei 2023-10-13: disable because it is eating DB
+        # https://github.com/matrix-org/synapse/issues/16480
+        if False and hs.config.worker.run_background_tasks:
             self._clock.looping_call(
                 self._prune_old_outbound_device_pokes, 60 * 60 * 1000
             )
