@@ -1,0 +1,1 @@
+Fix a bug introduced in Synapse 1.59.0 where servers would be incorrectly marked as available when a request resulted in an error.
