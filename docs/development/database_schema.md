@@ -25,20 +25,37 @@ updated. They work as follows:
 
  * The Synapse codebase defines a constant `synapse.storage.schema.SCHEMA_VERSION`
    which represents the expectations made about the database by that version. For
-   example, as of Synapse v1.36, this is `59`.
+   example, as of Synapse v1.36, this is `59`. This version should be incremented
+   whenever a backwards-incompatible change is made to the database format (normally
+   via a `delta` file)
 
- * The database stores a "compatibility version" in
+ * The Synapse codebase defines a constant `synapse.storage.schema.SCHEMA_COMPAT_VERSION`
+   which represents the minimum database versions the current code supports.
+   Whenever the Synapse code is updated to assume backwards-incompatible changes
+   made to the database format, `synapse.storage.schema.SCHEMA_COMPAT_VERSION` is also updated
+   so that administrators can not accidentally roll back to a too-old version of Synapse.
+
+   The database stores a "compatibility version" in
    `schema_compat_version.compat_version` which defines the `SCHEMA_VERSION` of the
    oldest version of Synapse which will work with the database. On startup, if
    `compat_version` is found to be newer than `SCHEMA_VERSION`, Synapse will refuse to
    start.
 
-   Synapse automatically updates this field from
-   `synapse.storage.schema.SCHEMA_COMPAT_VERSION`.
+   Synapse automatically updates `schema_compat_version.compat_version` from
+   `synapse.storage.schema.SCHEMA_COMPAT_VERSION` during start-up.
 
- * Whenever a backwards-incompatible change is made to the database format (normally
-   via a `delta` file), `synapse.storage.schema.SCHEMA_COMPAT_VERSION` is also updated
-   so that administrators can not accidentally roll back to a too-old version of Synapse.
+ * The Synapse codebase defines a constant `synapse.storage.schema.BACKGROUND_UPDATES_COMPAT_VERSION`
+   which represents the earliest supported background updates.
+
+   On startup, if there exists any background update (via the
+   `background_updates.ordering` column) older than `BACKGROUND_UPDATES_COMPAT_VERSION`,
+   Synpase will refuse to start.
+
+   This is useful for adding delta files which assume background updates have
+   finished; overall maintenance of Synapse (by allowing for removal of code
+   supporting old background updates); among other things.
+
+   `BACKGROUND_UPDATES_COMPAT_VERSION` must be < the latest [full schema dump](#full-schema-dumps).
 
 Generally, the goal is to maintain compatibility with at least one or two previous
 releases of Synapse, so any substantial change tends to require multiple releases and a
