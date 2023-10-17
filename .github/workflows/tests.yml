@@ -42,6 +42,7 @@ jobs:
             - 'synapse/**'
             - 'tests/**'
             - 'rust/**'
+            - '.ci/**'
             - 'Cargo.toml'
             - 'Cargo.lock'
             - 'pyproject.toml'
@@ -56,6 +57,7 @@ jobs:
             - 'pyproject.toml'
             - 'poetry.lock'
             - 'docker/**'
+            - '.ci/**'
             - 'scripts-dev/complement.sh'
 
           linting:
