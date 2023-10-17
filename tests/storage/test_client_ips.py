@@ -68,7 +68,7 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
         )
 
         r = result[(user_id, device_id)]
-        self.assertLessEqual(
+        self.assertEqual(
             DeviceLastConnectionInfo(
                 user_id=user_id,
                 device_id=device_id,
@@ -529,7 +529,7 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
         )
 
         r = result[(user_id, device_id)]
-        self.assertLessEqual(
+        self.assertEqual(
             DeviceLastConnectionInfo(
                 user_id=user_id,
                 device_id=device_id,
@@ -564,7 +564,7 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
         )
 
         r = result[(user_id, device_id)]
-        self.assertLessEqual(
+        self.assertEqual(
             DeviceLastConnectionInfo(
                 user_id=user_id,
                 device_id=device_id,
@@ -643,7 +643,7 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
         )
 
         r = result2[(user_id, device_id)]
-        self.assertLessEqual(
+        self.assertEqual(
             DeviceLastConnectionInfo(
                 user_id=user_id,
                 device_id=device_id,
@@ -780,7 +780,7 @@ class ClientIpAuthTestCase(unittest.HomeserverTestCase):
             self.store.get_last_client_ip_by_device(self.user_id, device_id)
         )
         r = result[(self.user_id, device_id)]
-        self.assertLessEqual(
+        self.assertEqual(
             DeviceLastConnectionInfo(
                 user_id=self.user_id,
                 device_id=device_id,
