@@ -60,10 +60,10 @@ too many state updates for a particular room in the same update. This replaces a
 
 """
 
-# Any room with more than MAX_STATE_UPDATES_PER_ROOM will send a EventsStreamAllStateRow
+# Any room with more than _MAX_STATE_UPDATES_PER_ROOM will send a EventsStreamAllStateRow
 # instead of individual EventsStreamEventRow. This is predominantly useful when
 # purging large rooms.
-MAX_STATE_UPDATES_PER_ROOM = 100
+_MAX_STATE_UPDATES_PER_ROOM = 150
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
@@ -242,7 +242,7 @@ class EventsStream(Stream):
         state_all_rows = [
             (stream_ids[-1], room_id)
             for room_id, stream_ids in state_updates_by_room.items()
-            if len(stream_ids) >= MAX_STATE_UPDATES_PER_ROOM
+            if len(stream_ids) >= _MAX_STATE_UPDATES_PER_ROOM
         ]
         state_all_updates: Iterable[Tuple[int, Tuple]] = (
             (max_stream_id, (EventsStreamAllStateRow.TypeId, (room_id,)))
