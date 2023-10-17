@@ -648,6 +648,19 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
         with self.assertRaises(IncorrectDatabaseSetup):
             self._create_id_generator("first")
 
+    def test_minimal_local_token(self) -> None:
+        self._insert_rows("first", 3)
+        self._insert_rows("second", 4)
+
+        first_id_gen = self._create_id_generator("first", writers=["first", "second"])
+        second_id_gen = self._create_id_generator("second", writers=["first", "second"])
+
+        self.assertEqual(first_id_gen.get_positions(), {"first": 3, "second": 7})
+        self.assertEqual(first_id_gen.get_minimal_local_current_token(), 3)
+
+        self.assertEqual(second_id_gen.get_positions(), {"first": 3, "second": 7})
+        self.assertEqual(second_id_gen.get_minimal_local_current_token(), 7)
+
 
 class BackwardsMultiWriterIdGeneratorTestCase(HomeserverTestCase):
     """Tests MultiWriterIdGenerator that produce *negative* stream IDs."""

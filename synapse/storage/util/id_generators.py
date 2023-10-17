@@ -134,6 +134,15 @@ class AbstractStreamIdGenerator(metaclass=abc.ABCMeta):
         raise NotImplementedError()
 
     @abc.abstractmethod
+    def get_minimal_local_current_token(self) -> int:
+        """Tries to return a minimal current token for the local instance,
+        i.e. for writers this would be the last successful write.
+
+        If local instance is not a writer (or has written yet) then falls back
+        to returning the normal "current token".
+        """
+
+    @abc.abstractmethod
     def get_next(self) -> AsyncContextManager[int]:
         """
         Usage:
@@ -310,6 +319,9 @@ class StreamIdGenerator(AbstractStreamIdGenerator):
             return self._current
 
     def get_current_token_for_writer(self, instance_name: str) -> int:
+        return self.get_current_token()
+
+    def get_minimal_local_current_token(self) -> int:
         return self.get_current_token()
 
 
@@ -720,6 +732,12 @@ class MultiWriterIdGenerator(AbstractStreamIdGenerator):
             # here so that nothing waits for us to advance.
             pos = max(pos, self._persisted_upto_position)
             return self._return_factor * pos
+
+    def get_minimal_local_current_token(self) -> int:
+        with self._lock:
+            return self._return_factor * self._current_positions.get(
+                self._instance_name, self._persisted_upto_position
+            )
 
     def get_positions(self) -> Dict[str, int]:
         """Get a copy of the current positon map.
