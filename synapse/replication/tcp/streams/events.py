@@ -234,7 +234,7 @@ class EventsStream(Stream):
         )
 
         # Separate out rooms that have many state updates, listeners should clear
-        # alls tate for those rooms.
+        # all state for those rooms.
         state_updates_by_room = defaultdict(list)
         for stream_id, room_id, _type, _state_key, _event_id in state_rows:
             state_updates_by_room[room_id].append(stream_id)
