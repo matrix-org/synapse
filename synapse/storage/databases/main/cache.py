@@ -23,6 +23,7 @@ from synapse.metrics.background_process_metrics import wrap_as_background_proces
 from synapse.replication.tcp.streams import BackfillStream, CachesStream
 from synapse.replication.tcp.streams.events import (
     EventsStream,
+    EventsStreamAllStateRow,
     EventsStreamCurrentStateRow,
     EventsStreamEventRow,
     EventsStreamRow,
@@ -264,6 +265,13 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
                     (data.state_key,)
                 )
                 self.get_rooms_for_user.invalidate((data.state_key,))  # type: ignore[attr-defined]
+        elif row.type == EventsStreamAllStateRow.TypeId:
+            assert isinstance(data, EventsStreamAllStateRow)
+            # Similar to the above, but the entire caches are invalidated. This is
+            # unfortunate for the membership caches, but should recover quickly.
+            self._curr_state_delta_stream_cache.entity_has_changed(data.room_id, token)  # type: ignore[attr-defined]
+            self.get_rooms_for_user_with_stream_ordering.invalidate_all()  # type: ignore[attr-defined]
+            self.get_rooms_for_user.invalidate_all()  # type: ignore[attr-defined]
         else:
             raise Exception("Unknown events stream row type %s" % (row.type,))
 

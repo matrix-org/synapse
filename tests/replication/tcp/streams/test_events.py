@@ -21,6 +21,7 @@ from synapse.events import EventBase
 from synapse.replication.tcp.commands import RdataCommand
 from synapse.replication.tcp.streams._base import _STREAM_UPDATE_TARGET_ROW_COUNT
 from synapse.replication.tcp.streams.events import (
+    EventsStreamAllStateRow,
     EventsStreamCurrentStateRow,
     EventsStreamEventRow,
     EventsStreamRow,
@@ -202,8 +203,7 @@ class EventsStreamTestCase(BaseStreamTestCase):
             row for row in self.test_handler.received_rdata_rows if row[0] == "events"
         ]
 
-        # first check the first two rows, which should be state1
-
+        # first check the first two rows, which should be the state1 event.
         stream_name, token, row = received_rows.pop(0)
         self.assertEqual("events", stream_name)
         self.assertIsInstance(row, EventsStreamRow)
@@ -217,7 +217,7 @@ class EventsStreamTestCase(BaseStreamTestCase):
         self.assertIsInstance(row.data, EventsStreamCurrentStateRow)
         self.assertEqual(row.data.event_id, state1.event_id)
 
-        # now the last two rows, which should be state2
+        # now the last two rows, which should be the state2 event.
         stream_name, token, row = received_rows.pop(-2)
         self.assertEqual("events", stream_name)
         self.assertIsInstance(row, EventsStreamRow)
@@ -231,8 +231,9 @@ class EventsStreamTestCase(BaseStreamTestCase):
         self.assertIsInstance(row.data, EventsStreamCurrentStateRow)
         self.assertEqual(row.data.event_id, state2.event_id)
 
-        # that should leave us with the rows for the PL event
-        self.assertEqual(len(received_rows), len(events) + 2)
+        # that should leave us with the rows for the PL event, the state changes
+        # get collapsed into a single row.
+        self.assertEqual(len(received_rows), 2)
 
         stream_name, token, row = received_rows.pop(0)
         self.assertEqual("events", stream_name)
@@ -241,24 +242,11 @@ class EventsStreamTestCase(BaseStreamTestCase):
         self.assertIsInstance(row.data, EventsStreamEventRow)
         self.assertEqual(row.data.event_id, pl_event.event_id)
 
-        # the state rows are unsorted
-        state_rows: List[EventsStreamCurrentStateRow] = []
-        for stream_name, _, row in received_rows:
-            self.assertEqual("events", stream_name)
-            self.assertIsInstance(row, EventsStreamRow)
-            self.assertEqual(row.type, "state")
-            self.assertIsInstance(row.data, EventsStreamCurrentStateRow)
-            state_rows.append(row.data)
-
-        state_rows.sort(key=lambda r: r.state_key)
-
-        sr = state_rows.pop(0)
-        self.assertEqual(sr.type, EventTypes.PowerLevels)
-        self.assertEqual(sr.event_id, pl_event.event_id)
-        for sr in state_rows:
-            self.assertEqual(sr.type, "test_state_event")
-            # "None" indicates the state has been deleted
-            self.assertIsNone(sr.event_id)
+        stream_name, token, row = received_rows.pop(0)
+        self.assertIsInstance(row, EventsStreamRow)
+        self.assertEqual(row.type, "state-all")
+        self.assertIsInstance(row.data, EventsStreamAllStateRow)
+        self.assertEqual(row.data.room_id, state2.room_id)
 
     def test_update_function_state_row_limit(self) -> None:
         """Test replication with many state events over several stream ids."""
