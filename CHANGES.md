@@ -3,11 +3,11 @@
 ### Bugfixes
 
 - Remove legacy unspecced `knock_state_events` field returned in some responses. ([\#16403](https://github.com/matrix-org/synapse/issues/16403))
-- Fixes possbile `AttributeError` when `_matrix/client/v3/account/whoami` is called over a unix socket. Contributed by @Sir-Photch. ([\#16404](https://github.com/matrix-org/synapse/issues/16404))
+- Fix a bug introduced in Synapse 1.81.0 where an `AttributeError` would be raised when `_matrix/client/v3/account/whoami` is called over a unix socket. Contributed by @Sir-Photch. ([\#16404](https://github.com/matrix-org/synapse/issues/16404))
 - Properly return inline media when content types have parameters. ([\#16440](https://github.com/matrix-org/synapse/issues/16440))
 - Prevent the purging of large rooms from timing out when Postgres is in use. The timeout which causes this issue was introduced in Synapse 1.88.0. ([\#16455](https://github.com/matrix-org/synapse/issues/16455))
 - Improve the performance of purging rooms, particularly encrypted rooms. ([\#16457](https://github.com/matrix-org/synapse/issues/16457))
-- Fix a bug introduced in Synapse 1.59.0 where servers would be incorrectly marked as available when a request resulted in an error. ([\#16506](https://github.com/matrix-org/synapse/issues/16506))
+- Fix a bug introduced in Synapse 1.59.0 where servers could be incorrectly marked as available after an error response was received. ([\#16506](https://github.com/matrix-org/synapse/issues/16506))
 
 ### Improved Documentation
 
