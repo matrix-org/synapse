@@ -99,7 +99,7 @@ class EmailPusher(Pusher):
                 pass
             self.timed_call = None
 
-    def on_new_receipts(self, min_stream_id: int, max_stream_id: int) -> None:
+    def on_new_receipts(self) -> None:
         # We could wake up and cancel the timer but there tend to be quite a
         # lot of read receipts so it's probably less work to just let the
         # timer fire

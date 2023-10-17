@@ -56,6 +56,7 @@ jobs:
             - 'pyproject.toml'
             - 'poetry.lock'
             - 'docker/**'
+            - 'scripts-dev/complement.sh'
 
           linting:
             - 'synapse/**'
@@ -280,7 +281,6 @@ jobs:
       - check-lockfile
       - lint-clippy
       - lint-rustfmt
-      - check-signoff
     runs-on: ubuntu-latest
     steps:
       - run: "true"

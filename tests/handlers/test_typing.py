@@ -28,7 +28,7 @@ from synapse.federation.transport.server import TransportLayerServer
 from synapse.handlers.typing import TypingWriterHandler
 from synapse.http.federation.matrix_federation_agent import MatrixFederationAgent
 from synapse.server import HomeServer
-from synapse.types import JsonDict, Requester, UserID, create_requester
+from synapse.types import JsonDict, Requester, StreamKeyType, UserID, create_requester
 from synapse.util import Clock
 
 from tests import unittest
@@ -174,7 +174,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             return_value=1
         )
 
-        self.datastore.get_partial_current_state_deltas = Mock(return_value=(0, None))  # type: ignore[method-assign]
+        self.datastore.get_partial_current_state_deltas = Mock(return_value=(0, []))  # type: ignore[method-assign]
 
         self.datastore.get_to_device_stream_token = Mock(  # type: ignore[method-assign]
             return_value=0
@@ -203,7 +203,9 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        self.on_new_event.assert_has_calls([call("typing_key", 1, rooms=[ROOM_ID])])
+        self.on_new_event.assert_has_calls(
+            [call(StreamKeyType.TYPING, 1, rooms=[ROOM_ID])]
+        )
 
         self.assertEqual(self.event_source.get_current_key(), 1)
         events = self.get_success(
@@ -273,7 +275,9 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(channel.code, 200)
 
-        self.on_new_event.assert_has_calls([call("typing_key", 1, rooms=[ROOM_ID])])
+        self.on_new_event.assert_has_calls(
+            [call(StreamKeyType.TYPING, 1, rooms=[ROOM_ID])]
+        )
 
         self.assertEqual(self.event_source.get_current_key(), 1)
         events = self.get_success(
@@ -349,7 +353,9 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        self.on_new_event.assert_has_calls([call("typing_key", 1, rooms=[ROOM_ID])])
+        self.on_new_event.assert_has_calls(
+            [call(StreamKeyType.TYPING, 1, rooms=[ROOM_ID])]
+        )
 
         self.mock_federation_client.put_json.assert_called_once_with(
             "farm",
@@ -399,7 +405,9 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        self.on_new_event.assert_has_calls([call("typing_key", 1, rooms=[ROOM_ID])])
+        self.on_new_event.assert_has_calls(
+            [call(StreamKeyType.TYPING, 1, rooms=[ROOM_ID])]
+        )
         self.on_new_event.reset_mock()
 
         self.assertEqual(self.event_source.get_current_key(), 1)
@@ -425,7 +433,9 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
 
         self.reactor.pump([16])
 
-        self.on_new_event.assert_has_calls([call("typing_key", 2, rooms=[ROOM_ID])])
+        self.on_new_event.assert_has_calls(
+            [call(StreamKeyType.TYPING, 2, rooms=[ROOM_ID])]
+        )
 
         self.assertEqual(self.event_source.get_current_key(), 2)
         events = self.get_success(
@@ -459,7 +469,9 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        self.on_new_event.assert_has_calls([call("typing_key", 3, rooms=[ROOM_ID])])
+        self.on_new_event.assert_has_calls(
+            [call(StreamKeyType.TYPING, 3, rooms=[ROOM_ID])]
+        )
         self.on_new_event.reset_mock()
 
         self.assertEqual(self.event_source.get_current_key(), 3)

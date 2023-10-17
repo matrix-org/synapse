@@ -94,12 +94,12 @@ class ModuleApiTestCase(BaseModuleApiTestCase):
         self.assertEqual(len(emails), 1)
 
         email = emails[0]
-        self.assertEqual(email["medium"], "email")
-        self.assertEqual(email["address"], "bob@bobinator.bob")
+        self.assertEqual(email.medium, "email")
+        self.assertEqual(email.address, "bob@bobinator.bob")
 
         # Should these be 0?
-        self.assertEqual(email["validated_at"], 0)
-        self.assertEqual(email["added_at"], 0)
+        self.assertEqual(email.validated_at, 0)
+        self.assertEqual(email.added_at, 0)
 
         # Check that the displayname was assigned
         displayname = self.get_success(

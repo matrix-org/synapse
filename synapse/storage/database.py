@@ -1874,9 +1874,9 @@ class DatabasePool:
         keyvalues: Optional[Dict[str, Any]] = None,
         desc: str = "simple_select_many_batch",
         batch_size: int = 100,
-    ) -> List[Dict[str, Any]]:
+    ) -> List[Tuple[Any, ...]]:
         """Executes a SELECT query on the named table, which may return zero or
-        more rows, returning the result as a list of dicts.
+        more rows.
 
         Filters rows by whether the value of `column` is in `iterable`.
 
@@ -1888,10 +1888,13 @@ class DatabasePool:
             keyvalues: dict of column names and values to select the rows with
             desc: description of the transaction, for logging and metrics
             batch_size: the number of rows for each select query
+
+        Returns:
+            The results as a list of tuples.
         """
         keyvalues = keyvalues or {}
 
-        results: List[Dict[str, Any]] = []
+        results: List[Tuple[Any, ...]] = []
 
         for chunk in batch_iter(iterable, batch_size):
             rows = await self.runInteraction(
@@ -1918,9 +1921,9 @@ class DatabasePool:
         iterable: Collection[Any],
         keyvalues: Dict[str, Any],
         retcols: Iterable[str],
-    ) -> List[Dict[str, Any]]:
+    ) -> List[Tuple[Any, ...]]:
         """Executes a SELECT query on the named table, which may return zero or
-        more rows, returning the result as a list of dicts.
+        more rows.
 
         Filters rows by whether the value of `column` is in `iterable`.
 
@@ -1931,6 +1934,9 @@ class DatabasePool:
             iterable: list
             keyvalues: dict of column names and values to select the rows with
             retcols: list of strings giving the names of the columns to return
+
+        Returns:
+            The results as a list of tuples.
         """
         if not iterable:
             return []
@@ -1949,7 +1955,7 @@ class DatabasePool:
         )
 
         txn.execute(sql, values)
-        return cls.cursor_to_dict(txn)
+        return txn.fetchall()
 
     async def simple_update(
         self,
@@ -2418,7 +2424,7 @@ class DatabasePool:
         keyvalues: Optional[Dict[str, Any]] = None,
         exclude_keyvalues: Optional[Dict[str, Any]] = None,
         order_direction: str = "ASC",
-    ) -> List[Dict[str, Any]]:
+    ) -> List[Tuple[Any, ...]]:
         """
         Executes a SELECT query on the named table with start and limit,
         of row numbers, which may return zero or number of rows from start to limit,
@@ -2447,7 +2453,7 @@ class DatabasePool:
             order_direction: Whether the results should be ordered "ASC" or "DESC".
 
         Returns:
-            The result as a list of dictionaries.
+            The result as a list of tuples.
         """
         if order_direction not in ["ASC", "DESC"]:
             raise ValueError("order_direction must be one of 'ASC' or 'DESC'.")
@@ -2474,69 +2480,7 @@ class DatabasePool:
         )
         txn.execute(sql, arg_list + [limit, start])
 
-        return cls.cursor_to_dict(txn)
-
-    async def simple_search_list(
-        self,
-        table: str,
-        term: Optional[str],
-        col: str,
-        retcols: Collection[str],
-        desc: str = "simple_search_list",
-    ) -> Optional[List[Dict[str, Any]]]:
-        """Executes a SELECT query on the named table, which may return zero or
-        more rows, returning the result as a list of dicts.
-
-        Args:
-            table: the table name
-            term: term for searching the table matched to a column.
-            col: column to query term should be matched to
-            retcols: the names of the columns to return
-
-        Returns:
-            A list of dictionaries or None.
-        """
-
-        return await self.runInteraction(
-            desc,
-            self.simple_search_list_txn,
-            table,
-            term,
-            col,
-            retcols,
-            db_autocommit=True,
-        )
-
-    @classmethod
-    def simple_search_list_txn(
-        cls,
-        txn: LoggingTransaction,
-        table: str,
-        term: Optional[str],
-        col: str,
-        retcols: Iterable[str],
-    ) -> Optional[List[Dict[str, Any]]]:
-        """Executes a SELECT query on the named table, which may return zero or
-        more rows, returning the result as a list of dicts.
-
-        Args:
-            txn: Transaction object
-            table: the table name
-            term: term for searching the table matched to a column.
-            col: column to query term should be matched to
-            retcols: the names of the columns to return
-
-        Returns:
-            None if no term is given, otherwise a list of dictionaries.
-        """
-        if term:
-            sql = "SELECT %s FROM %s WHERE %s LIKE ?" % (", ".join(retcols), table, col)
-            termvalues = ["%%" + term + "%%"]
-            txn.execute(sql, termvalues)
-        else:
-            return None
-
-        return cls.cursor_to_dict(txn)
+        return txn.fetchall()
 
 
 def make_in_list_sql_clause(

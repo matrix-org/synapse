@@ -14,15 +14,16 @@
 
 from pyperf import perf_counter
 
+from synapse.types import ISynapseReactor
 from synapse.util.caches.lrucache import LruCache
 
 
-async def main(reactor, loops):
+async def main(reactor: ISynapseReactor, loops: int) -> float:
     """
     Benchmark `loops` number of insertions into LruCache where half of them are
     evicted.
     """
-    cache = LruCache(loops // 2)
+    cache: LruCache[int, bool] = LruCache(loops // 2)
 
     start = perf_counter()
 

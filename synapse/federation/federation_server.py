@@ -850,14 +850,7 @@ class FederationServer(FederationBase):
                 context, self._room_prejoin_state_types
             )
         )
-        return {
-            "knock_room_state": stripped_room_state,
-            # Since v1.37, Synapse incorrectly used "knock_state_events" for this field.
-            # Thus, we also populate a 'knock_state_events' with the same content to
-            # support old instances.
-            # See https://github.com/matrix-org/synapse/issues/14088.
-            "knock_state_events": stripped_room_state,
-        }
+        return {"knock_room_state": stripped_room_state}
 
     async def _on_send_membership_event(
         self, origin: str, content: JsonDict, membership_type: str, room_id: str
