@@ -523,11 +523,25 @@ class SyncHandler:
         self,
         room_id: str,
         sync_config: SyncConfig,
-        now_token: StreamToken,
+        upto_token: StreamToken,
         since_token: Optional[StreamToken] = None,
         potential_recents: Optional[List[EventBase]] = None,
         newly_joined_room: bool = False,
     ) -> TimelineBatch:
+        """Create a timeline batch for the room
+
+        Args:
+            room_id
+            sync_result_builder
+            sync_config
+            upto_token: The token up to which we should fetch (more) events.
+                If `potential_results` is non-empty then this is *start* of
+                the the list.
+            since_token
+            potential_recents: If non-empty, the events between the since token
+                and current token to send down to clients.
+            newly_joined_room
+        """
         with Measure(self.clock, "load_filtered_recents"):
             timeline_limit = sync_config.filter_collection.timeline_limit()
             block_all_timeline = (
@@ -548,7 +562,7 @@ class SyncHandler:
             gap_token = await self.store.get_timeline_gaps(
                 room_id,
                 since_token.room_key if since_token else None,
-                now_token.room_key,
+                upto_token.room_key,
             )
             if gap_token:
                 potential_recents = []
@@ -592,10 +606,10 @@ class SyncHandler:
                 recents = []
 
             if not limited or block_all_timeline:
-                prev_batch_token = now_token
+                prev_batch_token = upto_token
                 if recents:
                     room_key = recents[0].internal_metadata.before
-                    prev_batch_token = now_token.copy_and_replace(
+                    prev_batch_token = upto_token.copy_and_replace(
                         StreamKeyType.ROOM, room_key
                     )
 
@@ -606,7 +620,7 @@ class SyncHandler:
             filtering_factor = 2
             load_limit = max(timeline_limit * filtering_factor, 10)
             max_repeat = 5  # Only try a few times per room, otherwise
-            room_key = now_token.room_key
+            room_key = upto_token.room_key
             end_key = room_key
 
             since_key = None
@@ -684,7 +698,7 @@ class SyncHandler:
                 recents = recents[-timeline_limit:]
                 room_key = recents[0].internal_metadata.before
 
-            prev_batch_token = now_token.copy_and_replace(StreamKeyType.ROOM, room_key)
+            prev_batch_token = upto_token.copy_and_replace(StreamKeyType.ROOM, room_key)
 
         # Don't bother to bundle aggregations if the timeline is unlimited,
         # as clients will have all the necessary information.
@@ -2437,7 +2451,7 @@ class SyncHandler:
             batch = await self._load_filtered_recents(
                 room_id,
                 sync_config,
-                now_token=upto_token,
+                upto_token=upto_token,
                 since_token=since_token,
                 potential_recents=events,
                 newly_joined_room=newly_joined,
