@@ -522,6 +522,7 @@ class SyncHandler:
     async def _load_filtered_recents(
         self,
         room_id: str,
+        sync_result_builder: "SyncResultBuilder",
         sync_config: SyncConfig,
         upto_token: StreamToken,
         since_token: Optional[StreamToken] = None,
@@ -562,10 +563,13 @@ class SyncHandler:
             gap_token = await self.store.get_timeline_gaps(
                 room_id,
                 since_token.room_key if since_token else None,
-                upto_token.room_key,
+                sync_result_builder.now_token.room_key,
             )
             if gap_token:
-                potential_recents = []
+                # There's a gap, so we need to ignore the passed in
+                # `potential_recents`, and reset `upto_token` to match.
+                potential_recents = None
+                upto_token = sync_result_builder.now_token
                 limited = True
 
             log_kv({"limited": limited})
@@ -2450,6 +2454,7 @@ class SyncHandler:
 
             batch = await self._load_filtered_recents(
                 room_id,
+                sync_result_builder,
                 sync_config,
                 upto_token=upto_token,
                 since_token=since_token,
