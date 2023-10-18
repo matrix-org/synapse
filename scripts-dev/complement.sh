@@ -277,7 +277,7 @@ fi
 export PASS_SYNAPSE_LOG_TESTING=1
 
 # Run the tests!
-echo "Images built; running complement"
+echo "Images built; running complement with ${extra_test_args[@]} $@ $test_packages"
 cd "$COMPLEMENT_DIR"
 
 go test -v -tags "synapse_blacklist" -count=1 "${extra_test_args[@]}" "$@" $test_packages
