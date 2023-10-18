@@ -1623,7 +1623,9 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         from_token: Optional[RoomStreamToken],
         to_token: RoomStreamToken,
     ) -> Optional[RoomStreamToken]:
-        """Check if there is a gap, and return the token."""
+        """Check if there is a gap, and return a token that marks the position
+        of the gap in the stream.
+        """
 
         sql = """
             SELECT instance_name, stream_ordering
