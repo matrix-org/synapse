@@ -1,0 +1,1 @@
+Remove duplicate call to mark remote server 'awake' when using a federation sending worker.
