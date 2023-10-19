@@ -33,6 +33,7 @@ DISTS = (
     "ubuntu:focal",  # 20.04 LTS (EOL 2025-04) (our EOL forced by Python 3.8 is 2024-10-14)
     "ubuntu:jammy",  # 22.04 LTS (EOL 2027-04) (our EOL forced by Python 3.10 is 2026-10-04)
     "ubuntu:lunar",  # 23.04 (EOL 2024-01) (our EOL forced by Python 3.11 is 2027-10-24)
+    "ubuntu:mantic",  # 23.10 (EOL 2024-07) (our EOL forced by Python 3.11 is 2027-10-24)
     "debian:trixie",  # (EOL not specified yet)
 )
 
