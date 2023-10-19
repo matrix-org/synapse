@@ -30,6 +30,7 @@ from typing import (
     Generic,
     Iterable,
     List,
+    Mapping,
     NoReturn,
     Optional,
     Tuple,
@@ -251,7 +252,7 @@ class TestCase(unittest.TestCase):
             except AssertionError as e:
                 raise (type(e))(f"Assert error for '.{key}':") from e
 
-    def assert_dict(self, required: dict, actual: dict) -> None:
+    def assert_dict(self, required: Mapping, actual: Mapping) -> None:
         """Does a partial assert of a dict.
 
         Args:

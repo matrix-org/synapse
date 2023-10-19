@@ -156,6 +156,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         result = self.successResultOf(
             defer.ensureDeferred(self.handler.query_room_alias_exists(room_alias))
         )
+        assert result is not None
 
         self.mock_as_api.query_alias.assert_called_once_with(
             interested_service, room_alias_str
