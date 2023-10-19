@@ -123,6 +123,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         if ssl:
             server_factory = wrap_server_factory_for_tls(
                 server_factory,
+                self.reactor,
                 tls_sanlist
                 or [
                     b"DNS:testserv",
@@ -443,6 +444,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         # now we make another test server to act as the upstream HTTP server.
         server_ssl_protocol = wrap_server_factory_for_tls(
             _get_test_protocol_factory(),
+            self.reactor,
             sanlist=[
                 b"DNS:testserv",
                 b"DNS:target-server",

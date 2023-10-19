@@ -248,7 +248,7 @@ class MatrixFederationAgentTests(TestCase):
         """
         if ssl:
             server_factory = wrap_server_factory_for_tls(
-                server_factory, tls_sanlist or [b"DNS:test.com"]
+                server_factory, self.reactor, tls_sanlist or [b"DNS:test.com"]
             )
 
         server_protocol = server_factory.buildProtocol(dummy_address)
@@ -617,7 +617,7 @@ class MatrixFederationAgentTests(TestCase):
 
         # now we make another test server to act as the upstream HTTP server.
         server_ssl_protocol = wrap_server_factory_for_tls(
-            _get_test_protocol_factory(), sanlist=[b"DNS:test.com"]
+            _get_test_protocol_factory(), self.reactor, sanlist=[b"DNS:test.com"]
         ).buildProtocol(dummy_address)
 
         # Tell the HTTP server to send outgoing traffic back via the proxy's transport.
@@ -784,7 +784,7 @@ class MatrixFederationAgentTests(TestCase):
 
         # now we can replace the proxy channel with a new, SSL-wrapped HTTP channel
         ssl_factory = wrap_server_factory_for_tls(
-            _get_test_protocol_factory(), sanlist=[b"DNS:test.com"]
+            _get_test_protocol_factory(), self.reactor, sanlist=[b"DNS:test.com"]
         )
         ssl_protocol = ssl_factory.buildProtocol(dummy_address)
         assert isinstance(ssl_protocol, TLSMemoryBIOProtocol)

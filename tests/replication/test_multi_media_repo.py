@@ -101,7 +101,7 @@ class MediaRepoShardTestCase(BaseMultiWorkerStreamTestCase):
         server_factory.log = _log_request
 
         server_tls_protocol = wrap_server_factory_for_tls(
-            server_factory, sanlist=[b"DNS:example.com"]
+            server_factory, self.reactor, sanlist=[b"DNS:example.com"]
         ).buildProtocol(None)
 
         # now, tell the client protocol factory to build the client protocol (it will be a
