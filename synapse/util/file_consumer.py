@@ -84,9 +84,11 @@ class BackgroundFileConsumer:
             threads.deferToThreadPool,
             # mypy seems to get confused with the chaining of ParamSpec from
             # run_in_background to deferToThreadPool.
-            self._reactor,  # type: ignore[arg-type]
-            self._reactor.getThreadPool(),  # type: ignore[arg-type]
-            self._writer,  # type: ignore[arg-type]
+            #
+            # For Twisted trunk, ignore arg-type; for Twisted release ignore unused-ignore.
+            self._reactor,  # type: ignore[arg-type,unused-ignore]
+            self._reactor.getThreadPool(),  # type: ignore[arg-type,unused-ignore]
+            self._writer,  # type: ignore[arg-type,unused-ignore]
         )
         if not streaming:
             self._producer.resumeProducing()
