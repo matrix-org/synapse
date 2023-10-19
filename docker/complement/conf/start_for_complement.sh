@@ -26,6 +26,8 @@ case "$SYNAPSE_COMPLEMENT_DATABASE" in
     export POSTGRES_PASSWORD=somesecret
     export POSTGRES_USER=postgres
     export POSTGRES_HOST=localhost
+    export POSTGRES_CP_MIN=1
+    export POSTGRES_CP_MAX=3
 
     # configure supervisord to start postgres
     export START_POSTGRES=true
