@@ -133,6 +133,7 @@ elif isinstance(reactor, AsyncioSelectorReactor):
         if isinstance(selector, SelectSelector):
             wrapper = selector._select = CallWrapper(selector._select)  # type: ignore[attr-defined]
 
+        # poll, epoll, and /dev/poll.
         elif isinstance(selector, _PollLikeSelector):
             selector._selector = ObjWrapper(selector._selector, "poll")  # type: ignore[attr-defined]
             wrapper = selector._selector._wrapped_method  # type: ignore[attr-defined]
