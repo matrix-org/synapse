@@ -726,10 +726,6 @@ class MultiWriterIdGenerator(AbstractStreamIdGenerator):
                 instance_name, self._persisted_upto_position
             )
 
-            max_pos = max(
-                self._current_positions.values(), default=self._persisted_upto_position
-            )
-
             # We want to return the maximum "current token" that we can for a
             # writer, this helps ensure that streams progress as fast as
             # possible.
@@ -737,17 +733,17 @@ class MultiWriterIdGenerator(AbstractStreamIdGenerator):
 
             if (
                 self._instance_name == instance_name
-                and self._in_flight_fetches
-                and self._unfinished_ids
+                and not self._in_flight_fetches
+                and not self._unfinished_ids
             ):
                 # For our own instance when there's nothing in flight, it's safe
                 # to advance to the maximum persisted position we've seen (as we
                 # know that any new tokens we request will be greater).
-                max_pos = max(
+                max_pos_of_all_writers = max(
                     self._current_positions.values(),
                     default=self._persisted_upto_position,
                 )
-                pos = max(pos, max_pos)
+                pos = max(pos, max_pos_of_all_writers)
 
             return self._return_factor * pos
 
