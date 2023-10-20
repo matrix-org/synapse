@@ -12,16 +12,45 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import select
+import logging
 import time
-from typing import Any, Iterable, List, Tuple
+from selectors import SelectSelector, _PollLikeSelector  # type: ignore[attr-defined]
+from typing import Any, Callable, Iterable
 
 from prometheus_client import Histogram, Metric
 from prometheus_client.core import REGISTRY, GaugeMetricFamily
 
 from twisted.internet import reactor
+from twisted.internet.asyncioreactor import AsyncioSelectorReactor
+from twisted.internet.selectreactor import SelectReactor
 
 from synapse.metrics._types import Collector
+
+try:
+    from selectors import KqueueSelector
+except ImportError:
+
+    class KqueueSelector:  # type: ignore[no-redef]
+        pass
+
+
+try:
+    from twisted.internet.epollreactor import EPollReactor
+except ImportError:
+
+    class EPollReactor:  # type: ignore[no-redef]
+        pass
+
+
+try:
+    from twisted.internet.pollreactor import PollReactor
+except ImportError:
+
+    class PollReactor:  # type: ignore[no-redef]
+        pass
+
+
+logger = logging.getLogger(__name__)
 
 #
 # Twisted reactor metrics
@@ -34,52 +63,87 @@ tick_time = Histogram(
 )
 
 
-class EpollWrapper:
-    """a wrapper for an epoll object which records the time between polls"""
+class CallWrapper:
+    """a wrapper for a callable which records the time between calls"""
 
-    def __init__(self, poller: "select.epoll"):  # type: ignore[name-defined]
+    def __init__(self, wrapped: Callable[..., Any]):
         self.last_polled = time.time()
-        self._poller = poller
+        self._wrapped = wrapped
 
-    def poll(self, *args, **kwargs) -> List[Tuple[int, int]]:  # type: ignore[no-untyped-def]
-        # record the time since poll() was last called. This gives a good proxy for
+    def __call__(self, *args, **kwargs) -> Any:  # type: ignore[no-untyped-def]
+        # record the time since this was last called. This gives a good proxy for
         # how long it takes to run everything in the reactor - ie, how long anything
         # waiting for the next tick will have to wait.
         tick_time.observe(time.time() - self.last_polled)
 
-        ret = self._poller.poll(*args, **kwargs)
+        ret = self._wrapped(*args, **kwargs)
 
         self.last_polled = time.time()
         return ret
 
+
+class ObjWrapper:
+    """a wrapper for an callable which records the time between calls"""
+
+    def __init__(self, wrapped: Any, method: str):
+        self._wrapped = wrapped
+        self._method = method
+        self._wrapped_method = CallWrapper(getattr(wrapped, method))
+
     def __getattr__(self, item: str) -> Any:
-        return getattr(self._poller, item)
+        if item == self._method:
+            return self._wrapped_method
+
+        return getattr(self._wrapped, item)
 
 
 class ReactorLastSeenMetric(Collector):
-    def __init__(self, epoll_wrapper: EpollWrapper):
-        self._epoll_wrapper = epoll_wrapper
+    def __init__(self, call_wrapper: CallWrapper):
+        self._call_wrapper = call_wrapper
 
     def collect(self) -> Iterable[Metric]:
         cm = GaugeMetricFamily(
             "python_twisted_reactor_last_seen",
             "Seconds since the Twisted reactor was last seen",
         )
-        cm.add_metric([], time.time() - self._epoll_wrapper.last_polled)
+        cm.add_metric([], time.time() - self._call_wrapper.last_polled)
         yield cm
 
 
-try:
-    # if the reactor has a `_poller` attribute, which is an `epoll` object
-    # (ie, it's an EPollReactor), we wrap the `epoll` with a thing that will
-    # measure the time between ticks
-    from select import epoll  # type: ignore[attr-defined]
+# Twisted has already select a reasonable reactor for us, so assumptions can be
+# made about the shape.
+wrapper = None
+if isinstance(reactor, (PollReactor, EPollReactor)):
+    wrapper = reactor._poller.poll = CallWrapper(reactor._poller.poll)
 
-    poller = reactor._poller  # type: ignore[attr-defined]
-except (AttributeError, ImportError):
-    pass
-else:
-    if isinstance(poller, epoll):
-        poller = EpollWrapper(poller)
-        reactor._poller = poller  # type: ignore[attr-defined]
-        REGISTRY.register(ReactorLastSeenMetric(poller))
+elif isinstance(reactor, SelectReactor):
+    from twisted.internet import selectreactor
+
+    wrapper = selectreactor._select = CallWrapper(selectreactor._select)
+
+elif isinstance(reactor, AsyncioSelectorReactor):
+    # For asyncio we need to go deeper.
+    asyncio_loop = reactor._asyncioEventloop  # A sub-class of BaseEventLoop,
+
+    # If an unexpected asyncio loop implementation is used, these might fail.
+    try:
+        # A sub-class of BaseSelector.
+        selector = asyncio_loop._selector  # type: ignore[attr-defined]
+
+        if isinstance(selector, SelectSelector):
+            wrapper = selector._select = CallWrapper(selector._select)  # type: ignore[attr-defined]
+
+        elif isinstance(selector, _PollLikeSelector):
+            selector._selector = ObjWrapper(selector._selector, "poll")  # type: ignore[attr-defined]
+            wrapper = selector._selector._wrapped_method  # type: ignore[attr-defined]
+
+        elif isinstance(selector, KqueueSelector):
+            selector._selector = ObjWrapper(selector._selector, "control")  # type: ignore[attr-defined]
+            wrapper = selector._selector._wrapped_method  # type: ignore[attr-defined]
+
+        # XXX Will not work on (Windows-only) ProactorEventLoop.
+    except AttributeError:
+        logger.warn("Unexpected asyncio loop: %r", asyncio_loop)
+
+if wrapper:
+    REGISTRY.register(ReactorLastSeenMetric(wrapper))
