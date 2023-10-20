@@ -147,9 +147,15 @@
                         </div>
 
                         <h1 id="presence-router-callbacks"><a class="header" href="#presence-router-callbacks">Presence router callbacks</a></h1>
-<p>Presence router callbacks allow module developers to specify additional users (local or remote)
-to receive certain presence updates from local users. Presence router callbacks can be 
-registered using the module API's <code>register_presence_router_callbacks</code> method.</p>
+<p>Presence router callbacks allow module developers to define additional users
+which receive presence updates from local users. The additional users
+can be local or remote.</p>
+<p>For example, it could be used to direct all of <code>@alice:example.com</code> (a local user)'s
+presence updates to <code>@bob:matrix.org</code> (a remote user), even though they don't share a
+room. (Note that those presence updates might not make it to <code>@bob:matrix.org</code>'s client
+unless a similar presence router is running on that homeserver.)</p>
+<p>Presence router callbacks can be registered using the module API's
+<code>register_presence_router_callbacks</code> method.</p>
 <h2 id="callbacks"><a class="header" href="#callbacks">Callbacks</a></h2>
 <p>The available presence router callbacks are:</p>
 <h3 id="get_users_for_states"><a class="header" href="#get_users_for_states"><code>get_users_for_states</code></a></h3>
