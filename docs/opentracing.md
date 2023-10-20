@@ -51,6 +51,9 @@ docker run -d --name jaeger \
   jaegertracing/all-in-one:1
 ```
 
+Additionally to point synapse to a specific IP you can use the
+`JAEGER_AGENT_HOST` environment variable.
+
 Latest documentation is probably at
 https://www.jaegertracing.io/docs/latest/getting-started.
 
