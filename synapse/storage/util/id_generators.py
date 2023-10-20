@@ -723,7 +723,9 @@ class MultiWriterIdGenerator(AbstractStreamIdGenerator):
             if new_cur:
                 curr = self._current_positions.get(self._instance_name, 0)
                 self._current_positions[self._instance_name] = max(curr, new_cur)
-                self._max_position_of_local_instance = max(curr, new_cur)
+                self._max_position_of_local_instance = max(
+                    curr, new_cur, self._max_position_of_local_instance
+                )
 
             self._add_persisted_position(next_id)
 
@@ -834,7 +836,9 @@ class MultiWriterIdGenerator(AbstractStreamIdGenerator):
         if not self._unfinished_ids and not self._in_flight_fetches:
             # If we don't have anything in flight, it's safe to advance to the
             # max seen stream ID.
-            self._max_position_of_local_instance = self._max_seen_allocated_stream_id
+            self._max_position_of_local_instance = max(
+                self._max_seen_allocated_stream_id, self._max_position_of_local_instance
+            )
 
         # We now iterate through the seen positions, discarding those that are
         # less than the current min positions, and incrementing the min position
