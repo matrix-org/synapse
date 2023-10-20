@@ -20,9 +20,8 @@ from typing import Any, Callable, Iterable
 from prometheus_client import Histogram, Metric
 from prometheus_client.core import REGISTRY, GaugeMetricFamily
 
-from twisted.internet import reactor
+from twisted.internet import reactor, selectreactor
 from twisted.internet.asyncioreactor import AsyncioSelectorReactor
-from twisted.internet.selectreactor import SelectReactor
 
 from synapse.metrics._types import Collector
 
@@ -64,7 +63,7 @@ tick_time = Histogram(
 
 
 class CallWrapper:
-    """a wrapper for a callable which records the time between calls"""
+    """A wrapper for a callable which records the time between calls"""
 
     def __init__(self, wrapped: Callable[..., Any]):
         self.last_polled = time.time()
@@ -83,15 +82,21 @@ class CallWrapper:
 
 
 class ObjWrapper:
-    """a wrapper for an callable which records the time between calls"""
+    """A wrapper for an object which wraps a specified method in CallWrapper.
 
-    def __init__(self, wrapped: Any, method: str):
+    Other methods/attributes are passed to the original object.
+
+    This is necessary when the wrapped object does not allow the attribute to be
+    overwritten.
+    """
+
+    def __init__(self, wrapped: Any, method_name: str):
         self._wrapped = wrapped
-        self._method = method
-        self._wrapped_method = CallWrapper(getattr(wrapped, method))
+        self._method_name = method_name
+        self._wrapped_method = CallWrapper(getattr(wrapped, method_name))
 
     def __getattr__(self, item: str) -> Any:
-        if item == self._method:
+        if item == self._method_name:
             return self._wrapped_method
 
         return getattr(self._wrapped, item)
@@ -116,13 +121,12 @@ wrapper = None
 if isinstance(reactor, (PollReactor, EPollReactor)):
     wrapper = reactor._poller.poll = CallWrapper(reactor._poller.poll)
 
-elif isinstance(reactor, SelectReactor):
-    from twisted.internet import selectreactor
-
+elif isinstance(reactor, selectreactor.SelectReactor):
+    # Twisted uses a module-level _select function.
     wrapper = selectreactor._select = CallWrapper(selectreactor._select)
 
 elif isinstance(reactor, AsyncioSelectorReactor):
-    # For asyncio we need to go deeper.
+    # For asyncio look at the underlying asyncio event loop.
     asyncio_loop = reactor._asyncioEventloop  # A sub-class of BaseEventLoop,
 
     # If an unexpected asyncio loop implementation is used, these might fail.
