@@ -20,9 +20,12 @@ from zope.interface import implementer
 from OpenSSL import SSL
 from OpenSSL.SSL import Connection
 from twisted.internet.address import IPv4Address
-from twisted.internet.interfaces import IOpenSSLServerConnectionCreator
+from twisted.internet.interfaces import (
+    IOpenSSLServerConnectionCreator,
+    IProtocolFactory,
+)
 from twisted.internet.ssl import Certificate, trustRootFromCertificates
-from twisted.protocols.tls import TLSMemoryBIOProtocol
+from twisted.protocols.tls import TLSMemoryBIOFactory, TLSMemoryBIOProtocol
 from twisted.web.client import BrowserLikePolicyForHTTPS  # noqa: F401
 from twisted.web.iweb import IPolicyForHTTPS  # noqa: F401
 
@@ -151,6 +154,27 @@ class TestServerTLSConnectionFactory:
         ctx.use_certificate_file(self._cert_file)
         ctx.use_privatekey_file(get_test_key_file())
         return Connection(ctx, None)
+
+
+def wrap_server_factory_for_tls(
+    factory: IProtocolFactory, sanlist: List[bytes]
+) -> TLSMemoryBIOFactory:
+    """Wrap an existing Protocol Factory with a test TLSMemoryBIOFactory
+
+    The resultant factory will create a TLS server which presents a certificate
+    signed by our test CA, valid for the domains in `sanlist`
+
+    Args:
+        factory: protocol factory to wrap
+        sanlist: list of domains the cert should be valid for
+
+    Returns:
+        interfaces.IProtocolFactory
+    """
+    connection_creator = TestServerTLSConnectionFactory(sanlist=sanlist)
+    return TLSMemoryBIOFactory(
+        connection_creator, isClient=False, wrappedFactory=factory
+    )
 
 
 # A dummy address, useful for tests that use FakeTransport and don't care about where
