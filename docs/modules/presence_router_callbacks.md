@@ -1,7 +1,7 @@
 # Presence router callbacks
 
 Presence router callbacks allow module developers to define additional users
-which receive updates presence updates from local users. The additional users
+which receive presence updates from local users. The additional users
 can be local or remote.
 
 For example, it could be used to have `alice` receive all presence updates from
