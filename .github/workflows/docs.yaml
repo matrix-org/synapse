@@ -57,6 +57,9 @@ jobs:
         with:
           mdbook-version: '0.4.17'
 
+      - name: Set version of docs
+        run: echo 'window.SYNAPSE_VERSION = "${{ needs.pre.outputs.branch-version }}";' > ./docs/website_files/version.js
+
       - name: Build the documentation
         # mdbook will only create an index.html if we're including docs/README.md in SUMMARY.md.
         # However, we're using docs/README.md for other purposes and need to pick a new page
