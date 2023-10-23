@@ -40,7 +40,7 @@ from typing import (
     Union,
     cast,
 )
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import attr
 from typing_extensions import ParamSpec
@@ -473,6 +473,18 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
                 if name not in lookups:
                     return fail(DNSLookupError("OH NO: unknown %s" % (name,)))
                 return succeed(lookups[name])
+
+        # In order for the TLS protocols to use the proper reactor's clock we need to patch
+        # _get_default_clock.
+        #
+        # This is *super* dirty since we never unpatch and rely on the next test
+        # to patch over us.
+        #
+        # Use create=True for backwards compatibilty with Twisted <= 23.8.0.
+        self._tls_clock_patcher = patch(
+            "twisted.protocols.tls._get_default_clock", return_value=self, create=True
+        )
+        self._tls_clock_patcher.start()
 
         self.nameResolver = SimpleResolverComplexifier(FakeResolver())
         super().__init__()
