@@ -478,18 +478,19 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                 log_kv({"message": "No changes in cache since last check"})
                 return 0
 
-        ROW_ID_NAME = self.database_engine.row_id_name
-
         def delete_messages_for_device_txn(txn: LoggingTransaction) -> int:
             limit_statement = "" if limit is None else f"LIMIT {limit}"
             sql = f"""
-                DELETE FROM device_inbox WHERE {ROW_ID_NAME} IN (
-                  SELECT {ROW_ID_NAME} FROM device_inbox
-                  WHERE user_id = ? AND device_id = ? AND stream_id <= ?
-                  {limit_statement}
+                DELETE FROM device_inbox WHERE user_id = ? AND device_id = ? AND stream_id <= (
+                  SELECT MAX(stream_id) FROM (
+                    SELECT stream_id FROM device_inbox
+                    WHERE user_id = ? AND device_id = ? AND stream_id <= ?
+                    ORDER BY stream_id
+                    {limit_statement}
+                  ) AS q1
                 )
                 """
-            txn.execute(sql, (user_id, device_id, up_to_stream_id))
+            txn.execute(sql, (user_id, device_id, user_id, device_id, up_to_stream_id))
             return txn.rowcount
 
         count = await self.db_pool.runInteraction(

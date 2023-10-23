@@ -1,8 +1,16 @@
 # Presence router callbacks
 
-Presence router callbacks allow module developers to specify additional users (local or remote)
-to receive certain presence updates from local users. Presence router callbacks can be 
-registered using the module API's `register_presence_router_callbacks` method.
+Presence router callbacks allow module developers to define additional users
+which receive presence updates from local users. The additional users
+can be local or remote.
+
+For example, it could be used to direct all of `@alice:example.com` (a local user)'s
+presence updates to `@bob:matrix.org` (a remote user), even though they don't share a
+room. (Note that those presence updates might not make it to `@bob:matrix.org`'s client
+unless a similar presence router is running on that homeserver.)
+
+Presence router callbacks can be registered using the module API's
+`register_presence_router_callbacks` method.
 
 ## Callbacks
 
