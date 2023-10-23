@@ -1809,7 +1809,7 @@ class DatabasePool:
         desc: str = "simple_select_list",
     ) -> List[Tuple[Any, ...]]:
         """Executes a SELECT query on the named table, which may return zero or
-        more rows, returning the result as a list of dicts.
+        more rows, returning the result as a list of tuples.
 
         Args:
             table: the table name
@@ -1840,7 +1840,7 @@ class DatabasePool:
         retcols: Iterable[str],
     ) -> List[Tuple[Any, ...]]:
         """Executes a SELECT query on the named table, which may return zero or
-        more rows, returning the result as a list of dicts.
+        more rows, returning the result as a list of tuples.
 
         Args:
             txn: Transaction object
