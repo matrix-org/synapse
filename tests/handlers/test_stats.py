@@ -70,7 +70,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
 
     async def get_all_room_state(self) -> List[Optional[str]]:
         rows = cast(
-            List[Tuple[str]],
+            List[Tuple[Optional[str]]],
             await self.store.db_pool.simple_select_list(
                 "room_stats_state", None, retcols=("topic",)
             ),

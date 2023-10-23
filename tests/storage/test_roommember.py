@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import List, Tuple, cast
+from typing import List, Optional, Tuple, cast
 
 from twisted.test.proto_helpers import MemoryReactor
 
@@ -113,7 +113,7 @@ class RoomMemberStoreTestCase(unittest.HomeserverTestCase):
         room = self.helper.create_room_as(self.u_alice, tok=self.t_alice)
 
         res = cast(
-            List[Tuple[str, str]],
+            List[Tuple[Optional[str], str]],
             self.get_success(
                 self.store.db_pool.simple_select_list(
                     "room_memberships",
@@ -145,7 +145,7 @@ class RoomMemberStoreTestCase(unittest.HomeserverTestCase):
         )
 
         res2 = cast(
-            List[Tuple[str, str]],
+            List[Tuple[Optional[str], str]],
             self.get_success(
                 self.store.db_pool.simple_select_list(
                     "room_memberships",
