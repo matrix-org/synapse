@@ -474,7 +474,7 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
                     return fail(DNSLookupError("OH NO: unknown %s" % (name,)))
                 return succeed(lookups[name])
 
-        # In order for the TLS protocols to use the proper we need to patch
+        # In order for the TLS protocols to use the proper reactor's clock we need to patch
         # _get_default_clock.
         #
         # This is *super* dirty since we never unpatch and rely on the next test
