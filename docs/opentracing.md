@@ -51,8 +51,10 @@ docker run -d --name jaeger \
   jaegertracing/all-in-one:1
 ```
 
-Additionally to point synapse to a specific IP you can use the
-`JAEGER_AGENT_HOST` environment variable.
+By default, Synapse will publish traces to Jaeger on localhost.
+If Jaeger is hosted elsewhere, point Synapse to the correct host by setting
+`opentracing.jaeger_config.local_agent.reporting_host` in the synapse configuration
+or by setting the `JAEGER_AGENT_HOST` environment variable to the desired address.
 
 Latest documentation is probably at
 https://www.jaegertracing.io/docs/latest/getting-started.
