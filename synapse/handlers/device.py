@@ -592,6 +592,8 @@ class DeviceHandler(DeviceWorkerHandler):
                 )
 
             # Delete device messages asynchronously and in batches using the task scheduler
+            # We specify an upper stream id to avoid deleting non delivered messages
+            # if an user re-uses a device ID.
             await self._task_scheduler.schedule_task(
                 DELETE_DEVICE_MSGS_TASK_NAME,
                 resource_id=device_id,
