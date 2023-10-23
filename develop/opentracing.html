@@ -187,6 +187,10 @@ using docker like so:</p>
   -p 14268:14268 \
   jaegertracing/all-in-one:1
 </code></pre>
+<p>By default, Synapse will publish traces to Jaeger on localhost.
+If Jaeger is hosted elsewhere, point Synapse to the correct host by setting
+<code>opentracing.jaeger_config.local_agent.reporting_host</code> <a href="usage/configuration/config_documentation.html#opentracing-1">in the Synapse configuration</a>
+or by setting the <code>JAEGER_AGENT_HOST</code> environment variable to the desired address.</p>
 <p>Latest documentation is probably at
 https://www.jaegertracing.io/docs/latest/getting-started.</p>
 <h2 id="enable-opentracing-in-synapse"><a class="header" href="#enable-opentracing-in-synapse">Enable OpenTracing in Synapse</a></h2>
