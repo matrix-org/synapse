@@ -119,7 +119,8 @@ class ReactorLastSeenMetric(Collector):
 # made about the shape.
 wrapper = None
 if isinstance(reactor, (PollReactor, EPollReactor)):
-    wrapper = reactor._poller.poll = CallWrapper(reactor._poller.poll)
+    reactor._poller = ObjWrapper(reactor._poller, "poll")  # type: ignore[attr-defined]
+    wrapper = reactor._poller._wrapped_method  # type: ignore[attr-defined]
 
 elif isinstance(reactor, selectreactor.SelectReactor):
     # Twisted uses a module-level _select function.
