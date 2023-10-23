@@ -680,7 +680,7 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
         self.assertEqual(second_id_gen.get_current_token(), 7)
 
         # Check that the first ID gen advancing causes the second ID gen to
-        # advance (as it has nothing in flight).
+        # advance (as the second ID gen has nothing in flight).
 
         async def _get_next_async() -> None:
             async with first_id_gen.get_next_mult(2):
@@ -694,7 +694,7 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
         self.assertEqual(second_id_gen.get_current_token(), 7)
 
         # Check that the first ID gen advancing doesn't advance the second ID
-        # gen  when it has stuff in flight.
+        # gen when the second ID gen has stuff in flight.
         self.get_success(_get_next_async())
 
         ctxmgr = second_id_gen.get_next()
