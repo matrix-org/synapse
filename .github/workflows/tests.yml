@@ -37,15 +37,18 @@ jobs:
             - 'Cargo.toml'
             - 'Cargo.lock'
             - '.rustfmt.toml'
+            - '.github/workflows/tests.yml'
 
           trial:
             - 'synapse/**'
             - 'tests/**'
             - 'rust/**'
+            - '.ci/scripts/calculate_jobs.py'
             - 'Cargo.toml'
             - 'Cargo.lock'
             - 'pyproject.toml'
             - 'poetry.lock'
+            - '.github/workflows/tests.yml'
 
           integration:
             - 'synapse/**'
@@ -56,6 +59,9 @@ jobs:
             - 'pyproject.toml'
             - 'poetry.lock'
             - 'docker/**'
+            - '.ci/**'
+            - 'scripts-dev/complement.sh'
+            - '.github/workflows/tests.yml'
 
           linting:
             - 'synapse/**'
@@ -69,6 +75,7 @@ jobs:
             - 'mypy.ini'
             - 'pyproject.toml'
             - 'poetry.lock'
+            - '.github/workflows/tests.yml'
 
   check-sampleconfig:
     runs-on: ubuntu-latest
@@ -280,7 +287,6 @@ jobs:
       - check-lockfile
       - lint-clippy
       - lint-rustfmt
-      - check-signoff
     runs-on: ubuntu-latest
     steps:
       - run: "true"

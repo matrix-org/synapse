@@ -212,8 +212,8 @@ class AccountValidityHandler:
 
         addresses = []
         for threepid in threepids:
-            if threepid["medium"] == "email":
-                addresses.append(threepid["address"])
+            if threepid.medium == "email":
+                addresses.append(threepid.address)
 
         return addresses
 

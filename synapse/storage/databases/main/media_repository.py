@@ -28,6 +28,7 @@ from typing import (
 
 from synapse.api.constants import Direction
 from synapse.logging.opentracing import trace
+from synapse.media._base import ThumbnailInfo
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import (
     DatabasePool,
@@ -435,8 +436,8 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
             desc="store_url_cache",
         )
 
-    async def get_local_media_thumbnails(self, media_id: str) -> List[Dict[str, Any]]:
-        return await self.db_pool.simple_select_list(
+    async def get_local_media_thumbnails(self, media_id: str) -> List[ThumbnailInfo]:
+        rows = await self.db_pool.simple_select_list(
             "local_media_repository_thumbnails",
             {"media_id": media_id},
             (
@@ -448,6 +449,16 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
             ),
             desc="get_local_media_thumbnails",
         )
+        return [
+            ThumbnailInfo(
+                width=row["thumbnail_width"],
+                height=row["thumbnail_height"],
+                method=row["thumbnail_method"],
+                type=row["thumbnail_type"],
+                length=row["thumbnail_length"],
+            )
+            for row in rows
+        ]
 
     @trace
     async def store_local_thumbnail(
@@ -556,8 +567,8 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
 
     async def get_remote_media_thumbnails(
         self, origin: str, media_id: str
-    ) -> List[Dict[str, Any]]:
-        return await self.db_pool.simple_select_list(
+    ) -> List[ThumbnailInfo]:
+        rows = await self.db_pool.simple_select_list(
             "remote_media_cache_thumbnails",
             {"media_origin": origin, "media_id": media_id},
             (
@@ -566,10 +577,19 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
                 "thumbnail_method",
                 "thumbnail_type",
                 "thumbnail_length",
-                "filesystem_id",
             ),
             desc="get_remote_media_thumbnails",
         )
+        return [
+            ThumbnailInfo(
+                width=row["thumbnail_width"],
+                height=row["thumbnail_height"],
+                method=row["thumbnail_method"],
+                type=row["thumbnail_type"],
+                length=row["thumbnail_length"],
+            )
+            for row in rows
+        ]
 
     @trace
     async def get_remote_media_thumbnail(

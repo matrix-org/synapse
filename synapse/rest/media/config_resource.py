@@ -14,17 +14,19 @@
 # limitations under the License.
 #
 
+import re
 from typing import TYPE_CHECKING
 
-from synapse.http.server import DirectServeJsonResource, respond_with_json
+from synapse.http.server import respond_with_json
+from synapse.http.servlet import RestServlet
 from synapse.http.site import SynapseRequest
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 
-class MediaConfigResource(DirectServeJsonResource):
-    isLeaf = True
+class MediaConfigResource(RestServlet):
+    PATTERNS = [re.compile("/_matrix/media/(r0|v3|v1)/config$")]
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -33,9 +35,6 @@ class MediaConfigResource(DirectServeJsonResource):
         self.auth = hs.get_auth()
         self.limits_dict = {"m.upload.size": config.media.max_upload_size}
 
-    async def _async_render_GET(self, request: SynapseRequest) -> None:
+    async def on_GET(self, request: SynapseRequest) -> None:
         await self.auth.get_user_by_req(request)
         respond_with_json(request, 200, self.limits_dict, send_cors=True)
-
-    async def _async_render_OPTIONS(self, request: SynapseRequest) -> None:
-        respond_with_json(request, 200, {}, send_cors=True)

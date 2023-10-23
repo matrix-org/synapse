@@ -94,13 +94,23 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
                 hs.get_replication_notifier(),
                 "room_account_data",
                 "stream_id",
-                extra_tables=[("room_tags_revisions", "stream_id")],
+                extra_tables=[
+                    ("account_data", "stream_id"),
+                    ("room_tags_revisions", "stream_id"),
+                ],
                 is_writer=self._instance_name in hs.config.worker.writers.account_data,
             )
 
         account_max = self.get_max_account_data_stream_id()
         self._account_data_stream_cache = StreamChangeCache(
             "AccountDataAndTagsChangeCache", account_max
+        )
+
+        self.db_pool.updates.register_background_index_update(
+            update_name="room_account_data_index_room_id",
+            index_name="room_account_data_room_id",
+            table="room_account_data",
+            columns=("room_id",),
         )
 
         self.db_pool.updates.register_background_update_handler(
