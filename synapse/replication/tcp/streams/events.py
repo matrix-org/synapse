@@ -19,10 +19,10 @@ from typing import TYPE_CHECKING, Iterable, Optional, Tuple, Type, TypeVar, cast
 import attr
 
 from synapse.replication.tcp.streams._base import (
-    Stream,
     StreamRow,
     StreamUpdateResult,
     Token,
+    _StreamFromIdGen,
 )
 
 if TYPE_CHECKING:
@@ -139,7 +139,7 @@ _EventRows: Tuple[Type[BaseEventsStreamRow], ...] = (
 TypeToRow = {Row.TypeId: Row for Row in _EventRows}
 
 
-class EventsStream(Stream):
+class EventsStream(_StreamFromIdGen):
     """We received a new event, or an event went from being an outlier to not"""
 
     NAME = "events"
@@ -147,9 +147,7 @@ class EventsStream(Stream):
     def __init__(self, hs: "HomeServer"):
         self._store = hs.get_datastores().main
         super().__init__(
-            hs.get_instance_name(),
-            self._store._stream_id_gen.get_current_token_for_writer,
-            self._update_function,
+            hs.get_instance_name(), self._update_function, self._store._stream_id_gen
         )
 
     async def _update_function(
