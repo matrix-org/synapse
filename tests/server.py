@@ -43,9 +43,11 @@ from typing import (
 from unittest.mock import Mock, patch
 
 import attr
+from incremental import Version
 from typing_extensions import ParamSpec
 from zope.interface import implementer
 
+import twisted
 from twisted.internet import address, tcp, threads, udp
 from twisted.internet._resolver import SimpleResolverComplexifier
 from twisted.internet.defer import Deferred, fail, maybeDeferred, succeed
@@ -474,17 +476,18 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
                     return fail(DNSLookupError("OH NO: unknown %s" % (name,)))
                 return succeed(lookups[name])
 
-        # In order for the TLS protocols to use the proper reactor's clock we need to patch
-        # _get_default_clock.
+        # In order for the TLS protocols to use the proper reactor's clock, patch
+        # _get_default_clock on newer Twisted versions.
         #
-        # This is *super* dirty since we never unpatch and rely on the next test
-        # to patch over us.
+        # This is *super* dirty since it is never stopped and relies on the next
+        # test to patch over it.
         #
         # Use create=True for backwards compatibilty with Twisted <= 23.8.0.
-        self._tls_clock_patcher = patch(
-            "twisted.protocols.tls._get_default_clock", return_value=self, create=True
-        )
-        self._tls_clock_patcher.start()
+        if twisted.version > Version("Twisted", 23, 8, 0):
+            self._tls_clock_patcher = patch(
+                "twisted.protocols.tls._get_default_clock", return_value=self
+            )
+            self._tls_clock_patcher.start()
 
         self.nameResolver = SimpleResolverComplexifier(FakeResolver())
         super().__init__()
