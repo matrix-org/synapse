@@ -485,7 +485,7 @@ def _upload(gh_token: Optional[str]) -> None:
             urllib.request.urlretrieve(asset_download_url, filename=filename)
 
         if click.confirm("Upload to PyPI?", default=True):
-            subprocess.run("twine upload *", shell=True, cwd=tmpdir)
+            subprocess.run("twine upload *", shell=True, cwd=tmpdir, check=True)
 
     click.echo(
         f"Done! Remember to merge the tag {tag_name} into the appropriate branches"
