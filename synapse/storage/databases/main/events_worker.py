@@ -2096,12 +2096,6 @@ class EventsWorkerStore(SQLBaseStore):
         def _cleanup_old_transaction_ids_txn(txn: LoggingTransaction) -> None:
             one_day_ago = self._clock.time_msec() - 24 * 60 * 60 * 1000
             sql = """
-                DELETE FROM event_txn_id
-                WHERE inserted_ts < ?
-            """
-            txn.execute(sql, (one_day_ago,))
-
-            sql = """
                 DELETE FROM event_txn_id_device_id
                 WHERE inserted_ts < ?
             """
