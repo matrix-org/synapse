@@ -222,6 +222,7 @@ class TestBasicProxyCredentials(TestCase):
         """Reproduces https://github.com/matrix-org/synapse/pull/16504."""
         proxy_connection_string = b"looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooonguser:pass@proxy.local:9988"
         _, _, _, creds = parse_proxy(proxy_connection_string)
+        assert creds is not None  # for mypy's benefit
         self.assertIsInstance(creds, BasicProxyCredentials)
 
         auth_value = creds.as_proxy_authorization_value()
