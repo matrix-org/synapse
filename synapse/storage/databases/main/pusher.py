@@ -372,7 +372,7 @@ class PusherWorkerStore(SQLBaseStore):
         self, pusher_id: int
     ) -> Dict[str, ThrottleParams]:
         res = cast(
-            List[Tuple[str, int, int]],
+            List[Tuple[str, Optional[int], Optional[int]]],
             await self.db_pool.simple_select_list(
                 "pusher_throttle",
                 {"pusher": pusher_id},
@@ -383,7 +383,9 @@ class PusherWorkerStore(SQLBaseStore):
 
         params_by_room = {}
         for room_id, last_sent_ts, throttle_ms in res:
-            params_by_room[room_id] = ThrottleParams(last_sent_ts, throttle_ms)
+            params_by_room[room_id] = ThrottleParams(
+                last_sent_ts or 0, throttle_ms or 0
+            )
 
         return params_by_room
 
