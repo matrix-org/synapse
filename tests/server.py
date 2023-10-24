@@ -484,7 +484,7 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
         if twisted.version > Version("Twisted", 23, 8, 0):
             from twisted.protocols import tls
 
-            tls._get_default_clock = lambda: self
+            tls._get_default_clock = lambda: self  # type: ignore[attr-defined]
 
         self.nameResolver = SimpleResolverComplexifier(FakeResolver())
         super().__init__()
