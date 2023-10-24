@@ -94,7 +94,10 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
                 hs.get_replication_notifier(),
                 "room_account_data",
                 "stream_id",
-                extra_tables=[("room_tags_revisions", "stream_id")],
+                extra_tables=[
+                    ("account_data", "stream_id"),
+                    ("room_tags_revisions", "stream_id"),
+                ],
                 is_writer=self._instance_name in hs.config.worker.writers.account_data,
             )
 

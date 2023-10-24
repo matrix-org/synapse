@@ -217,6 +217,27 @@ class ProxyParserTests(TestCase):
         )
 
 
+class TestBasicProxyCredentials(TestCase):
+    def test_long_user_pass_string_encoded_without_newlines(self) -> None:
+        """Reproduces https://github.com/matrix-org/synapse/pull/16504."""
+        proxy_connection_string = b"looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooonguser:pass@proxy.local:9988"
+        _, _, _, creds = parse_proxy(proxy_connection_string)
+        assert creds is not None  # for mypy's benefit
+        self.assertIsInstance(creds, BasicProxyCredentials)
+
+        auth_value = creds.as_proxy_authorization_value()
+        self.assertNotIn(b"\n", auth_value)
+        self.assertEqual(
+            creds.as_proxy_authorization_value(),
+            b"Basic bG9vb29vb29vb29vb29vb29vb29vb29vb29vb29vb29vb29vb29vb29vb29vb29vb29vb29vb29vb29vb29vb29vb29vb29vbmd1c2VyOnBhc3M=",
+        )
+        basic_auth_payload = creds.as_proxy_authorization_value().split(b" ")[1]
+        self.assertEqual(
+            base64.b64decode(basic_auth_payload),
+            b"looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooonguser:pass",
+        )
+
+
 class MatrixFederationAgentTests(TestCase):
     def setUp(self) -> None:
         self.reactor = ThreadedMemoryReactorClock()

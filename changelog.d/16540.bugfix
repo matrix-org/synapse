@@ -1,0 +1,1 @@
+Fix long-standing bug where `/sync` could tightloop after restart when using SQLite.
