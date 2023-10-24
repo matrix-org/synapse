@@ -61,6 +61,7 @@ class BasicProxyCredentials(ProxyCredentials):
         # Encode as base64 and prepend the authorization type
         return b"Basic " + base64.b64encode(self.username_password)
 
+
 @attr.s(auto_attribs=True)
 class BearerProxyCredentials(ProxyCredentials):
     access_token: bytes
