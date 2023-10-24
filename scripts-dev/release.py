@@ -58,6 +58,7 @@ def cli() -> None:
     """An interactive script to walk through the parts of creating a release.
 
     Requirements:
+
       - The dev dependencies be installed, which can be done via:
 
             pip install -e .[dev]
@@ -73,6 +74,7 @@ def cli() -> None:
         ./scripts-dev/release.py tag
 
         # wait for assets to build, either manually or with:
+
         ./scripts-dev/release.py wait-for-actions
 
         ./scripts-dev/release.py publish
@@ -82,6 +84,7 @@ def cli() -> None:
         ./scripts-dev/release.py merge-back
 
         # Optional: generate some nice links for the announcement
+
         ./scripts-dev/release.py announce
 
     Alternatively, `./scripts-dev/release.py full` will do all the above
