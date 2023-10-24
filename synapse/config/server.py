@@ -372,6 +372,11 @@ class ServerConfig(Config):
         if self.use_presence is None:
             self.use_presence = config.get("use_presence", True)
 
+        # Selectively enable syncing of presence, even if it is disabled.
+        self.use_presence_for_sync = presence_config.get(
+            "enabled_for_sync", self.use_presence
+        )
+
         # Custom presence router module
         # This is the legacy way of configuring it (the config should now be put in the modules section)
         self.presence_router_module_class = None

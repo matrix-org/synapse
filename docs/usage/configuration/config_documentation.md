@@ -230,6 +230,9 @@ Example configuration:
 presence:
   enabled: false
 ```
+
+The `enabled_for_sync` sub-option can be used to selectively enable/disable
+returning presence information in `/sync` response.
 ---
 ### `require_auth_for_profile_requests`
 

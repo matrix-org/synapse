@@ -1215,7 +1215,9 @@ class ModuleApi:
                 state=state, status_msg=status_msg
             )
 
-        await presence_handler._update_states(states.values(), force_notify=True)
+        await presence_handler._update_states(
+            states.values(), force_notify=True, override=True
+        )
 
     def looping_background_call(
         self,

@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import itertools
 from typing import Optional, cast
 from unittest.mock import Mock, call
 
@@ -66,7 +66,12 @@ class PresenceUpdateTestCase(unittest.HomeserverTestCase):
         )
 
         state, persist_and_notify, federation_ping = handle_update(
-            prev_state, new_state, is_mine=True, wheel_timer=wheel_timer, now=now
+            prev_state,
+            new_state,
+            is_mine=True,
+            wheel_timer=wheel_timer,
+            now=now,
+            override=False,
         )
 
         self.assertTrue(persist_and_notify)
@@ -108,7 +113,12 @@ class PresenceUpdateTestCase(unittest.HomeserverTestCase):
         )
 
         state, persist_and_notify, federation_ping = handle_update(
-            prev_state, new_state, is_mine=True, wheel_timer=wheel_timer, now=now
+            prev_state,
+            new_state,
+            is_mine=True,
+            wheel_timer=wheel_timer,
+            now=now,
+            override=False,
         )
 
         self.assertFalse(persist_and_notify)
@@ -153,7 +163,12 @@ class PresenceUpdateTestCase(unittest.HomeserverTestCase):
         )
 
         state, persist_and_notify, federation_ping = handle_update(
-            prev_state, new_state, is_mine=True, wheel_timer=wheel_timer, now=now
+            prev_state,
+            new_state,
+            is_mine=True,
+            wheel_timer=wheel_timer,
+            now=now,
+            override=False,
         )
 
         self.assertFalse(persist_and_notify)
@@ -196,7 +211,12 @@ class PresenceUpdateTestCase(unittest.HomeserverTestCase):
         new_state = prev_state.copy_and_replace(state=PresenceState.ONLINE)
 
         state, persist_and_notify, federation_ping = handle_update(
-            prev_state, new_state, is_mine=True, wheel_timer=wheel_timer, now=now
+            prev_state,
+            new_state,
+            is_mine=True,
+            wheel_timer=wheel_timer,
+            now=now,
+            override=False,
         )
 
         self.assertTrue(persist_and_notify)
@@ -231,7 +251,12 @@ class PresenceUpdateTestCase(unittest.HomeserverTestCase):
         new_state = prev_state.copy_and_replace(state=PresenceState.ONLINE)
 
         state, persist_and_notify, federation_ping = handle_update(
-            prev_state, new_state, is_mine=False, wheel_timer=wheel_timer, now=now
+            prev_state,
+            new_state,
+            is_mine=False,
+            wheel_timer=wheel_timer,
+            now=now,
+            override=False,
         )
 
         self.assertFalse(persist_and_notify)
@@ -265,7 +290,12 @@ class PresenceUpdateTestCase(unittest.HomeserverTestCase):
         new_state = prev_state.copy_and_replace(state=PresenceState.OFFLINE)
 
         state, persist_and_notify, federation_ping = handle_update(
-            prev_state, new_state, is_mine=True, wheel_timer=wheel_timer, now=now
+            prev_state,
+            new_state,
+            is_mine=True,
+            wheel_timer=wheel_timer,
+            now=now,
+            override=False,
         )
 
         self.assertTrue(persist_and_notify)
@@ -287,7 +317,12 @@ class PresenceUpdateTestCase(unittest.HomeserverTestCase):
         new_state = prev_state.copy_and_replace(state=PresenceState.UNAVAILABLE)
 
         state, persist_and_notify, federation_ping = handle_update(
-            prev_state, new_state, is_mine=True, wheel_timer=wheel_timer, now=now
+            prev_state,
+            new_state,
+            is_mine=True,
+            wheel_timer=wheel_timer,
+            now=now,
+            override=False,
         )
 
         self.assertTrue(persist_and_notify)
@@ -346,6 +381,41 @@ class PresenceUpdateTestCase(unittest.HomeserverTestCase):
         # Compare what we put into the storage with what we got out.
         # They should be identical.
         self.assertEqual(presence_states_compare, db_presence_states)
+
+    @parameterized.expand(
+        itertools.permutations(
+            (
+                PresenceState.BUSY,
+                PresenceState.ONLINE,
+                PresenceState.UNAVAILABLE,
+                PresenceState.OFFLINE,
+            ),
+            2,
+        )
+    )
+    def test_override(self, initial_state: str, final_state: str) -> None:
+        """Overridden statuses should not go into the wheel timer."""
+        wheel_timer = Mock()
+        user_id = "@foo:bar"
+        now = 5000000
+
+        prev_state = UserPresenceState.default(user_id)
+        prev_state = prev_state.copy_and_replace(
+            state=initial_state, last_active_ts=now, currently_active=True
+        )
+
+        new_state = prev_state.copy_and_replace(state=final_state, last_active_ts=now)
+
+        handle_update(
+            prev_state,
+            new_state,
+            is_mine=True,
+            wheel_timer=wheel_timer,
+            now=now,
+            override=True,
+        )
+
+        wheel_timer.insert.assert_not_called()
 
 
 class PresenceTimeoutTestCase(unittest.TestCase):

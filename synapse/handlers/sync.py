@@ -1512,7 +1512,7 @@ class SyncHandler:
 
         # Presence data is included if the server has it enabled and not filtered out.
         include_presence_data = bool(
-            self.hs_config.server.use_presence
+            self.hs_config.server.use_presence_for_sync
             and not sync_config.filter_collection.blocks_all_presence()
         )
         # Device list updates are sent if a since token is provided.

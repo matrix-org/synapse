@@ -905,7 +905,10 @@ class PresenceHandler(BasePresenceHandler):
             )
 
     async def _update_states(
-        self, new_states: Iterable[UserPresenceState], force_notify: bool = False
+        self,
+        new_states: Iterable[UserPresenceState],
+        force_notify: bool = False,
+        override: bool = False,
     ) -> None:
         """Updates presence of users. Sets the appropriate timeouts. Pokes
         the notifier and federation if and only if the changed presence state
@@ -917,8 +920,9 @@ class PresenceHandler(BasePresenceHandler):
                 even if it doesn't change the state of a user's presence (e.g online -> online).
                 This is currently used to bump the max presence stream ID without changing any
                 user's presence (see PresenceHandler.add_users_to_send_full_presence_to).
+            override: Whether to set the presence state even if presence is disabled.
         """
-        if not self._presence_enabled:
+        if not self._presence_enabled and not override:
             # We shouldn't get here if presence is disabled, but we check anyway
             # to ensure that we don't a) send out presence federation and b)
             # don't add things to the wheel timer that will never be handled.
@@ -957,6 +961,7 @@ class PresenceHandler(BasePresenceHandler):
                     is_mine=self.is_mine_id(user_id),
                     wheel_timer=self.wheel_timer,
                     now=now,
+                    override=override,
                 )
 
                 if force_notify:
@@ -2118,6 +2123,7 @@ def handle_update(
     is_mine: bool,
     wheel_timer: WheelTimer,
     now: int,
+    override: bool,
 ) -> Tuple[UserPresenceState, bool, bool]:
     """Given a presence update:
         1. Add any appropriate timers.
@@ -2129,6 +2135,8 @@ def handle_update(
         is_mine: Whether the user is ours
         wheel_timer
         now: Time now in ms
+        override: True if this state should persist until another update occurs.
+            Skips insertion into wheel timers.
 
     Returns:
         3-tuple: `(new_state, persist_and_notify, federation_ping)` where:
@@ -2146,14 +2154,15 @@ def handle_update(
     if is_mine:
         if new_state.state == PresenceState.ONLINE:
             # Idle timer
-            wheel_timer.insert(
-                now=now, obj=user_id, then=new_state.last_active_ts + IDLE_TIMER
-            )
+            if not override:
+                wheel_timer.insert(
+                    now=now, obj=user_id, then=new_state.last_active_ts + IDLE_TIMER
+                )
 
             active = now - new_state.last_active_ts < LAST_ACTIVE_GRANULARITY
             new_state = new_state.copy_and_replace(currently_active=active)
 
-            if active:
+            if active and not override:
                 wheel_timer.insert(
                     now=now,
                     obj=user_id,
@@ -2162,11 +2171,12 @@ def handle_update(
 
         if new_state.state != PresenceState.OFFLINE:
             # User has stopped syncing
-            wheel_timer.insert(
-                now=now,
-                obj=user_id,
-                then=new_state.last_user_sync_ts + SYNC_ONLINE_TIMEOUT,
-            )
+            if not override:
+                wheel_timer.insert(
+                    now=now,
+                    obj=user_id,
+                    then=new_state.last_user_sync_ts + SYNC_ONLINE_TIMEOUT,
+                )
 
             last_federate = new_state.last_federation_update_ts
             if now - last_federate > FEDERATION_PING_INTERVAL:
@@ -2174,7 +2184,7 @@ def handle_update(
                 new_state = new_state.copy_and_replace(last_federation_update_ts=now)
                 federation_ping = True
 
-        if new_state.state == PresenceState.BUSY:
+        if new_state.state == PresenceState.BUSY and not override:
             wheel_timer.insert(
                 now=now,
                 obj=user_id,
@@ -2182,11 +2192,13 @@ def handle_update(
             )
 
     else:
-        wheel_timer.insert(
-            now=now,
-            obj=user_id,
-            then=new_state.last_federation_update_ts + FEDERATION_TIMEOUT,
-        )
+        # An update for a remote user was received.
+        if not override:
+            wheel_timer.insert(
+                now=now,
+                obj=user_id,
+                then=new_state.last_federation_update_ts + FEDERATION_TIMEOUT,
+            )
 
     # Check whether the change was something worth notifying about
     if should_notify(prev_state, new_state, is_mine):
