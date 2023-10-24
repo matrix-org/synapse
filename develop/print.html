@@ -6985,53 +6985,126 @@ users by always returning an empty list for all queries. Defaults to true.</p>
 </code></pre>
 <hr />
 <h3 id="alias_creation_rules"><a class="header" href="#alias_creation_rules"><code>alias_creation_rules</code></a></h3>
-<p>The <code>alias_creation_rules</code> option controls who is allowed to create aliases
-on this server.</p>
-<p>The format of this option is a list of rules that contain globs that
-match against user_id, room_id and the new alias (fully qualified with
-server name). The action in the first rule that matches is taken,
-which can currently either be &quot;allow&quot; or &quot;deny&quot;.</p>
-<p>Missing user_id/room_id/alias fields default to &quot;*&quot;.</p>
-<p>If no rules match the request is denied. An empty list means no one
-can create aliases.</p>
-<p>Options for the rules include:</p>
+<p>The <code>alias_creation_rules</code> option allows server admins to prevent unwanted
+alias creation on this server.</p>
+<p>This setting is an optional list of 0 or more rules. By default, no list is
+provided, meaning that all alias creations are permitted.</p>
+<p>Otherwise, requests to create aliases are matched against each rule in order.
+The first rule that matches decides if the request is allowed or denied. If no 
+rule matches, the request is denied. In particular, this means that configuring
+an empty list of rules will deny every alias creation request.</p>
+<p>Each rule is a YAML object containing four fields, each of which is an optional string:</p>
 <ul>
-<li><code>user_id</code>: Matches against the creator of the alias. Defaults to &quot;*&quot;.</li>
-<li><code>alias</code>: Matches against the alias being created. Defaults to &quot;*&quot;.</li>
-<li><code>room_id</code>: Matches against the room ID the alias is being pointed at. Defaults to &quot;*&quot;</li>
-<li><code>action</code>: Whether to &quot;allow&quot; or &quot;deny&quot; the request if the rule matches. Defaults to allow.</li>
+<li><code>user_id</code>: a glob pattern that matches against the creator of the alias.</li>
+<li><code>alias</code>: a glob pattern that matches against the alias being created.</li>
+<li><code>room_id</code>: a glob pattern that matches against the room ID the alias is being pointed at.</li>
+<li><code>action</code>: either <code>allow</code> or <code>deny</code>. What to do with the request if the rule matches. Defaults to <code>allow</code>.</li>
 </ul>
+<p>Each of the glob patterns is optional, defaulting to <code>*</code> (&quot;match anything&quot;).
+Note that the patterns match against fully qualified IDs, e.g. against 
+<code>@alice:example.com</code>, <code>#room:example.com</code> and <code>!abcdefghijk:example.com</code> instead
+of <code>alice</code>, <code>room</code> and <code>abcedgghijk</code>.</p>
 <p>Example configuration:</p>
-<pre><code class="language-yaml">alias_creation_rules:
-  - user_id: &quot;bad_user&quot;
-    alias: &quot;spammy_alias&quot;
-    room_id: &quot;*&quot;
+<pre><code class="language-yaml"># No rule list specified. All alias creations are allowed.
+# This is the default behaviour.
+alias_creation_rules:
+</code></pre>
+<pre><code class="language-yaml"># A list of one rule which allows everything.
+# This has the same effect as the previous example.
+alias_creation_rules:
+  - &quot;action&quot;: &quot;allow&quot;
+</code></pre>
+<pre><code class="language-yaml"># An empty list of rules. All alias creations are denied.
+alias_creation_rules: []
+</code></pre>
+<pre><code class="language-yaml"># A list of one rule which denies everything.
+# This has the same effect as the previous example.
+alias_creation_rules:
+  - &quot;action&quot;: &quot;deny&quot;
+</code></pre>
+<pre><code class="language-yaml"># Prevent a specific user from creating aliases.
+# Allow other users to create any alias
+alias_creation_rules:
+  - user_id: &quot;@bad_user:example.com&quot;
     action: deny
+    
+  - action: allow
+</code></pre>
+<pre><code class="language-yaml"># Prevent aliases being created which point to a specific room.
+alias_creation_rules:
+  - room_id: &quot;!forbiddenRoom:example.com&quot;
+    action: deny
+
+  - action: allow
 </code></pre>
 <hr />
 <h3 id="room_list_publication_rules"><a class="header" href="#room_list_publication_rules"><code>room_list_publication_rules</code></a></h3>
-<p>The <code>room_list_publication_rules</code> option controls who can publish and
-which rooms can be published in the public room list.</p>
+<p>The <code>room_list_publication_rules</code> option allows server admins to prevent
+unwanted entries from being published in the public room list.</p>
 <p>The format of this option is the same as that for
-<code>alias_creation_rules</code>.</p>
-<p>If the room has one or more aliases associated with it, only one of
-the aliases needs to match the alias rule. If there are no aliases
-then only rules with <code>alias: *</code> match.</p>
-<p>If no rules match the request is denied. An empty list means no one
-can publish rooms.</p>
-<p>Options for the rules include:</p>
+<a href="usage/configuration/config_documentation.html#alias_creation_rules"><code>alias_creation_rules</code></a>: an optional list of 0 or more
+rules. By default, no list is provided, meaning that all rooms may be
+published to the room list.</p>
+<p>Otherwise, requests to publish a room are matched against each rule in order.
+The first rule that matches decides if the request is allowed or denied. If no
+rule matches, the request is denied. In particular, this means that configuring
+an empty list of rules will deny every alias creation request.</p>
+<p>Each rule is a YAML object containing four fields, each of which is an optional string:</p>
 <ul>
-<li><code>user_id</code>: Matches against the creator of the alias. Defaults to &quot;*&quot;.</li>
-<li><code>alias</code>: Matches against any current local or canonical aliases associated with the room. Defaults to &quot;*&quot;.</li>
-<li><code>room_id</code>: Matches against the room ID being published. Defaults to &quot;*&quot;.</li>
-<li><code>action</code>: Whether to &quot;allow&quot; or &quot;deny&quot; the request if the rule matches. Defaults to allow.</li>
+<li><code>user_id</code>: a glob pattern that matches against the user publishing the room.</li>
+<li><code>alias</code>: a glob pattern that matches against one of published room's aliases.
+<ul>
+<li>If the room has no aliases, the alias match fails unless <code>alias</code> is unspecified or <code>*</code>.</li>
+<li>If the room has exactly one alias, the alias match succeeds if the <code>alias</code> pattern matches that alias.</li>
+<li>If the room has two or more aliases, the alias match succeeds if the pattern matches at least one of the aliases.</li>
 </ul>
+</li>
+<li><code>room_id</code>: a glob pattern that matches against the room ID of the room being published.</li>
+<li><code>action</code>: either <code>allow</code> or <code>deny</code>. What to do with the request if the rule matches. Defaults to <code>allow</code>.</li>
+</ul>
+<p>Each of the glob patterns is optional, defaulting to <code>*</code> (&quot;match anything&quot;).
+Note that the patterns match against fully qualified IDs, e.g. against
+<code>@alice:example.com</code>, <code>#room:example.com</code> and <code>!abcdefghijk:example.com</code> instead
+of <code>alice</code>, <code>room</code> and <code>abcedgghijk</code>.</p>
 <p>Example configuration:</p>
-<pre><code class="language-yaml">room_list_publication_rules:
-  - user_id: &quot;*&quot;
-    alias: &quot;*&quot;
-    room_id: &quot;*&quot;
-    action: allow
+<pre><code class="language-yaml"># No rule list specified. Anyone may publish any room to the public list.
+# This is the default behaviour.
+room_list_publication_rules:
+</code></pre>
+<pre><code class="language-yaml"># A list of one rule which allows everything.
+# This has the same effect as the previous example.
+room_list_publication_rules:
+  - &quot;action&quot;: &quot;allow&quot;
+</code></pre>
+<pre><code class="language-yaml"># An empty list of rules. No-one may publish to the room list.
+room_list_publication_rules: []
+</code></pre>
+<pre><code class="language-yaml"># A list of one rule which denies everything.
+# This has the same effect as the previous example.
+room_list_publication_rules:
+  - &quot;action&quot;: &quot;deny&quot;
+</code></pre>
+<pre><code class="language-yaml"># Prevent a specific user from publishing rooms.
+# Allow other users to publish anything.
+room_list_publication_rules:
+  - user_id: &quot;@bad_user:example.com&quot;
+    action: deny
+    
+  - action: allow
+</code></pre>
+<pre><code class="language-yaml"># Prevent publication of a specific room.
+room_list_publication_rules:
+  - room_id: &quot;!forbiddenRoom:example.com&quot;
+    action: deny
+
+  - action: allow
+</code></pre>
+<pre><code class="language-yaml"># Prevent publication of rooms with at least one alias containing the word &quot;potato&quot;.
+room_list_publication_rules:
+  - alias: &quot;#*potato*:example.com&quot;
+    action: deny
+
+  - action: allow
 </code></pre>
 <hr />
 <h3 id="default_power_level_content_override"><a class="header" href="#default_power_level_content_override"><code>default_power_level_content_override</code></a></h3>
