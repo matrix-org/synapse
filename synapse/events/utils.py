@@ -45,6 +45,7 @@ from . import EventBase
 
 if TYPE_CHECKING:
     from synapse.handlers.relations import BundledAggregations
+    from synapse.server import HomeServer
 
 
 # Split strings on "." but not "\." (or "\\\.").
@@ -509,7 +510,10 @@ class EventClientSerializer:
     clients.
     """
 
-    def serialize_event(
+    def __init__(self, hs: "HomeServer") -> None:
+        self._store = hs.get_datastores().main
+
+    async def serialize_event(
         self,
         event: Union[JsonDict, EventBase],
         time_now: int,
@@ -538,7 +542,7 @@ class EventClientSerializer:
         # Check if there are any bundled aggregations to include with the event.
         if bundle_aggregations:
             if event.event_id in bundle_aggregations:
-                self._inject_bundled_aggregations(
+                await self._inject_bundled_aggregations(
                     event,
                     time_now,
                     config,
@@ -548,7 +552,7 @@ class EventClientSerializer:
 
         return serialized_event
 
-    def _inject_bundled_aggregations(
+    async def _inject_bundled_aggregations(
         self,
         event: EventBase,
         time_now: int,
@@ -590,7 +594,7 @@ class EventClientSerializer:
             # said that we should only include the `event_id`, `origin_server_ts` and
             # `sender` of the edit; however MSC3925 proposes extending it to the whole
             # of the edit, which is what we do here.
-            serialized_aggregations[RelationTypes.REPLACE] = self.serialize_event(
+            serialized_aggregations[RelationTypes.REPLACE] = await self.serialize_event(
                 event_aggregations.replace,
                 time_now,
                 config=config,
@@ -600,7 +604,7 @@ class EventClientSerializer:
         if event_aggregations.thread:
             thread = event_aggregations.thread
 
-            serialized_latest_event = self.serialize_event(
+            serialized_latest_event = await self.serialize_event(
                 thread.latest_event,
                 time_now,
                 config=config,
@@ -623,7 +627,7 @@ class EventClientSerializer:
                 "m.relations", {}
             ).update(serialized_aggregations)
 
-    def serialize_events(
+    async def serialize_events(
         self,
         events: Iterable[Union[JsonDict, EventBase]],
         time_now: int,
@@ -645,7 +649,7 @@ class EventClientSerializer:
             The list of serialized events
         """
         return [
-            self.serialize_event(
+            await self.serialize_event(
                 event,
                 time_now,
                 config=config,
