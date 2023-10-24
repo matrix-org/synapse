@@ -131,8 +131,13 @@ ENV CARGO_NET_GIT_FETCH_WITH_CLI=$CARGO_NET_GIT_FETCH_WITH_CLI
 #
 # This is aiming at installing the `[tool.poetry.depdendencies]` from pyproject.toml.
 COPY --from=requirements /synapse/requirements.txt /synapse/
+
 RUN --mount=type=cache,target=/root/.cache/pip \
   pip install --prefix="/install" --no-deps --no-warn-script-location -r /synapse/requirements.txt
+
+# Add support for S3 storage provider (https://github.com/matrix-org/synapse-s3-storage-provider)
+RUN --mount=type=cache,target=/root/.cache/pip \
+  pip install --prefix="/install" --no-warn-script-location synapse-s3-storage-provider
 
 # Copy over the rest of the synapse source code.
 COPY synapse /synapse/synapse/
