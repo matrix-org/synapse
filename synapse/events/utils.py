@@ -17,6 +17,7 @@ import re
 from typing import (
     TYPE_CHECKING,
     Any,
+    Awaitable,
     Callable,
     Dict,
     Iterable,
@@ -55,6 +56,13 @@ ESCAPE_SEQUENCE_PATTERN = re.compile(r"\\(.)")
 
 CANONICALJSON_MAX_INT = (2**53) - 1
 CANONICALJSON_MIN_INT = -CANONICALJSON_MAX_INT
+
+
+# Module API callback that allows adding fields to the unsigned section of
+# events that are sent to clients.
+ADD_EXTRA_FIELDS_TO_UNSIGNED_CLIENT_EVENT_CALLBACK = Callable[
+    [EventBase], Awaitable[JsonDict]
+]
 
 
 def prune_event(event: EventBase) -> EventBase:
@@ -512,6 +520,9 @@ class EventClientSerializer:
 
     def __init__(self, hs: "HomeServer") -> None:
         self._store = hs.get_datastores().main
+        self._add_extra_fields_to_unsigned_client_event_callbacks: List[
+            ADD_EXTRA_FIELDS_TO_UNSIGNED_CLIENT_EVENT_CALLBACK
+        ] = []
 
     async def serialize_event(
         self,
@@ -538,6 +549,17 @@ class EventClientSerializer:
             return event
 
         serialized_event = serialize_event(event, time_now, config=config)
+
+        new_unsigned = {}
+        for callback in self._add_extra_fields_to_unsigned_client_event_callbacks:
+            u = await callback(event)
+            new_unsigned.update(u)
+
+        if new_unsigned:
+            # We do the `update` this way round so that modules can't clobber
+            # existing fields.
+            new_unsigned.update(serialized_event["unsigned"])
+            serialized_event["unsigned"] = new_unsigned
 
         # Check if there are any bundled aggregations to include with the event.
         if bundle_aggregations:
@@ -657,6 +679,14 @@ class EventClientSerializer:
             )
             for event in events
         ]
+
+    def register_add_extra_fields_to_unsigned_client_event_callback(
+        self, callback: ADD_EXTRA_FIELDS_TO_UNSIGNED_CLIENT_EVENT_CALLBACK
+    ) -> None:
+        """Register a callback that returns additions to the unsigned section of
+        serialized events.
+        """
+        self._add_extra_fields_to_unsigned_client_event_callbacks.append(callback)
 
 
 _PowerLevel = Union[str, int]
