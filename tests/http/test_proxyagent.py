@@ -220,9 +220,7 @@ class ProxyParserTests(TestCase):
 class TestBasicProxyCredentials(TestCase):
     def test_long_user_pass_string_encoded_without_newlines(self) -> None:
         """Reproduces https://github.com/matrix-org/synapse/pull/16504."""
-        proxy_connection_string = (
-            b"looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooonguser:pass@proxy.local:9988"
-        )
+        proxy_connection_string = b"looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooonguser:pass@proxy.local:9988"
         _, _, _, creds = parse_proxy(proxy_connection_string)
         self.assertIsInstance(creds, BasicProxyCredentials)
 
@@ -237,6 +235,7 @@ class TestBasicProxyCredentials(TestCase):
             base64.b64decode(basic_auth_payload),
             b"looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooonguser:pass",
         )
+
 
 class MatrixFederationAgentTests(TestCase):
     def setUp(self) -> None:
