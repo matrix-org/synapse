@@ -40,7 +40,7 @@ from typing import (
     Union,
     cast,
 )
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 import attr
 from incremental import Version
