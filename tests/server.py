@@ -476,18 +476,15 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
                     return fail(DNSLookupError("OH NO: unknown %s" % (name,)))
                 return succeed(lookups[name])
 
-        # In order for the TLS protocols to use the proper reactor's clock, patch
-        # _get_default_clock on newer Twisted versions.
+        # In order for the TLS protocol tests to work, modify _get_default_clock
+        # on newer Twisted versions to use the test reactor's clock.
         #
-        # This is *super* dirty since it is never stopped and relies on the next
-        # test to patch over it.
-        #
-        # Use create=True for backwards compatibilty with Twisted <= 23.8.0.
+        # This is *super* dirty since it is never undone and relies on the next
+        # test to overwrite it.
         if twisted.version > Version("Twisted", 23, 8, 0):
-            self._tls_clock_patcher = patch(
-                "twisted.protocols.tls._get_default_clock", return_value=self
-            )
-            self._tls_clock_patcher.start()
+            from twisted.protocols import tls
+
+            tls._get_default_clock = lambda: self
 
         self.nameResolver = SimpleResolverComplexifier(FakeResolver())
         super().__init__()
