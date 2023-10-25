@@ -43,9 +43,11 @@ from typing import (
 from unittest.mock import Mock
 
 import attr
+from incremental import Version
 from typing_extensions import ParamSpec
 from zope.interface import implementer
 
+import twisted
 from twisted.internet import address, tcp, threads, udp
 from twisted.internet._resolver import SimpleResolverComplexifier
 from twisted.internet.defer import Deferred, fail, maybeDeferred, succeed
@@ -473,6 +475,16 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
                 if name not in lookups:
                     return fail(DNSLookupError("OH NO: unknown %s" % (name,)))
                 return succeed(lookups[name])
+
+        # In order for the TLS protocol tests to work, modify _get_default_clock
+        # on newer Twisted versions to use the test reactor's clock.
+        #
+        # This is *super* dirty since it is never undone and relies on the next
+        # test to overwrite it.
+        if twisted.version > Version("Twisted", 23, 8, 0):
+            from twisted.protocols import tls
+
+            tls._get_default_clock = lambda: self  # type: ignore[attr-defined]
 
         self.nameResolver = SimpleResolverComplexifier(FakeResolver())
         super().__init__()

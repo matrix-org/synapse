@@ -126,8 +126,9 @@ class ReplicationDataHandler:
                 StreamKeyType.ACCOUNT_DATA, token, users=[row.user_id for row in rows]
             )
         elif stream_name == ReceiptsStream.NAME:
+            new_token = self.store.get_max_receipt_stream_id()
             self.notifier.on_new_event(
-                StreamKeyType.RECEIPT, token, rooms=[row.room_id for row in rows]
+                StreamKeyType.RECEIPT, new_token, rooms=[row.room_id for row in rows]
             )
             await self._pusher_pool.on_new_receipts({row.user_id for row in rows})
         elif stream_name == ToDeviceStream.NAME:

@@ -23,7 +23,7 @@ from synapse.handlers.room import RoomEventSource
 from synapse.handlers.typing import TypingNotificationEventSource
 from synapse.logging.opentracing import trace
 from synapse.streams import EventSource
-from synapse.types import StreamKeyType, StreamToken
+from synapse.types import MultiWriterStreamToken, StreamKeyType, StreamToken
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -111,7 +111,7 @@ class EventSources:
             room_key=await self.sources.room.get_current_key_for_room(room_id),
             presence_key=0,
             typing_key=0,
-            receipt_key=0,
+            receipt_key=MultiWriterStreamToken(stream=0),
             account_data_key=0,
             push_rules_key=0,
             to_device_key=0,

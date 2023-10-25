@@ -47,7 +47,7 @@ from synapse.storage.databases.main.stream import (
     generate_pagination_where_clause,
 )
 from synapse.storage.engines import PostgresEngine
-from synapse.types import JsonDict, StreamKeyType, StreamToken
+from synapse.types import JsonDict, MultiWriterStreamToken, StreamKeyType, StreamToken
 from synapse.util.caches.descriptors import cached, cachedList
 
 if TYPE_CHECKING:
@@ -314,7 +314,7 @@ class RelationsWorkerStore(SQLBaseStore):
                         room_key=next_key,
                         presence_key=0,
                         typing_key=0,
-                        receipt_key=0,
+                        receipt_key=MultiWriterStreamToken(stream=0),
                         account_data_key=0,
                         push_rules_key=0,
                         to_device_key=0,
