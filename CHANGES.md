@@ -1,3 +1,10 @@
+# Synapse 1.95.0 (2023-10-24)
+
+### Internal Changes
+
+- Build Debian packages for [Ubuntu 23.10 Mantic Minotaur](https://canonical.com/blog/canonical-releases-ubuntu-23-10-mantic-minotaur). ([\#16524](https://github.com/matrix-org/synapse/issues/16524))
+
+
 # Synapse 1.95.0rc1 (2023-10-17)
 
 ### Bugfixes
