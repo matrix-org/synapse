@@ -24,3 +24,9 @@ async def add_field_to_unsigned(
 
 where the extra fields to add to the event's unsigned section is returned.
 (Modules must not attempt to modify the `event` directly).
+
+This cannot be used to alter the "core" fields in the unsigned section emitted
+by Synapse itself.
+
+If multiple such callbacks try to add the same field to an event's unsigned
+section, the last-registered callback wins.
