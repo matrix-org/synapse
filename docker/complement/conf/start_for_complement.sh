@@ -26,8 +26,6 @@ case "$SYNAPSE_COMPLEMENT_DATABASE" in
     export POSTGRES_PASSWORD=somesecret
     export POSTGRES_USER=postgres
     export POSTGRES_HOST=localhost
-    export POSTGRES_CP_MIN=1
-    export POSTGRES_CP_MAX=3
 
     # configure supervisord to start postgres
     export START_POSTGRES=true
@@ -70,6 +68,10 @@ if [[ -n "$SYNAPSE_COMPLEMENT_USE_WORKERS" ]]; then
 
   fi
   log "Workers requested: $SYNAPSE_WORKER_TYPES"
+  # adjust connection pool limits on worker mode as otherwise running lots of worker synapses
+  # can make docker unhappy (in GHA)
+  export POSTGRES_CP_MIN=1
+  export POSTGRES_CP_MAX=3
   # Improve startup times by using a launcher based on fork()
   export SYNAPSE_USE_EXPERIMENTAL_FORKING_LAUNCHER=1
 else
