@@ -78,6 +78,27 @@ class RatelimitOverride:
     burst_count: int
 
 
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class RoomStats:
+    room_id: str
+    name: Optional[str]
+    canonical_alias: Optional[str]
+    joined_members: str
+    joined_local_members: int
+    version: str
+    creator: str
+    encryption: Optional[str]
+    federatable: bool
+    public: bool
+    join_rules: Optional[str]
+    guest_access: Optional[str]
+    history_visibility: Optional[str]
+    state_events: int
+    avatar: Optional[str]
+    topic: Optional[str]
+    room_type: Optional[str]
+
+
 class RoomSortOrder(Enum):
     """
     Enum to define the sorting method used when returning rooms with get_rooms_paginate
@@ -204,7 +225,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             allow_none=True,
         )
 
-    async def get_room_with_stats(self, room_id: str) -> Optional[Dict[str, Any]]:
+    async def get_room_with_stats(self, room_id: str) -> Optional[RoomStats]:
         """Retrieve room with statistics.
 
         Args:
@@ -215,7 +236,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
 
         def get_room_with_stats_txn(
             txn: LoggingTransaction, room_id: str
-        ) -> Optional[Dict[str, Any]]:
+        ) -> Optional[RoomStats]:
             sql = """
                 SELECT room_id, state.name, state.canonical_alias, curr.joined_members,
                   curr.local_users_in_room AS joined_local_members, rooms.room_version AS version,
@@ -229,15 +250,28 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
                 WHERE room_id = ?
                 """
             txn.execute(sql, [room_id])
-            # Catch error if sql returns empty result to return "None" instead of an error
-            try:
-                res = self.db_pool.cursor_to_dict(txn)[0]
-            except IndexError:
+            row = txn.fetchone()
+            if not row:
                 return None
-
-            res["federatable"] = bool(res["federatable"])
-            res["public"] = bool(res["public"])
-            return res
+            return RoomStats(
+                room_id=row[0],
+                name=row[1],
+                canonical_alias=row[2],
+                joined_members=row[3],
+                joined_local_members=row[4],
+                version=row[5],
+                creator=row[6],
+                encryption=row[7],
+                federatable=bool(row[8]),
+                public=bool(row[9]),
+                join_rules=row[10],
+                guest_access=row[11],
+                history_visibility=row[12],
+                state_events=row[13],
+                avatar=row[14],
+                topic=row[15],
+                room_type=row[16],
+            )
 
         return await self.db_pool.runInteraction(
             "get_room_with_stats", get_room_with_stats_txn, room_id

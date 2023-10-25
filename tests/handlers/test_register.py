@@ -342,10 +342,10 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         # Ensure the room is properly not federated.
         room = self.get_success(self.store.get_room_with_stats(room_id["room_id"]))
         assert room is not None
-        self.assertFalse(room["federatable"])
-        self.assertFalse(room["public"])
-        self.assertEqual(room["join_rules"], "public")
-        self.assertIsNone(room["guest_access"])
+        self.assertFalse(room.federatable)
+        self.assertFalse(room.public)
+        self.assertEqual(room.join_rules, "public")
+        self.assertIsNone(room.guest_access)
 
         # The user should be in the room.
         rooms = self.get_success(self.store.get_rooms_for_user(user_id))
@@ -372,7 +372,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         # Ensure the room is properly a public room.
         room = self.get_success(self.store.get_room_with_stats(room_id["room_id"]))
         assert room is not None
-        self.assertEqual(room["join_rules"], "public")
+        self.assertEqual(room.join_rules, "public")
 
         # Both users should be in the room.
         rooms = self.get_success(self.store.get_rooms_for_user(inviter))
@@ -411,9 +411,9 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         # Ensure the room is properly a private room.
         room = self.get_success(self.store.get_room_with_stats(room_id["room_id"]))
         assert room is not None
-        self.assertFalse(room["public"])
-        self.assertEqual(room["join_rules"], "invite")
-        self.assertEqual(room["guest_access"], "can_join")
+        self.assertFalse(room.public)
+        self.assertEqual(room.join_rules, "invite")
+        self.assertEqual(room.guest_access, "can_join")
 
         # Both users should be in the room.
         rooms = self.get_success(self.store.get_rooms_for_user(inviter))
@@ -455,9 +455,9 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         # Ensure the room is properly a private room.
         room = self.get_success(self.store.get_room_with_stats(room_id["room_id"]))
         assert room is not None
-        self.assertFalse(room["public"])
-        self.assertEqual(room["join_rules"], "invite")
-        self.assertEqual(room["guest_access"], "can_join")
+        self.assertFalse(room.public)
+        self.assertEqual(room.join_rules, "invite")
+        self.assertEqual(room.guest_access, "can_join")
 
         # Both users should be in the room.
         rooms = self.get_success(self.store.get_rooms_for_user(inviter))
