@@ -298,9 +298,13 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                     )
 
         # Add the initial set of chains, excluding the sequence corresponding to
-        # initial event.
+        # initial event. Ultimately, the chains dict will be what is pulled from the
+        # database, there is a chance that a sequence number here will end up being a
+        # '0', which doesn't exist. Don't bother sending that to the database query.
         for chain_id, seq_no in event_chains.items():
-            chains[chain_id] = max(seq_no - 1, chains.get(chain_id, 0))
+            max_sequence_result = max(seq_no - 1, chains.get(chain_id, 0))
+            if max_sequence_result > 0:
+                chains[chain_id] = max_sequence_result
 
         # Now for each chain we figure out the maximum sequence number reachable
         # from *any* event ID. Events with a sequence less than that are in the
