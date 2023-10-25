@@ -231,8 +231,9 @@ presence:
   enabled: false
 ```
 
-The `enabled_for_sync` sub-option can be used to selectively enable/disable
-returning presence information in `/sync` response.
+`enabled` can also be set to a special value of "untracked" which ignores updates
+received via clients and federation, while still accepting updates from the
+[module API](../../modules/index.md).
 ---
 ### `require_auth_for_profile_requests`
 

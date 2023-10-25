@@ -33,6 +33,7 @@ from synapse.handlers.presence import (
     IDLE_TIMER,
     LAST_ACTIVE_GRANULARITY,
     SYNC_ONLINE_TIMEOUT,
+    PresenceHandler,
     handle_timeout,
     handle_update,
 )
@@ -71,7 +72,7 @@ class PresenceUpdateTestCase(unittest.HomeserverTestCase):
             is_mine=True,
             wheel_timer=wheel_timer,
             now=now,
-            override=False,
+            persist=False,
         )
 
         self.assertTrue(persist_and_notify)
@@ -118,7 +119,7 @@ class PresenceUpdateTestCase(unittest.HomeserverTestCase):
             is_mine=True,
             wheel_timer=wheel_timer,
             now=now,
-            override=False,
+            persist=False,
         )
 
         self.assertFalse(persist_and_notify)
@@ -168,7 +169,7 @@ class PresenceUpdateTestCase(unittest.HomeserverTestCase):
             is_mine=True,
             wheel_timer=wheel_timer,
             now=now,
-            override=False,
+            persist=False,
         )
 
         self.assertFalse(persist_and_notify)
@@ -216,7 +217,7 @@ class PresenceUpdateTestCase(unittest.HomeserverTestCase):
             is_mine=True,
             wheel_timer=wheel_timer,
             now=now,
-            override=False,
+            persist=False,
         )
 
         self.assertTrue(persist_and_notify)
@@ -256,7 +257,7 @@ class PresenceUpdateTestCase(unittest.HomeserverTestCase):
             is_mine=False,
             wheel_timer=wheel_timer,
             now=now,
-            override=False,
+            persist=False,
         )
 
         self.assertFalse(persist_and_notify)
@@ -295,7 +296,7 @@ class PresenceUpdateTestCase(unittest.HomeserverTestCase):
             is_mine=True,
             wheel_timer=wheel_timer,
             now=now,
-            override=False,
+            persist=False,
         )
 
         self.assertTrue(persist_and_notify)
@@ -322,7 +323,7 @@ class PresenceUpdateTestCase(unittest.HomeserverTestCase):
             is_mine=True,
             wheel_timer=wheel_timer,
             now=now,
-            override=False,
+            persist=False,
         )
 
         self.assertTrue(persist_and_notify)
@@ -412,7 +413,7 @@ class PresenceUpdateTestCase(unittest.HomeserverTestCase):
             is_mine=True,
             wheel_timer=wheel_timer,
             now=now,
-            override=True,
+            persist=True,
         )
 
         wheel_timer.insert.assert_not_called()
@@ -808,7 +809,6 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.presence_handler = hs.get_presence_handler()
-        self.clock = hs.get_clock()
 
     def test_external_process_timeout(self) -> None:
         """Test that if an external process doesn't update the records for a while
@@ -1540,6 +1540,29 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
         new_state = self.get_success(self.presence_handler.get_state(self.user_id_obj))
         self.assertEqual(new_state.state, state)
         self.assertEqual(new_state.status_msg, status_msg)
+
+    @unittest.override_config({"presence": {"enabled": "untracked"}})
+    def test_untracked_does_not_idle(self) -> None:
+        """Untracked presence should not idle."""
+
+        # Mark user as online, this needs to reach into internals in order to
+        # bypass checks.
+        state = self.get_success(self.presence_handler.get_state(self.user_id_obj))
+        assert isinstance(self.presence_handler, PresenceHandler)
+        self.get_success(
+            self.presence_handler._update_states(
+                [state.copy_and_replace(state=PresenceState.ONLINE)]
+            )
+        )
+
+        # Ensure the update took.
+        state = self.get_success(self.presence_handler.get_state(self.user_id_obj))
+        self.assertEqual(state.state, PresenceState.ONLINE)
+
+        # The timeout should not fire and the state should be the same.
+        self.reactor.advance(SYNC_ONLINE_TIMEOUT)
+        state = self.get_success(self.presence_handler.get_state(self.user_id_obj))
+        self.assertEqual(state.state, PresenceState.ONLINE)
 
 
 class PresenceFederationQueueTestCase(unittest.HomeserverTestCase):

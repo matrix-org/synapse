@@ -192,7 +192,8 @@ class BasePresenceHandler(abc.ABC):
         self.state = hs.get_state_handler()
         self.is_mine_id = hs.is_mine_id
 
-        self._presence_enabled = hs.config.server.use_presence
+        self._presence_enabled = hs.config.server.presence_enabled
+        self._track_presence = hs.config.server.track_presence
 
         self._federation = None
         if hs.should_send_federation():
@@ -512,7 +513,7 @@ class WorkerPresenceHandler(BasePresenceHandler):
         )
 
     async def _on_shutdown(self) -> None:
-        if self._presence_enabled:
+        if self._track_presence:
             self.hs.get_replication_command_handler().send_command(
                 ClearUserSyncsCommand(self.instance_id)
             )
@@ -524,7 +525,7 @@ class WorkerPresenceHandler(BasePresenceHandler):
         is_syncing: bool,
         last_sync_ms: int,
     ) -> None:
-        if self._presence_enabled:
+        if self._track_presence:
             self.hs.get_replication_command_handler().send_user_sync(
                 self.instance_id, user_id, device_id, is_syncing, last_sync_ms
             )
@@ -571,7 +572,7 @@ class WorkerPresenceHandler(BasePresenceHandler):
         Called by the sync and events servlets to record that a user has connected to
         this worker and is waiting for some events.
         """
-        if not affect_presence or not self._presence_enabled:
+        if not affect_presence or not self._track_presence:
             return _NullContextManager()
 
         # Note that this causes last_active_ts to be incremented which is not
@@ -702,8 +703,8 @@ class WorkerPresenceHandler(BasePresenceHandler):
 
         user_id = target_user.to_string()
 
-        # If presence is disabled, no-op
-        if not self._presence_enabled:
+        # If tracking of presence is disabled, no-op
+        if not self._track_presence:
             return
 
         # Proxy request to instance that writes presence
@@ -723,7 +724,7 @@ class WorkerPresenceHandler(BasePresenceHandler):
         with the app.
         """
         # If presence is disabled, no-op
-        if not self._presence_enabled:
+        if not self._track_presence:
             return
 
         # Proxy request to instance that writes presence
@@ -760,7 +761,7 @@ class PresenceHandler(BasePresenceHandler):
         ] = {}
 
         now = self.clock.time_msec()
-        if self._presence_enabled:
+        if self._track_presence:
             for state in self.user_to_current_state.values():
                 # Create a psuedo-device to properly handle time outs. This will
                 # be overridden by any "real" devices within SYNC_ONLINE_TIMEOUT.
@@ -831,7 +832,7 @@ class PresenceHandler(BasePresenceHandler):
 
         self.external_sync_linearizer = Linearizer(name="external_sync_linearizer")
 
-        if self._presence_enabled:
+        if self._track_presence:
             # Start a LoopingCall in 30s that fires every 5s.
             # The initial delay is to allow disconnected clients a chance to
             # reconnect before we treat them as offline.
@@ -839,6 +840,9 @@ class PresenceHandler(BasePresenceHandler):
                 30, self.clock.looping_call, self._handle_timeouts, 5000
             )
 
+        # Presence information is persisted, whether or not it is being tracked
+        # internally.
+        if self._presence_enabled:
             self.clock.call_later(
                 60,
                 self.clock.looping_call,
@@ -854,7 +858,7 @@ class PresenceHandler(BasePresenceHandler):
         )
 
         # Used to handle sending of presence to newly joined users/servers
-        if self._presence_enabled:
+        if self._track_presence:
             self.notifier.add_replication_callback(self.notify_new_event)
 
         # Presence is best effort and quickly heals itself, so lets just always
@@ -908,7 +912,6 @@ class PresenceHandler(BasePresenceHandler):
         self,
         new_states: Iterable[UserPresenceState],
         force_notify: bool = False,
-        override: bool = False,
     ) -> None:
         """Updates presence of users. Sets the appropriate timeouts. Pokes
         the notifier and federation if and only if the changed presence state
@@ -920,9 +923,8 @@ class PresenceHandler(BasePresenceHandler):
                 even if it doesn't change the state of a user's presence (e.g online -> online).
                 This is currently used to bump the max presence stream ID without changing any
                 user's presence (see PresenceHandler.add_users_to_send_full_presence_to).
-            override: Whether to set the presence state even if presence is disabled.
         """
-        if not self._presence_enabled and not override:
+        if not self._presence_enabled:
             # We shouldn't get here if presence is disabled, but we check anyway
             # to ensure that we don't a) send out presence federation and b)
             # don't add things to the wheel timer that will never be handled.
@@ -963,7 +965,7 @@ class PresenceHandler(BasePresenceHandler):
                     now=now,
                     # When overriding disabled presence, don't kick off all the
                     # wheel timers.
-                    persist=override,
+                    persist=not self._track_presence,
                 )
 
                 if force_notify:
@@ -1079,7 +1081,7 @@ class PresenceHandler(BasePresenceHandler):
         with the app.
         """
         # If presence is disabled, no-op
-        if not self._presence_enabled:
+        if not self._track_presence:
             return
 
         user_id = user.to_string()
@@ -1131,7 +1133,7 @@ class PresenceHandler(BasePresenceHandler):
                 client that is being used by a user.
             presence_state: The presence state indicated in the sync request
         """
-        if not affect_presence or not self._presence_enabled:
+        if not affect_presence or not self._track_presence:
             return _NullContextManager()
 
         curr_sync = self._user_device_to_num_current_syncs.get((user_id, device_id), 0)
@@ -1291,7 +1293,7 @@ class PresenceHandler(BasePresenceHandler):
 
     async def incoming_presence(self, origin: str, content: JsonDict) -> None:
         """Called when we receive a `m.presence` EDU from a remote server."""
-        if not self._presence_enabled:
+        if not self._track_presence:
             return
 
         now = self.clock.time_msec()
@@ -1366,7 +1368,7 @@ class PresenceHandler(BasePresenceHandler):
             raise SynapseError(400, "Invalid presence state")
 
         # If presence is disabled, no-op
-        if not self._presence_enabled:
+        if not self._track_presence:
             return
 
         user_id = target_user.to_string()

@@ -1192,7 +1192,7 @@ class ModuleApi:
         """
         Update the internal presence state of users.
 
-        Note that this can be used for either local or remote users.
+        This can be used for either local or remote users.
 
         Note that this method can only be run on the process that is configured to write to the
         presence stream. By default, this is the main process.
@@ -1215,9 +1215,7 @@ class ModuleApi:
                 state=state, status_msg=status_msg
             )
 
-        await presence_handler._update_states(
-            states.values(), force_notify=True, override=True
-        )
+        await presence_handler._update_states(states.values(), force_notify=True)
 
     def looping_background_call(
         self,
