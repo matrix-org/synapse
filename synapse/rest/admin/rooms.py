@@ -724,7 +724,17 @@ class ForwardExtremitiesRestServlet(ResolveRoomIdMixin, RestServlet):
         room_id, _ = await self.resolve_room_id(room_identifier)
 
         extremities = await self.store.get_forward_extremities_for_room(room_id)
-        return HTTPStatus.OK, {"count": len(extremities), "results": extremities}
+        result = [
+            {
+                "event_id": ex[0],
+                "state_group": ex[1],
+                "depth": ex[2],
+                "received_ts": ex[3],
+            }
+            for ex in extremities
+        ]
+
+        return HTTPStatus.OK, {"count": len(extremities), "results": result}
 
 
 class RoomEventContextServlet(RestServlet):
