@@ -145,7 +145,7 @@ class InitialSyncHandler:
         joined_rooms = [r.room_id for r in room_list if r.membership == Membership.JOIN]
         receipt = await self.store.get_linearized_receipts_for_rooms(
             joined_rooms,
-            to_key=int(now_token.receipt_key),
+            to_key=now_token.receipt_key,
         )
 
         receipt = ReceiptEventSource.filter_out_private_receipts(receipt, user_id)
