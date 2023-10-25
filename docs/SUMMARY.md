@@ -48,7 +48,7 @@
         - [Password auth provider callbacks](modules/password_auth_provider_callbacks.md)
         - [Background update controller callbacks](modules/background_update_controller_callbacks.md)
         - [Account data callbacks](modules/account_data_callbacks.md)
-        - [Add extra fields to client events unsigned section callbacks](modules/add_extra_fields_to_client_events_unsgined.md)
+        - [Add extra fields to client events unsigned section callbacks](modules/add_extra_fields_to_client_events_unsigned.md)
         - [Porting a legacy module to the new interface](modules/porting_legacy_module.md)
     - [Workers](workers.md)
       - [Using `synctl` with Workers](synctl_workers.md)
