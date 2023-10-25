@@ -103,6 +103,7 @@ done
 
 # enable buildkit for the docker builds
 export DOCKER_BUILDKIT=1
+export SYNAPSE_TEST_LOG_LEVEL=DEBUG # XXX REMOVE
 
 # Determine whether to use the docker or podman container runtime.
 if [ -n "$PODMAN" ]; then
