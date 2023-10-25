@@ -79,17 +79,11 @@ class RatelimitOverride:
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
-class RoomStats:
+class LargestRoomStats:
     room_id: str
     name: Optional[str]
     canonical_alias: Optional[str]
-    joined_members: str
-    joined_local_members: int
-    version: str
-    creator: str
-    encryption: Optional[str]
-    federatable: bool
-    public: bool
+    joined_members: int
     join_rules: Optional[str]
     guest_access: Optional[str]
     history_visibility: Optional[str]
@@ -97,6 +91,16 @@ class RoomStats:
     avatar: Optional[str]
     topic: Optional[str]
     room_type: Optional[str]
+
+
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class RoomStats(LargestRoomStats):
+    joined_local_members: int
+    version: str
+    creator: str
+    encryption: Optional[str]
+    federatable: bool
+    public: bool
 
 
 class RoomSortOrder(Enum):
@@ -402,7 +406,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         bounds: Optional[Tuple[int, str]],
         forwards: bool,
         ignore_non_federatable: bool = False,
-    ) -> List[Dict[str, Any]]:
+    ) -> List[LargestRoomStats]:
         """Gets the largest public rooms (where largest is in terms of joined
         members, as tracked in the statistics table).
 
@@ -539,20 +543,34 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
 
         def _get_largest_public_rooms_txn(
             txn: LoggingTransaction,
-        ) -> List[Dict[str, Any]]:
+        ) -> List[LargestRoomStats]:
             txn.execute(sql, query_args)
 
-            results = self.db_pool.cursor_to_dict(txn)
+            results = [
+                LargestRoomStats(
+                    room_id=r[0],
+                    name=r[1],
+                    canonical_alias=r[3],
+                    joined_members=r[4],
+                    join_rules=r[8],
+                    guest_access=r[7],
+                    history_visibility=r[6],
+                    state_events=0,
+                    avatar=r[5],
+                    topic=r[2],
+                    room_type=r[9],
+                )
+                for r in txn
+            ]
 
             if not forwards:
                 results.reverse()
 
             return results
 
-        ret_val = await self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "get_largest_public_rooms", _get_largest_public_rooms_txn
         )
-        return ret_val
 
     @cached(max_entries=10000)
     async def is_room_blocked(self, room_id: str) -> Optional[bool]:
