@@ -947,7 +947,7 @@ class PresenceHandler(BasePresenceHandler):
             for new_state in new_states:
                 user_id = new_state.user_id
 
-                # Its fine to not hit the database here, as the only thing not in
+                # It's fine to not hit the database here, as the only thing not in
                 # the current state cache are OFFLINE states, where the only field
                 # of interest is last_active which is safe enough to assume is 0
                 # here.
@@ -961,7 +961,9 @@ class PresenceHandler(BasePresenceHandler):
                     is_mine=self.is_mine_id(user_id),
                     wheel_timer=self.wheel_timer,
                     now=now,
-                    override=override,
+                    # When overriding disabled presence, don't kick off all the
+                    # wheel timers.
+                    persist=override,
                 )
 
                 if force_notify:
@@ -2123,7 +2125,7 @@ def handle_update(
     is_mine: bool,
     wheel_timer: WheelTimer,
     now: int,
-    override: bool,
+    persist: bool,
 ) -> Tuple[UserPresenceState, bool, bool]:
     """Given a presence update:
         1. Add any appropriate timers.
@@ -2135,7 +2137,7 @@ def handle_update(
         is_mine: Whether the user is ours
         wheel_timer
         now: Time now in ms
-        override: True if this state should persist until another update occurs.
+        persist: True if this state should persist until another update occurs.
             Skips insertion into wheel timers.
 
     Returns:
@@ -2154,7 +2156,7 @@ def handle_update(
     if is_mine:
         if new_state.state == PresenceState.ONLINE:
             # Idle timer
-            if not override:
+            if not persist:
                 wheel_timer.insert(
                     now=now, obj=user_id, then=new_state.last_active_ts + IDLE_TIMER
                 )
@@ -2162,7 +2164,7 @@ def handle_update(
             active = now - new_state.last_active_ts < LAST_ACTIVE_GRANULARITY
             new_state = new_state.copy_and_replace(currently_active=active)
 
-            if active and not override:
+            if active and not persist:
                 wheel_timer.insert(
                     now=now,
                     obj=user_id,
@@ -2171,7 +2173,7 @@ def handle_update(
 
         if new_state.state != PresenceState.OFFLINE:
             # User has stopped syncing
-            if not override:
+            if not persist:
                 wheel_timer.insert(
                     now=now,
                     obj=user_id,
@@ -2184,7 +2186,7 @@ def handle_update(
                 new_state = new_state.copy_and_replace(last_federation_update_ts=now)
                 federation_ping = True
 
-        if new_state.state == PresenceState.BUSY and not override:
+        if new_state.state == PresenceState.BUSY and not persist:
             wheel_timer.insert(
                 now=now,
                 obj=user_id,
@@ -2193,7 +2195,7 @@ def handle_update(
 
     else:
         # An update for a remote user was received.
-        if not override:
+        if not persist:
             wheel_timer.insert(
                 now=now,
                 obj=user_id,
