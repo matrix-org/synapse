@@ -100,7 +100,6 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
         event_id, stream_ordering = self.get_success(
             self.hs.get_datastores().main.db_pool.execute(
                 "test:get_destination_rooms",
-                None,
                 """
                 SELECT event_id, stream_ordering
                     FROM destination_rooms dr

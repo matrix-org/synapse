@@ -456,8 +456,8 @@ class BackgroundUpdateValidateConstraintTestCase(unittest.HomeserverTestCase):
             );
         """
         self.get_success(
-            self.store.db_pool.execute(
-                "test_not_null_constraint", lambda _: None, table_sql
+            self.store.db_pool.runInteraction(
+                "test_not_null_constraint", lambda txn: txn.execute(table_sql)
             )
         )
 
@@ -465,8 +465,8 @@ class BackgroundUpdateValidateConstraintTestCase(unittest.HomeserverTestCase):
         # using SQLite.
         index_sql = "CREATE INDEX test_index ON test_constraint(a)"
         self.get_success(
-            self.store.db_pool.execute(
-                "test_not_null_constraint", lambda _: None, index_sql
+            self.store.db_pool.runInteraction(
+                "test_not_null_constraint", lambda txn: txn.execute(index_sql)
             )
         )
 
@@ -570,13 +570,13 @@ class BackgroundUpdateValidateConstraintTestCase(unittest.HomeserverTestCase):
             );
         """
         self.get_success(
-            self.store.db_pool.execute(
-                "test_foreign_key_constraint", lambda _: None, base_sql
+            self.store.db_pool.runInteraction(
+                "test_foreign_key_constraint", lambda txn: txn.execute(base_sql)
             )
         )
         self.get_success(
-            self.store.db_pool.execute(
-                "test_foreign_key_constraint", lambda _: None, table_sql
+            self.store.db_pool.runInteraction(
+                "test_foreign_key_constraint", lambda txn: txn.execute(table_sql)
             )
         )
 

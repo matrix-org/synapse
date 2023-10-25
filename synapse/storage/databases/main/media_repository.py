@@ -683,7 +683,7 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
 
         return cast(
             List[Tuple[str, str, str]],
-            await self.db_pool.execute("get_remote_media_ids", None, sql, before_ts),
+            await self.db_pool.execute("get_remote_media_ids", sql, before_ts),
         )
 
     async def delete_remote_media(self, media_origin: str, media_id: str) -> None:

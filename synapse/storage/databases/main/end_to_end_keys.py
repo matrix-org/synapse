@@ -155,7 +155,6 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
             """
             rows = await self.db_pool.execute(
                 "get_e2e_device_keys_for_federation_query_check",
-                None,
                 sql,
                 now_stream_id,
                 user_id,

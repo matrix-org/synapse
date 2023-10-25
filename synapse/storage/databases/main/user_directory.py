@@ -1146,7 +1146,7 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
 
         results = cast(
             List[Tuple[str, Optional[str], Optional[str]]],
-            await self.db_pool.execute("search_user_dir", None, sql, *args),
+            await self.db_pool.execute("search_user_dir", sql, *args),
         )
 
         limited = len(results) > limit

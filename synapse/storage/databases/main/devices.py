@@ -882,7 +882,6 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
 
         rows = await self.db_pool.execute(
             "get_all_devices_changed",
-            None,
             sql,
             from_key,
             to_key,
@@ -966,7 +965,7 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
                 WHERE from_user_id = ? AND stream_id > ?
             """
             rows = await self.db_pool.execute(
-                "get_users_whose_signatures_changed", None, sql, user_id, from_key
+                "get_users_whose_signatures_changed", sql, user_id, from_key
             )
             return {user for row in rows for user in db_to_json(row[0])}
         else:

@@ -510,7 +510,7 @@ class SearchStore(SearchBackgroundUpdateStore):
         # List of tuples of (rank, room_id, event_id).
         results = cast(
             List[Tuple[int, str, str]],
-            await self.db_pool.execute("search_msgs", None, sql, *args),
+            await self.db_pool.execute("search_msgs", sql, *args),
         )
 
         results = list(filter(lambda row: row[1] in room_ids, results))
@@ -533,9 +533,7 @@ class SearchStore(SearchBackgroundUpdateStore):
         # List of tuples of (room_id, count).
         count_results = cast(
             List[Tuple[str, int]],
-            await self.db_pool.execute(
-                "search_rooms_count", None, count_sql, *count_args
-            ),
+            await self.db_pool.execute("search_rooms_count", count_sql, *count_args),
         )
 
         count = sum(row[1] for row in count_results if row[0] in room_ids)
@@ -675,7 +673,7 @@ class SearchStore(SearchBackgroundUpdateStore):
         # List of tuples of (rank, room_id, event_id, origin_server_ts, stream_ordering).
         results = cast(
             List[Tuple[int, str, str, int, int]],
-            await self.db_pool.execute("search_rooms", None, sql, *args),
+            await self.db_pool.execute("search_rooms", sql, *args),
         )
 
         results = list(filter(lambda row: row[1] in room_ids, results))
@@ -698,9 +696,7 @@ class SearchStore(SearchBackgroundUpdateStore):
         # List of tuples of (room_id, count).
         count_results = cast(
             List[Tuple[str, int]],
-            await self.db_pool.execute(
-                "search_rooms_count", None, count_sql, *count_args
-            ),
+            await self.db_pool.execute("search_rooms_count", count_sql, *count_args),
         )
 
         count = sum(row[1] for row in count_results if row[0] in room_ids)

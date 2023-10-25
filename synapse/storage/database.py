@@ -35,7 +35,6 @@ from typing import (
     Tuple,
     Type,
     TypeVar,
-    Union,
     cast,
     overload,
 )
@@ -1044,43 +1043,20 @@ class DatabasePool:
         results = [dict(zip(col_headers, row)) for row in cursor]
         return results
 
-    @overload
-    async def execute(
-        self, desc: str, decoder: Literal[None], query: str, *args: Any
-    ) -> List[Tuple[Any, ...]]:
-        ...
-
-    @overload
-    async def execute(
-        self, desc: str, decoder: Callable[[Cursor], R], query: str, *args: Any
-    ) -> R:
-        ...
-
-    async def execute(
-        self,
-        desc: str,
-        decoder: Optional[Callable[[Cursor], R]],
-        query: str,
-        *args: Any,
-    ) -> Union[List[Tuple[Any, ...]], R]:
+    async def execute(self, desc: str, query: str, *args: Any) -> List[Tuple[Any, ...]]:
         """Runs a single query for a result set.
 
         Args:
             desc: description of the transaction, for logging and metrics
-            decoder - The function which can resolve the cursor results to
-                something meaningful.
             query - The query string to execute
             *args - Query args.
         Returns:
             The result of decoder(results)
         """
 
-        def interaction(txn: LoggingTransaction) -> Union[List[Tuple[Any, ...]], R]:
+        def interaction(txn: LoggingTransaction) -> List[Tuple[Any, ...]]:
             txn.execute(query, args)
-            if decoder:
-                return decoder(txn)
-            else:
-                return txn.fetchall()
+            return txn.fetchall()
 
         return await self.runInteraction(desc, interaction)
 
