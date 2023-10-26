@@ -1515,6 +1515,18 @@ class EventCreationHandler:
                 first_event.room_id
             )
             if writer_instance != self._instance_name:
+                # Ratelimit before sending to the other event persister, to
+                # ensure that we correctly have ratelimits on both the event
+                # creators and event persiters.
+                if ratelimit:
+                    for event, _ in events_and_context:
+                        is_admin_redaction = await self.is_admin_redaction(
+                            event.type, event.sender, event.redacts
+                        )
+                        await self.request_ratelimiter.ratelimit(
+                            requester, is_admin_redaction=is_admin_redaction
+                        )
+
                 try:
                     result = await self.send_events(
                         instance_name=writer_instance,
@@ -1545,14 +1557,6 @@ class EventCreationHandler:
                     # stream_ordering entry manually (as it was persisted on
                     # another worker).
                     event.internal_metadata.stream_ordering = stream_id
-
-                if ratelimit:
-                    is_admin_redaction = await self.is_admin_redaction(
-                        event.type, event.sender, event.redacts
-                    )
-                    await self.request_ratelimiter.ratelimit(
-                        requester, is_admin_redaction=is_admin_redaction
-                    )
 
                 return event
 
