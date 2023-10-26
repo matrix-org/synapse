@@ -73,9 +73,6 @@ pdus_pruned_from_federation_queue = Counter(
     "The number of events in the inbound federation staging that have been "
     "pruned due to the queue getting too long",
 )
-excluded_zeros_from_auth_chain_query = Counter(
-    "synapse_temp_auth_chain_zero_sequence", ""
-)
 
 logger = logging.getLogger(__name__)
 
@@ -308,8 +305,6 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
             max_sequence_result = max(seq_no - 1, chains.get(chain_id, 0))
             if max_sequence_result > 0:
                 chains[chain_id] = max_sequence_result
-            else:
-                excluded_zeros_from_auth_chain_query.inc()
 
         # Now for each chain we figure out the maximum sequence number reachable
         # from *any* event ID. Events with a sequence less than that are in the
