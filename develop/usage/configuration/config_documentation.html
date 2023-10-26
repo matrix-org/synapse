@@ -326,6 +326,10 @@ This option replaces the previous top-level 'use_presence' option.</p>
 <pre><code class="language-yaml">presence:
   enabled: false
 </code></pre>
+<p><code>enabled</code> can also be set to a special value of &quot;untracked&quot; which ignores updates
+received via clients and federation, while still accepting updates from the
+<a href="../../modules/index.html">module API</a>.</p>
+<p><em>The &quot;untracked&quot; option was added in Synapse 1.96.0.</em></p>
 <hr />
 <h3 id="require_auth_for_profile_requests"><a class="header" href="#require_auth_for_profile_requests"><code>require_auth_for_profile_requests</code></a></h3>
 <p>Whether to require authentication to retrieve profile data (avatars, display names) of other
