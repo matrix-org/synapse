@@ -21,7 +21,6 @@ from synapse.api.errors import Codes, SynapseError
 from synapse.http.server import respond_with_json
 from synapse.http.servlet import RestServlet, parse_bytes_from_args
 from synapse.http.site import SynapseRequest
-from synapse.media._base import parse_media_id
 from synapse.media.media_storage import SpamMediaException
 
 if TYPE_CHECKING:
@@ -34,9 +33,7 @@ logger = logging.getLogger(__name__)
 _UPLOAD_MEDIA_LOCK_NAME = "upload_media"
 
 
-class UploadResource(RestServlet):
-    PATTERNS = [re.compile("/_matrix/media/(r0|v3|v1)/upload")]
-
+class BaseUploadServlet(RestServlet):
     def __init__(self, hs: "HomeServer", media_repo: "MediaRepository"):
         super().__init__()
 
@@ -94,8 +91,9 @@ class UploadResource(RestServlet):
 
         return content_length, upload_name, media_type
 
-    async def _async_render_OPTIONS(self, request: SynapseRequest) -> None:
-        respond_with_json(request, 200, {}, send_cors=True)
+
+class UploadServlet(BaseUploadServlet):
+    PATTERNS = [re.compile("/_matrix/media/(r0|v3|v1)/upload$")]
 
     async def on_POST(self, request: SynapseRequest) -> None:
         requester = await self.auth.get_user_by_req(request)
@@ -117,9 +115,18 @@ class UploadResource(RestServlet):
             request, 200, {"content_uri": str(content_uri)}, send_cors=True
         )
 
-    async def _async_render_PUT(self, request: SynapseRequest) -> None:
+
+class AsyncUploadServlet(BaseUploadServlet):
+    PATTERNS = [
+        re.compile(
+            "/_matrix/media/v1/upload/(?P<server_name>[^/]*)/(?P<media_id>[^/]*)$"
+        )
+    ]
+
+    async def on_PUT(
+        self, request: SynapseRequest, server_name: str, media_id: str
+    ) -> None:
         requester = await self.auth.get_user_by_req(request)
-        server_name, media_id, _ = parse_media_id(request)
 
         if server_name != self.server_name:
             raise SynapseError(
