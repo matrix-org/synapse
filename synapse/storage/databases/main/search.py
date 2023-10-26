@@ -26,6 +26,7 @@ from typing import (
     Set,
     Tuple,
     Union,
+    cast,
 )
 
 import attr
@@ -506,16 +507,18 @@ class SearchStore(SearchBackgroundUpdateStore):
         # entire table from the database.
         sql += " ORDER BY rank DESC LIMIT 500"
 
-        results = await self.db_pool.execute(
-            "search_msgs", self.db_pool.cursor_to_dict, sql, *args
+        # List of tuples of (rank, room_id, event_id).
+        results = cast(
+            List[Tuple[Union[int, float], str, str]],
+            await self.db_pool.execute("search_msgs", sql, *args),
         )
 
-        results = list(filter(lambda row: row["room_id"] in room_ids, results))
+        results = list(filter(lambda row: row[1] in room_ids, results))
 
         # We set redact_behaviour to block here to prevent redacted events being returned in
         # search results (which is a data leak)
         events = await self.get_events_as_list(  # type: ignore[attr-defined]
-            [r["event_id"] for r in results],
+            [r[2] for r in results],
             redact_behaviour=EventRedactBehaviour.block,
         )
 
@@ -527,16 +530,18 @@ class SearchStore(SearchBackgroundUpdateStore):
 
         count_sql += " GROUP BY room_id"
 
-        count_results = await self.db_pool.execute(
-            "search_rooms_count", self.db_pool.cursor_to_dict, count_sql, *count_args
+        # List of tuples of (room_id, count).
+        count_results = cast(
+            List[Tuple[str, int]],
+            await self.db_pool.execute("search_rooms_count", count_sql, *count_args),
         )
 
-        count = sum(row["count"] for row in count_results if row["room_id"] in room_ids)
+        count = sum(row[1] for row in count_results if row[0] in room_ids)
         return {
             "results": [
-                {"event": event_map[r["event_id"]], "rank": r["rank"]}
+                {"event": event_map[r[2]], "rank": r[0]}
                 for r in results
-                if r["event_id"] in event_map
+                if r[2] in event_map
             ],
             "highlights": highlights,
             "count": count,
@@ -604,7 +609,7 @@ class SearchStore(SearchBackgroundUpdateStore):
             search_query = search_term
             sql = """
             SELECT ts_rank_cd(vector, websearch_to_tsquery('english', ?)) as rank,
-            origin_server_ts, stream_ordering, room_id, event_id
+            room_id, event_id, origin_server_ts, stream_ordering
             FROM event_search
             WHERE vector @@ websearch_to_tsquery('english', ?) AND
             """
@@ -665,16 +670,18 @@ class SearchStore(SearchBackgroundUpdateStore):
         # mypy expects to append only a `str`, not an `int`
         args.append(limit)
 
-        results = await self.db_pool.execute(
-            "search_rooms", self.db_pool.cursor_to_dict, sql, *args
+        # List of tuples of (rank, room_id, event_id, origin_server_ts, stream_ordering).
+        results = cast(
+            List[Tuple[Union[int, float], str, str, int, int]],
+            await self.db_pool.execute("search_rooms", sql, *args),
         )
 
-        results = list(filter(lambda row: row["room_id"] in room_ids, results))
+        results = list(filter(lambda row: row[1] in room_ids, results))
 
         # We set redact_behaviour to block here to prevent redacted events being returned in
         # search results (which is a data leak)
         events = await self.get_events_as_list(  # type: ignore[attr-defined]
-            [r["event_id"] for r in results],
+            [r[2] for r in results],
             redact_behaviour=EventRedactBehaviour.block,
         )
 
@@ -686,22 +693,23 @@ class SearchStore(SearchBackgroundUpdateStore):
 
         count_sql += " GROUP BY room_id"
 
-        count_results = await self.db_pool.execute(
-            "search_rooms_count", self.db_pool.cursor_to_dict, count_sql, *count_args
+        # List of tuples of (room_id, count).
+        count_results = cast(
+            List[Tuple[str, int]],
+            await self.db_pool.execute("search_rooms_count", count_sql, *count_args),
         )
 
-        count = sum(row["count"] for row in count_results if row["room_id"] in room_ids)
+        count = sum(row[1] for row in count_results if row[0] in room_ids)
 
         return {
             "results": [
                 {
-                    "event": event_map[r["event_id"]],
-                    "rank": r["rank"],
-                    "pagination_token": "%s,%s"
-                    % (r["origin_server_ts"], r["stream_ordering"]),
+                    "event": event_map[r[2]],
+                    "rank": r[0],
+                    "pagination_token": "%s,%s" % (r[3], r[4]),
                 }
                 for r in results
-                if r["event_id"] in event_map
+                if r[2] in event_map
             ],
             "highlights": highlights,
             "count": count,

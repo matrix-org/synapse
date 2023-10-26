@@ -1145,15 +1145,19 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
             raise Exception("Unrecognized database engine")
 
         results = cast(
-            List[UserProfile],
-            await self.db_pool.execute(
-                "search_user_dir", self.db_pool.cursor_to_dict, sql, *args
-            ),
+            List[Tuple[str, Optional[str], Optional[str]]],
+            await self.db_pool.execute("search_user_dir", sql, *args),
         )
 
         limited = len(results) > limit
 
-        return {"limited": limited, "results": results[0:limit]}
+        return {
+            "limited": limited,
+            "results": [
+                {"user_id": r[0], "display_name": r[1], "avatar_url": r[2]}
+                for r in results[0:limit]
+            ],
+        }
 
 
 def _filter_text_for_index(text: str) -> str:

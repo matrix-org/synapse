@@ -151,6 +151,22 @@ class ThreepidResult:
     added_at: int
 
 
+@attr.s(frozen=True, slots=True, auto_attribs=True)
+class ThreepidValidationSession:
+    address: str
+    """address of the 3pid"""
+    medium: str
+    """medium of the 3pid"""
+    client_secret: str
+    """a secret provided by the client for this validation session"""
+    session_id: str
+    """ID of the validation session"""
+    last_send_attempt: int
+    """a number serving to dedupe send attempts for this session"""
+    validated_at: Optional[int]
+    """timestamp of when this session was validated if so"""
+
+
 class RegistrationWorkerStore(CacheInvalidationWorkerStore):
     def __init__(
         self,
@@ -1172,7 +1188,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
         address: Optional[str] = None,
         sid: Optional[str] = None,
         validated: Optional[bool] = True,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> Optional[ThreepidValidationSession]:
         """Gets a session_id and last_send_attempt (if available) for a
         combination of validation metadata
 
@@ -1187,15 +1203,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                 perform no filtering
 
         Returns:
-            A dict containing the following:
-                * address - address of the 3pid
-                * medium - medium of the 3pid
-                * client_secret - a secret provided by the client for this validation session
-                * session_id - ID of the validation session
-                * send_attempt - a number serving to dedupe send attempts for this session
-                * validated_at - timestamp of when this session was validated if so
-
-                Otherwise None if a validation session is not found
+            A ThreepidValidationSession or None if a validation session is not found
         """
         if not client_secret:
             raise SynapseError(
@@ -1214,7 +1222,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
 
         def get_threepid_validation_session_txn(
             txn: LoggingTransaction,
-        ) -> Optional[Dict[str, Any]]:
+        ) -> Optional[ThreepidValidationSession]:
             sql = """
                 SELECT address, session_id, medium, client_secret,
                 last_send_attempt, validated_at
@@ -1229,11 +1237,18 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             sql += " LIMIT 1"
 
             txn.execute(sql, list(keyvalues.values()))
-            rows = self.db_pool.cursor_to_dict(txn)
-            if not rows:
+            row = txn.fetchone()
+            if not row:
                 return None
 
-            return rows[0]
+            return ThreepidValidationSession(
+                address=row[0],
+                session_id=row[1],
+                medium=row[2],
+                client_secret=row[3],
+                last_send_attempt=row[4],
+                validated_at=row[5],
+            )
 
         return await self.db_pool.runInteraction(
             "get_threepid_validation_session", get_threepid_validation_session_txn

@@ -949,10 +949,7 @@ class MediaRepository:
 
         deleted = 0
 
-        for media in old_media:
-            origin = media["media_origin"]
-            media_id = media["media_id"]
-            file_id = media["filesystem_id"]
+        for origin, media_id, file_id in old_media:
             key = (origin, media_id)
 
             logger.info("Deleting: %r", key)
