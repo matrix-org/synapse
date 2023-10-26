@@ -1937,23 +1937,22 @@ class EventCreationHandler:
     async def is_admin_redaction(
         self, event_type: str, sender: str, redacts: Optional[str]
     ) -> bool:
-        is_admin_redaction = False
-        if event_type == EventTypes.Redaction:
-            assert redacts is not None
+        if event_type != EventTypes.Redaction:
+            return False
 
-            original_event = await self.store.get_event(
-                redacts,
-                redact_behaviour=EventRedactBehaviour.as_is,
-                get_prev_content=False,
-                allow_rejected=False,
-                allow_none=True,
-            )
+        assert redacts is not None
 
-            is_admin_redaction = bool(
-                original_event and sender != original_event.sender
-            )
+        original_event = await self.store.get_event(
+            redacts,
+            redact_behaviour=EventRedactBehaviour.as_is,
+            get_prev_content=False,
+            allow_rejected=False,
+            allow_none=True,
+        )
 
-        return is_admin_redaction
+        return bool(
+            original_event and sender != original_event.sender
+        )
 
     async def _maybe_kick_guest_users(
         self, event: EventBase, context: EventContext
