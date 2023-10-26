@@ -509,7 +509,7 @@ class SearchStore(SearchBackgroundUpdateStore):
 
         # List of tuples of (rank, room_id, event_id).
         results = cast(
-            List[Tuple[int, str, str]],
+            List[Tuple[Union[int, float], str, str]],
             await self.db_pool.execute("search_msgs", sql, *args),
         )
 
@@ -672,7 +672,7 @@ class SearchStore(SearchBackgroundUpdateStore):
 
         # List of tuples of (rank, room_id, event_id, origin_server_ts, stream_ordering).
         results = cast(
-            List[Tuple[int, str, str, int, int]],
+            List[Tuple[Union[int, float], str, str, int, int]],
             await self.db_pool.execute("search_rooms", sql, *args),
         )
 
