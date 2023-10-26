@@ -1517,7 +1517,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
 
     async def get_registration_tokens(
         self, valid: Optional[bool] = None
-    ) -> List[Dict[str, Any]]:
+    ) -> List[Tuple[str, Optional[int], int, int, Optional[int]]]:
         """List all registration tokens. Used by the admin API.
 
         Args:
@@ -1526,34 +1526,48 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
               Default is None: return all tokens regardless of validity.
 
         Returns:
-            A list of dicts, each containing details of a token.
+            A list of tuples containing:
+                * The token
+                * The number of users allowed (or None)
+                * Whether it is pending
+                * Whether it has been completed
+                * An expiry time (or None)
         """
 
         def select_registration_tokens_txn(
             txn: LoggingTransaction, now: int, valid: Optional[bool]
-        ) -> List[Dict[str, Any]]:
+        ) -> List[Tuple[str, Optional[int], int, int, Optional[int]]]:
             if valid is None:
                 # Return all tokens regardless of validity
-                txn.execute("SELECT * FROM registration_tokens")
+                txn.execute(
+                    """
+                    SELECT token, uses_allowed, pending, completed, expiry_time
+                    FROM registration_tokens
+                    """
+                )
 
             elif valid:
                 # Select valid tokens only
-                sql = (
-                    "SELECT * FROM registration_tokens WHERE "
-                    "(uses_allowed > pending + completed OR uses_allowed IS NULL) "
-                    "AND (expiry_time > ? OR expiry_time IS NULL)"
-                )
+                sql = """
+                SELECT token, uses_allowed, pending, completed, expiry_time
+                FROM registration_tokens
+                WHERE (uses_allowed > pending + completed OR uses_allowed IS NULL)
+                    AND (expiry_time > ? OR expiry_time IS NULL)
+                """
                 txn.execute(sql, [now])
 
             else:
                 # Select invalid tokens only
-                sql = (
-                    "SELECT * FROM registration_tokens WHERE "
-                    "uses_allowed <= pending + completed OR expiry_time <= ?"
-                )
+                sql = """
+                SELECT token, uses_allowed, pending, completed, expiry_time
+                FROM registration_tokens
+                WHERE uses_allowed <= pending + completed OR expiry_time <= ?
+                """
                 txn.execute(sql, [now])
 
-            return self.db_pool.cursor_to_dict(txn)
+            return cast(
+                List[Tuple[str, Optional[int], int, int, Optional[int]]], txn.fetchall()
+            )
 
         return await self.db_pool.runInteraction(
             "select_registration_tokens",
