@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import logging
-from typing import List, Tuple, cast
+from typing import List, Optional, Tuple, cast
 
 from synapse.api.errors import SynapseError
 from synapse.storage.database import LoggingTransaction
@@ -91,7 +91,7 @@ class EventForwardExtremitiesStore(
 
     async def get_forward_extremities_for_room(
         self, room_id: str
-    ) -> List[Tuple[str, int, int, int]]:
+    ) -> List[Tuple[str, int, int, Optional[int]]]:
         """
         Get list of forward extremities for a room.
 
@@ -101,7 +101,7 @@ class EventForwardExtremitiesStore(
 
         def get_forward_extremities_for_room_txn(
             txn: LoggingTransaction,
-        ) -> List[Tuple[str, int, int, int]]:
+        ) -> List[Tuple[str, int, int, Optional[int]]]:
             sql = """
                 SELECT event_id, state_group, depth, received_ts
                 FROM event_forward_extremities
@@ -111,7 +111,7 @@ class EventForwardExtremitiesStore(
             """
 
             txn.execute(sql, (room_id,))
-            return cast(List[Tuple[str, int, int, int]], txn.fetchall())
+            return cast(List[Tuple[str, int, int, Optional[int]]], txn.fetchall())
 
         return await self.db_pool.runInteraction(
             "get_forward_extremities_for_room",
