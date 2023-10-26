@@ -1937,6 +1937,9 @@ class EventCreationHandler:
     async def is_admin_redaction(
         self, event_type: str, sender: str, redacts: Optional[str]
     ) -> bool:
+        """Return whether the event is a redaction made by an admin, and thus
+        should use a different ratelimiter.
+        """
         if event_type != EventTypes.Redaction:
             return False
 
@@ -1950,9 +1953,7 @@ class EventCreationHandler:
             allow_none=True,
         )
 
-        return bool(
-            original_event and sender != original_event.sender
-        )
+        return bool(original_event and sender != original_event.sender)
 
     async def _maybe_kick_guest_users(
         self, event: EventBase, context: EventContext
