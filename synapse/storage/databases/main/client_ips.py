@@ -508,21 +508,24 @@ class ClientIpWorkerStore(ClientIpBackgroundUpdateStore, MonthlyActiveUsersWorke
         if device_id is not None:
             keyvalues["device_id"] = device_id
 
-        res = await self.db_pool.simple_select_list(
-            table="devices",
-            keyvalues=keyvalues,
-            retcols=("user_id", "ip", "user_agent", "device_id", "last_seen"),
+        res = cast(
+            List[Tuple[str, Optional[str], Optional[str], str, Optional[int]]],
+            await self.db_pool.simple_select_list(
+                table="devices",
+                keyvalues=keyvalues,
+                retcols=("user_id", "ip", "user_agent", "device_id", "last_seen"),
+            ),
         )
 
         return {
-            (d["user_id"], d["device_id"]): DeviceLastConnectionInfo(
-                user_id=d["user_id"],
-                device_id=d["device_id"],
-                ip=d["ip"],
-                user_agent=d["user_agent"],
-                last_seen=d["last_seen"],
+            (user_id, device_id): DeviceLastConnectionInfo(
+                user_id=user_id,
+                device_id=device_id,
+                ip=ip,
+                user_agent=user_agent,
+                last_seen=last_seen,
             )
-            for d in res
+            for user_id, ip, user_agent, device_id, last_seen in res
         }
 
     async def _get_user_ip_and_agents_from_database(

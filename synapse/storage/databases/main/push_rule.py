@@ -179,46 +179,44 @@ class PushRulesWorkerStore(
 
     @cached(max_entries=5000)
     async def get_push_rules_for_user(self, user_id: str) -> FilteredPushRules:
-        rows = await self.db_pool.simple_select_list(
-            table="push_rules",
-            keyvalues={"user_name": user_id},
-            retcols=(
-                "user_name",
-                "rule_id",
-                "priority_class",
-                "priority",
-                "conditions",
-                "actions",
+        rows = cast(
+            List[Tuple[str, int, int, str, str]],
+            await self.db_pool.simple_select_list(
+                table="push_rules",
+                keyvalues={"user_name": user_id},
+                retcols=(
+                    "rule_id",
+                    "priority_class",
+                    "priority",
+                    "conditions",
+                    "actions",
+                ),
+                desc="get_push_rules_for_user",
             ),
-            desc="get_push_rules_for_user",
         )
 
-        rows.sort(key=lambda row: (-int(row["priority_class"]), -int(row["priority"])))
+        # Sort by highest priority_class, then highest priority.
+        rows.sort(key=lambda row: (-int(row[1]), -int(row[2])))
 
         enabled_map = await self.get_push_rules_enabled_for_user(user_id)
 
         return _load_rules(
-            [
-                (
-                    row["rule_id"],
-                    row["priority_class"],
-                    row["conditions"],
-                    row["actions"],
-                )
-                for row in rows
-            ],
+            [(row[0], row[1], row[3], row[4]) for row in rows],
             enabled_map,
             self.hs.config.experimental,
         )
 
     async def get_push_rules_enabled_for_user(self, user_id: str) -> Dict[str, bool]:
-        results = await self.db_pool.simple_select_list(
-            table="push_rules_enable",
-            keyvalues={"user_name": user_id},
-            retcols=("rule_id", "enabled"),
-            desc="get_push_rules_enabled_for_user",
+        results = cast(
+            List[Tuple[str, Optional[Union[int, bool]]]],
+            await self.db_pool.simple_select_list(
+                table="push_rules_enable",
+                keyvalues={"user_name": user_id},
+                retcols=("rule_id", "enabled"),
+                desc="get_push_rules_enabled_for_user",
+            ),
         )
-        return {r["rule_id"]: bool(r["enabled"]) for r in results}
+        return {r[0]: bool(r[1]) for r in results}
 
     async def have_push_rules_changed_for_user(
         self, user_id: str, last_id: int

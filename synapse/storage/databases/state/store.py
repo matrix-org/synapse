@@ -154,16 +154,22 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
             if not prev_group:
                 return _GetStateGroupDelta(None, None)
 
-            delta_ids = self.db_pool.simple_select_list_txn(
-                txn,
-                table="state_groups_state",
-                keyvalues={"state_group": state_group},
-                retcols=("type", "state_key", "event_id"),
+            delta_ids = cast(
+                List[Tuple[str, str, str]],
+                self.db_pool.simple_select_list_txn(
+                    txn,
+                    table="state_groups_state",
+                    keyvalues={"state_group": state_group},
+                    retcols=("type", "state_key", "event_id"),
+                ),
             )
 
             return _GetStateGroupDelta(
                 prev_group,
-                {(row["type"], row["state_key"]): row["event_id"] for row in delta_ids},
+                {
+                    (event_type, state_key): event_id
+                    for event_type, state_key, event_id in delta_ids
+                },
             )
 
         return await self.db_pool.runInteraction(
