@@ -206,3 +206,7 @@ class ExceptionBundle(Exception):
             parts.append(str(e))
         super().__init__("\n  - ".join(parts))
         self.exceptions = exceptions
+
+
+def filter_none(attr: attr.Attribute, value: Any) -> bool:
+    return value is not None

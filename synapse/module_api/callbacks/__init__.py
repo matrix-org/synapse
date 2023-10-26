@@ -27,9 +27,12 @@ from synapse.module_api.callbacks.third_party_event_rules_callbacks import (
     ThirdPartyEventRulesModuleApiCallbacks,
 )
 
+from .public_rooms_callbacks import PublicRoomsModuleApiCallbacks
+
 
 class ModuleApiCallbacks:
     def __init__(self, hs: "HomeServer") -> None:
         self.account_validity = AccountValidityModuleApiCallbacks()
         self.spam_checker = SpamCheckerModuleApiCallbacks(hs)
         self.third_party_event_rules = ThirdPartyEventRulesModuleApiCallbacks(hs)
+        self.public_rooms = PublicRoomsModuleApiCallbacks()

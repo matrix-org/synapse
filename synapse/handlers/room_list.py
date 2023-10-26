@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, Any, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 import attr
 import msgpack
@@ -33,7 +33,8 @@ from synapse.api.errors import (
     RequestSendFailed,
     SynapseError,
 )
-from synapse.types import JsonDict, JsonMapping, ThirdPartyInstanceID
+from synapse.types import JsonDict, JsonMapping, PublicRoom, ThirdPartyInstanceID
+from synapse.util import filter_none
 from synapse.util.caches.descriptors import _CacheContext, cached
 from synapse.util.caches.response_cache import ResponseCache
 
@@ -60,6 +61,7 @@ class RoomListHandler:
         self.remote_response_cache: ResponseCache[
             Tuple[str, Optional[int], Optional[str], bool, Optional[str]]
         ] = ResponseCache(hs.get_clock(), "remote_room_list", timeout_ms=30 * 1000)
+        self._module_api_callbacks = hs.get_module_api_callbacks().public_rooms
 
     async def get_local_public_room_list(
         self,
@@ -67,7 +69,8 @@ class RoomListHandler:
         since_token: Optional[str] = None,
         search_filter: Optional[dict] = None,
         network_tuple: Optional[ThirdPartyInstanceID] = EMPTY_THIRD_PARTY_ID,
-        from_federation: bool = False,
+        from_client_mxid: Optional[str] = None,
+        from_remote_server_name: Optional[str] = None,
     ) -> JsonDict:
         """Generate a local public room list.
 
@@ -75,14 +78,20 @@ class RoomListHandler:
         party network. A client can ask for a specific list or to return all.
 
         Args:
-            limit
-            since_token
-            search_filter
+            limit: The maximum number of rooms to return, or None to return all rooms.
+            since_token: A pagination token, or None to return the head of the public
+                rooms list.
+            search_filter: An optional dictionary with the following keys:
+                * generic_search_term: A string to search for in room ...
+                * room_types: A list to filter returned rooms by their type. If None or
+                    an empty list is passed, rooms will not be filtered by type.
             network_tuple: Which public list to use.
                 This can be (None, None) to indicate the main list, or a particular
                 appservice and network id to use an appservice specific one.
                 Setting to None returns all public rooms across all lists.
-            from_federation: true iff the request comes from the federation API
+            from_client_mxid: A user's MXID if this request came from a registered user.
+            from_remote_server_name: A remote homeserver's server name, if this
+                request came from the federation API.
         """
         if not self.enable_room_list_search:
             return {"chunk": [], "total_room_count_estimate": 0}
@@ -105,7 +114,8 @@ class RoomListHandler:
                 since_token,
                 search_filter,
                 network_tuple=network_tuple,
-                from_federation=from_federation,
+                from_client_mxid=from_client_mxid,
+                from_remote_server_name=from_remote_server_name,
             )
 
         key = (limit, since_token, network_tuple)
@@ -115,7 +125,8 @@ class RoomListHandler:
             limit,
             since_token,
             network_tuple=network_tuple,
-            from_federation=from_federation,
+            from_client_mxid=from_client_mxid,
+            from_remote_server_name=from_remote_server_name,
         )
 
     async def _get_public_room_list(
@@ -124,7 +135,8 @@ class RoomListHandler:
         since_token: Optional[str] = None,
         search_filter: Optional[dict] = None,
         network_tuple: Optional[ThirdPartyInstanceID] = EMPTY_THIRD_PARTY_ID,
-        from_federation: bool = False,
+        from_client_mxid: Optional[str] = None,
+        from_remote_server_name: Optional[str] = None,
     ) -> JsonDict:
         """Generate a public room list.
         Args:
@@ -135,65 +147,106 @@ class RoomListHandler:
                 This can be (None, None) to indicate the main list, or a particular
                 appservice and network id to use an appservice specific one.
                 Setting to None returns all public rooms across all lists.
-            from_federation: Whether this request originated from a
-                federating server or a client. Used for room filtering.
+            from_client_mxid: A user's MXID if this request came from a registered user.
+            from_remote_server_name: A remote homeserver's server name, if this
+                request came from the federation API.
         """
 
         # Pagination tokens work by storing the room ID sent in the last batch,
         # plus the direction (forwards or backwards). Next batch tokens always
         # go forwards, prev batch tokens always go backwards.
 
+        forwards = True
+        last_joined_members = None
+        last_room_id = None
+        last_module_index = None
         if since_token:
             batch_token = RoomListNextBatch.from_token(since_token)
-
-            bounds: Optional[Tuple[int, str]] = (
-                batch_token.last_joined_members,
-                batch_token.last_room_id,
-            )
+            print(batch_token)
             forwards = batch_token.direction_is_forward
-            has_batch_token = True
-        else:
-            bounds = None
+            last_joined_members = batch_token.last_joined_members
+            last_room_id = batch_token.last_room_id
+            last_module_index = batch_token.last_module_index
 
-            forwards = True
-            has_batch_token = False
-
-        # we request one more than wanted to see if there are more pages to come
+        # We request one more than wanted to see if there are more pages to come
         probing_limit = limit + 1 if limit is not None else None
 
-        results = await self.store.get_largest_public_rooms(
+        # We bucket results per joined members number since we want to keep order
+        # per joined members number
+        num_joined_members_buckets: Dict[int, List[PublicRoom]] = {}
+        room_ids_to_module_index: Dict[str, int] = {}
+
+        local_public_rooms = await self.store.get_largest_public_rooms(
             network_tuple,
             search_filter,
             probing_limit,
-            bounds=bounds,
+            bounds=(
+                last_joined_members,
+                last_room_id if last_module_index is None else None,
+            ),
             forwards=forwards,
-            ignore_non_federatable=from_federation,
+            ignore_non_federatable=bool(from_remote_server_name),
         )
 
-        def build_room_entry(room: JsonDict) -> JsonDict:
-            entry = {
-                "room_id": room["room_id"],
-                "name": room["name"],
-                "topic": room["topic"],
-                "canonical_alias": room["canonical_alias"],
-                "num_joined_members": room["joined_members"],
-                "avatar_url": room["avatar"],
-                "world_readable": room["history_visibility"]
-                == HistoryVisibility.WORLD_READABLE,
-                "guest_can_join": room["guest_access"] == "can_join",
-                "join_rule": room["join_rules"],
-                "room_type": room["room_type"],
-            }
+        for room in local_public_rooms:
+            num_joined_members_buckets.setdefault(room.num_joined_members, []).append(
+                room
+            )
 
-            # Filter out Nones – rather omit the field altogether
-            return {k: v for k, v in entry.items() if v is not None}
+        nb_modules = len(self._module_api_callbacks.fetch_public_rooms_callbacks)
 
-        results = [build_room_entry(r) for r in results]
+        module_range = range(nb_modules)
+        # if not forwards:
+        #     module_range = reversed(module_range)
+
+        for module_index in module_range:
+            fetch_public_rooms = (
+                self._module_api_callbacks.fetch_public_rooms_callbacks[module_index]
+            )
+            # Ask each module for a list of public rooms given the last_joined_members
+            # value from the since token and the probing limit
+            # last_joined_members needs to be reduce by one if this module has already
+            # given its result for last_joined_members
+            module_last_joined_members = last_joined_members
+            if module_last_joined_members is not None and last_module_index is not None:
+                if forwards and module_index < last_module_index:
+                    module_last_joined_members = module_last_joined_members - 1
+                # if not forwards and module_index > last_module_index:
+                #     module_last_joined_members = module_last_joined_members - 1
+
+            module_public_rooms = await fetch_public_rooms(
+                network_tuple,
+                search_filter,
+                probing_limit,
+                (
+                    module_last_joined_members,
+                    last_room_id if last_module_index == module_index else None,
+                ),
+                forwards,
+            )
+
+            for room in module_public_rooms:
+                num_joined_members_buckets.setdefault(
+                    room.num_joined_members, []
+                ).append(room)
+                room_ids_to_module_index[room.room_id] = module_index
+
+        nums_joined_members = list(num_joined_members_buckets.keys())
+        nums_joined_members.sort(reverse=forwards)
+
+        results = []
+        for num_joined_members in nums_joined_members:
+            rooms = num_joined_members_buckets[num_joined_members]
+            # if not forwards:
+            #     rooms.reverse()
+            results += rooms
+
+        print([(r.room_id, r.num_joined_members) for r in results])
 
         response: JsonDict = {}
         num_results = len(results)
-        if limit is not None:
-            more_to_come = num_results == probing_limit
+        if limit is not None and probing_limit is not None:
+            more_to_come = num_results >= probing_limit
 
             # Depending on direction we trim either the front or back.
             if forwards:
@@ -203,46 +256,60 @@ class RoomListHandler:
         else:
             more_to_come = False
 
+        print([(r.room_id, r.num_joined_members) for r in results])
+
         if num_results > 0:
             final_entry = results[-1]
             initial_entry = results[0]
 
             if forwards:
-                if has_batch_token:
+                if since_token is not None:
                     # If there was a token given then we assume that there
                     # must be previous results.
                     response["prev_batch"] = RoomListNextBatch(
-                        last_joined_members=initial_entry["num_joined_members"],
-                        last_room_id=initial_entry["room_id"],
+                        last_joined_members=initial_entry.num_joined_members,
+                        last_room_id=initial_entry.room_id,
                         direction_is_forward=False,
+                        last_module_index=room_ids_to_module_index.get(
+                            initial_entry.room_id
+                        ),
                     ).to_token()
 
                 if more_to_come:
                     response["next_batch"] = RoomListNextBatch(
-                        last_joined_members=final_entry["num_joined_members"],
-                        last_room_id=final_entry["room_id"],
+                        last_joined_members=final_entry.num_joined_members,
+                        last_room_id=final_entry.room_id,
                         direction_is_forward=True,
+                        last_module_index=room_ids_to_module_index.get(
+                            final_entry.room_id
+                        ),
                     ).to_token()
             else:
-                if has_batch_token:
+                if since_token is not None:
                     response["next_batch"] = RoomListNextBatch(
-                        last_joined_members=final_entry["num_joined_members"],
-                        last_room_id=final_entry["room_id"],
+                        last_joined_members=final_entry.num_joined_members,
+                        last_room_id=final_entry.room_id,
                         direction_is_forward=True,
+                        last_module_index=room_ids_to_module_index.get(
+                            final_entry.room_id
+                        ),
                     ).to_token()
 
                 if more_to_come:
                     response["prev_batch"] = RoomListNextBatch(
-                        last_joined_members=initial_entry["num_joined_members"],
-                        last_room_id=initial_entry["room_id"],
+                        last_joined_members=initial_entry.num_joined_members,
+                        last_room_id=initial_entry.room_id,
                         direction_is_forward=False,
+                        last_module_index=room_ids_to_module_index.get(
+                            initial_entry.room_id
+                        ),
                     ).to_token()
 
-        response["chunk"] = results
+        response["chunk"] = [attr.asdict(r, filter=filter_none) for r in results]
 
         response["total_room_count_estimate"] = await self.store.count_public_rooms(
             network_tuple,
-            ignore_non_federatable=from_federation,
+            ignore_non_federatable=bool(from_remote_server_name),
             search_filter=search_filter,
         )
 
@@ -484,11 +551,13 @@ class RoomListNextBatch:
     last_joined_members: int  # The count to get rooms after/before
     last_room_id: str  # The room_id to get rooms after/before
     direction_is_forward: bool  # True if this is a next_batch, false if prev_batch
+    last_module_index: Optional[int] = None
 
     KEY_DICT = {
         "last_joined_members": "m",
         "last_room_id": "r",
         "direction_is_forward": "d",
+        "last_module_index": "i",
     }
 
     REVERSE_KEY_DICT = {v: k for k, v in KEY_DICT.items()}
@@ -501,6 +570,7 @@ class RoomListNextBatch:
         )
 
     def to_token(self) -> str:
+        # print(self)
         return encode_base64(
             msgpack.dumps(
                 {self.KEY_DICT[key]: val for key, val in attr.asdict(self).items()}

@@ -79,6 +79,9 @@ from synapse.module_api.callbacks.account_validity_callbacks import (
     ON_LEGACY_SEND_MAIL_CALLBACK,
     ON_USER_REGISTRATION_CALLBACK,
 )
+from synapse.module_api.callbacks.public_rooms_callbacks import (
+    FETCH_PUBLIC_ROOMS_CALLBACK,
+)
 from synapse.module_api.callbacks.spamchecker_callbacks import (
     CHECK_EVENT_FOR_SPAM_CALLBACK,
     CHECK_LOGIN_FOR_SPAM_CALLBACK,
@@ -170,6 +173,7 @@ __all__ = [
     "DirectServeJsonResource",
     "ModuleApi",
     "PRESENCE_ALL_USERS",
+    "PublicRoomChunk",
     "LoginResponse",
     "JsonDict",
     "JsonMapping",
@@ -470,6 +474,19 @@ class ModuleApi:
         """
         return self._account_data_handler.register_module_callbacks(
             on_account_data_updated=on_account_data_updated,
+        )
+
+    def register_public_rooms_callbacks(
+        self,
+        *,
+        fetch_public_rooms: Optional[FETCH_PUBLIC_ROOMS_CALLBACK] = None,
+    ) -> None:
+        """Registers callback functions related to the public room directory.
+
+        Added in Synapse v1.80.0
+        """
+        return self._callbacks.public_rooms.register_callbacks(
+            fetch_public_rooms=fetch_public_rooms,
         )
 
     def register_web_resource(self, path: str, resource: Resource) -> None:

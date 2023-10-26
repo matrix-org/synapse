@@ -1168,6 +1168,20 @@ class UserInfo:
     locked: bool
 
 
+@attr.s(auto_attribs=True, frozen=True, slots=True)
+class PublicRoom:
+    room_id: str
+    num_joined_members: int
+    world_readable: bool
+    guest_can_join: bool
+    name: Optional[str] = None
+    topic: Optional[str] = None
+    canonical_alias: Optional[str] = None
+    avatar_url: Optional[str] = None
+    join_rule: Optional[str] = None
+    room_type: Optional[str] = None
+
+
 class UserProfile(TypedDict):
     user_id: str
     display_name: Optional[str]

@@ -476,8 +476,9 @@ class PublicRoomListRestServlet(RestServlet):
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         server = parse_string(request, "server")
 
+        requester: Optional[Requester] = None
         try:
-            await self.auth.get_user_by_req(request, allow_guest=True)
+            requester = await self.auth.get_user_by_req(request, allow_guest=True)
         except InvalidClientCredentialsError as e:
             # Option to allow servers to require auth when accessing
             # /publicRooms via CS API. This is especially helpful in private
@@ -516,8 +517,15 @@ class PublicRoomListRestServlet(RestServlet):
                 server, limit=limit, since_token=since_token
             )
         else:
+            # If a user we know made this request, pass that information to the
+            # public rooms list handler.
+            if requester is None:
+                from_client_mxid = None
+            else:
+                from_client_mxid = requester.user.to_string()
+
             data = await handler.get_local_public_room_list(
-                limit=limit, since_token=since_token
+                limit=limit, since_token=since_token, from_client_mxid=from_client_mxid
             )
 
         return 200, data

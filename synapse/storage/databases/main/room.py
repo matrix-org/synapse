@@ -38,6 +38,7 @@ from synapse.api.constants import (
     Direction,
     EventContentFields,
     EventTypes,
+    HistoryVisibility,
     JoinRules,
     PublicRoomsFilterFields,
 )
@@ -61,7 +62,13 @@ from synapse.storage.util.id_generators import (
     MultiWriterIdGenerator,
     StreamIdGenerator,
 )
-from synapse.types import JsonDict, RetentionPolicy, StrCollection, ThirdPartyInstanceID
+from synapse.types import (
+    JsonDict,
+    PublicRoom,
+    RetentionPolicy,
+    StrCollection,
+    ThirdPartyInstanceID,
+)
 from synapse.util import json_encoder
 from synapse.util.caches.descriptors import cached, cachedList
 from synapse.util.stringutils import MXC_REGEX
@@ -365,21 +372,21 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         network_tuple: Optional[ThirdPartyInstanceID],
         search_filter: Optional[dict],
         limit: Optional[int],
-        bounds: Optional[Tuple[int, str]],
+        bounds: Tuple[Optional[int], Optional[str]],
         forwards: bool,
         ignore_non_federatable: bool = False,
-    ) -> List[Dict[str, Any]]:
+    ) -> List[PublicRoom]:
         """Gets the largest public rooms (where largest is in terms of joined
         members, as tracked in the statistics table).
 
         Args:
             network_tuple
             search_filter
-            limit: Maxmimum number of rows to return, unlimited otherwise.
-            bounds: An uppoer or lower bound to apply to result set if given,
+            limit: Maximum number of rows to return, unlimited otherwise.
+            bounds: An upper or lower bound to apply to result set if given,
                 consists of a joined member count and room_id (these are
                 excluded from result set).
-            forwards: true iff going forwards, going backwards otherwise
+            forwards: true if going forwards, going backwards otherwise
             ignore_non_federatable: If true filters out non-federatable rooms.
 
         Returns:
@@ -413,26 +420,18 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         # Work out the bounds if we're given them, these bounds look slightly
         # odd, but are designed to help query planner use indices by pulling
         # out a common bound.
-        if bounds:
-            last_joined_members, last_room_id = bounds
-            if forwards:
-                where_clauses.append(
-                    """
-                        joined_members <= ? AND (
-                            joined_members < ? OR room_id < ?
-                        )
-                    """
-                )
-            else:
-                where_clauses.append(
-                    """
-                        joined_members >= ? AND (
-                            joined_members > ? OR room_id > ?
-                        )
-                    """
-                )
+        last_joined_members, last_room_id = bounds
+        if last_joined_members is not None:
+            comp = "<" if forwards else ">"
 
-            query_args += [last_joined_members, last_joined_members, last_room_id]
+            clause = f"joined_members {comp} ?"
+            query_args += [last_joined_members]
+
+            if last_room_id is not None:
+                clause += f" OR (joined_members = ? AND room_id {comp} ?)"
+                query_args += [last_joined_members, last_room_id]
+
+            where_clauses.append(clause)
 
         if ignore_non_federatable:
             where_clauses.append("is_federatable")
@@ -518,7 +517,25 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         ret_val = await self.db_pool.runInteraction(
             "get_largest_public_rooms", _get_largest_public_rooms_txn
         )
-        return ret_val
+
+        def build_room_entry(room: JsonDict) -> PublicRoom:
+            entry = PublicRoom(
+                room_id=room["room_id"],
+                name=room["name"],
+                topic=room["topic"],
+                canonical_alias=room["canonical_alias"],
+                num_joined_members=room["joined_members"],
+                avatar_url=room["avatar"],
+                world_readable=room["history_visibility"]
+                == HistoryVisibility.WORLD_READABLE,
+                guest_can_join=room["guest_access"] == "can_join",
+                join_rule=room["join_rules"],
+                room_type=room["room_type"],
+            )
+
+            return entry
+
+        return [build_room_entry(r) for r in ret_val]
 
     @cached(max_entries=10000)
     async def is_room_blocked(self, room_id: str) -> Optional[bool]:
