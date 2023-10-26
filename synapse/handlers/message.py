@@ -999,10 +999,16 @@ class EventCreationHandler:
             raise ShadowBanError()
 
         if ratelimit:
+            room_version = await self.store.get_room_version(event_dict["room_id"])
+            if room_version.updated_redaction_rules:
+                redacts = event_dict["content"].get("redacts")
+            else:
+                redacts = event_dict.get("redacts")
+
             is_admin_redaction = await self.is_admin_redaction(
                 event_type=event_dict["type"],
                 sender=event_dict["sender"],
-                redacts=event_dict.get("redacts"),
+                redacts=redacts,
             )
             await self.request_ratelimiter.ratelimit(
                 requester, is_admin_redaction=is_admin_redaction, update=False
