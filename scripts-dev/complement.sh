@@ -277,6 +277,8 @@ fi
 # particularly tricky.
 export PASS_SYNAPSE_LOG_TESTING=1
 
+env
+
 # Run the tests!
 echo "Images built; running complement with ${extra_test_args[@]} $@ $test_packages"
 cd "$COMPLEMENT_DIR"
