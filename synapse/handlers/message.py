@@ -999,7 +999,13 @@ class EventCreationHandler:
             raise ShadowBanError()
 
         if ratelimit:
-            room_version = await self.store.get_room_version(event_dict["room_id"])
+            room_id = event_dict["room_id"]
+            try:
+                room_version = await self.store.get_room_version(room_id)
+            except NotFoundError:
+                # If the room doesnt' exist.
+                raise AuthError(403, f"User {requester.user} not in room {room_id}")
+
             if room_version.updated_redaction_rules:
                 redacts = event_dict["content"].get("redacts")
             else:
