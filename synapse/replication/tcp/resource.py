@@ -204,13 +204,23 @@ class ReplicationStreamer:
                             # The token has advanced but there is no data to
                             # send, so we send a `POSITION` to inform other
                             # workers of the updated position.
+                            #
+                            # There are two reasons for this: 1) this instance
+                            # requested a stream ID but didn't use it, or 2)
+                            # this instance advanced its own stream position due
+                            # to receiving notifications about other instances
+                            # advancing their stream position.
 
-                            # We skip this for the `caches` stream as a) it
-                            # generates a lot of traffic as every worker would
-                            # echo each write, and b) nothing cares if a given
-                            # worker's caches stream position lags.
+                            # We skip sending `POSITION` for the `caches` stream
+                            # for the second case as a) it generates a lot of
+                            # traffic as every worker would echo each write, and
+                            # b) nothing cares if a given worker's caches stream
+                            # position lags.
                             if stream.NAME == CachesStream.NAME:
-                                continue
+                                # If there haven't been any writes since the
+                                # `last_token` then we're in the second case.
+                                if stream.minimal_local_current_token() <= last_token:
+                                    continue
 
                             # Note: `last_token` may not *actually* be the
                             # last token we sent out in a RDATA or POSITION.
