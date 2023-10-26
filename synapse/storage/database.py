@@ -605,13 +605,16 @@ class DatabasePool:
 
         If the background updates have not completed, wait 15 sec and check again.
         """
-        updates = await self.simple_select_list(
-            "background_updates",
-            keyvalues=None,
-            retcols=["update_name"],
-            desc="check_background_updates",
+        updates = cast(
+            List[Tuple[str]],
+            await self.simple_select_list(
+                "background_updates",
+                keyvalues=None,
+                retcols=["update_name"],
+                desc="check_background_updates",
+            ),
         )
-        background_update_names = [x["update_name"] for x in updates]
+        background_update_names = [x[0] for x in updates]
 
         for table, update_name in UNIQUE_INDEX_BACKGROUND_UPDATES.items():
             if update_name not in background_update_names:
@@ -1780,9 +1783,9 @@ class DatabasePool:
         keyvalues: Optional[Dict[str, Any]],
         retcols: Collection[str],
         desc: str = "simple_select_list",
-    ) -> List[Dict[str, Any]]:
+    ) -> List[Tuple[Any, ...]]:
         """Executes a SELECT query on the named table, which may return zero or
-        more rows, returning the result as a list of dicts.
+        more rows, returning the result as a list of tuples.
 
         Args:
             table: the table name
@@ -1793,8 +1796,7 @@ class DatabasePool:
             desc: description of the transaction, for logging and metrics
 
         Returns:
-            A list of dictionaries, one per result row, each a mapping between the
-            column names from `retcols` and that column's value for the row.
+            A list of tuples, one per result row, each the retcolumn's value for the row.
         """
         return await self.runInteraction(
             desc,
@@ -1812,9 +1814,9 @@ class DatabasePool:
         table: str,
         keyvalues: Optional[Dict[str, Any]],
         retcols: Iterable[str],
-    ) -> List[Dict[str, Any]]:
+    ) -> List[Tuple[Any, ...]]:
         """Executes a SELECT query on the named table, which may return zero or
-        more rows, returning the result as a list of dicts.
+        more rows, returning the result as a list of tuples.
 
         Args:
             txn: Transaction object
@@ -1825,8 +1827,7 @@ class DatabasePool:
             retcols: the names of the columns to return
 
         Returns:
-            A list of dictionaries, one per result row, each a mapping between the
-            column names from `retcols` and that column's value for the row.
+            A list of tuples, one per result row, each the retcolumn's value for the row.
         """
         if keyvalues:
             sql = "SELECT %s FROM %s WHERE %s" % (
@@ -1839,7 +1840,7 @@ class DatabasePool:
             sql = "SELECT %s FROM %s" % (", ".join(retcols), table)
             txn.execute(sql)
 
-        return cls.cursor_to_dict(txn)
+        return txn.fetchall()
 
     async def simple_select_many_batch(
         self,

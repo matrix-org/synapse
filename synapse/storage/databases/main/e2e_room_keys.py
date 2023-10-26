@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import TYPE_CHECKING, Dict, Iterable, Mapping, Optional, Tuple, cast
+from typing import TYPE_CHECKING, Dict, Iterable, List, Mapping, Optional, Tuple, cast
 
 from typing_extensions import Literal, TypedDict
 
@@ -274,32 +274,41 @@ class EndToEndRoomKeyStore(EndToEndRoomKeyBackgroundStore):
             if session_id:
                 keyvalues["session_id"] = session_id
 
-        rows = await self.db_pool.simple_select_list(
-            table="e2e_room_keys",
-            keyvalues=keyvalues,
-            retcols=(
-                "user_id",
-                "room_id",
-                "session_id",
-                "first_message_index",
-                "forwarded_count",
-                "is_verified",
-                "session_data",
+        rows = cast(
+            List[Tuple[str, str, int, int, int, str]],
+            await self.db_pool.simple_select_list(
+                table="e2e_room_keys",
+                keyvalues=keyvalues,
+                retcols=(
+                    "room_id",
+                    "session_id",
+                    "first_message_index",
+                    "forwarded_count",
+                    "is_verified",
+                    "session_data",
+                ),
+                desc="get_e2e_room_keys",
             ),
-            desc="get_e2e_room_keys",
         )
 
         sessions: Dict[
             Literal["rooms"], Dict[str, Dict[Literal["sessions"], Dict[str, RoomKey]]]
         ] = {"rooms": {}}
-        for row in rows:
-            room_entry = sessions["rooms"].setdefault(row["room_id"], {"sessions": {}})
-            room_entry["sessions"][row["session_id"]] = {
-                "first_message_index": row["first_message_index"],
-                "forwarded_count": row["forwarded_count"],
+        for (
+            room_id,
+            session_id,
+            first_message_index,
+            forwarded_count,
+            is_verified,
+            session_data,
+        ) in rows:
+            room_entry = sessions["rooms"].setdefault(room_id, {"sessions": {}})
+            room_entry["sessions"][session_id] = {
+                "first_message_index": first_message_index,
+                "forwarded_count": forwarded_count,
                 # is_verified must be returned to the client as a boolean
-                "is_verified": bool(row["is_verified"]),
-                "session_data": db_to_json(row["session_data"]),
+                "is_verified": bool(is_verified),
+                "session_data": db_to_json(session_data),
             }
 
         return sessions

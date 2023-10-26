@@ -103,10 +103,10 @@ class DeactivateAccountHandler:
         # Attempt to unbind any known bound threepids to this account from identity
         # server(s).
         bound_threepids = await self.store.user_get_bound_threepids(user_id)
-        for threepid in bound_threepids:
+        for medium, address in bound_threepids:
             try:
                 result = await self._identity_handler.try_unbind_threepid(
-                    user_id, threepid["medium"], threepid["address"], id_server
+                    user_id, medium, address, id_server
                 )
             except Exception:
                 # Do we want this to be a fatal error or should we carry on?
