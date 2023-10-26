@@ -358,9 +358,9 @@ class WorkerConfig(Config):
                 "Must only specify one instance to handle `account_data` messages."
             )
 
-        if len(self.writers.receipts) != 1:
+        if len(self.writers.receipts) == 0:
             raise ConfigError(
-                "Must only specify one instance to handle `receipts` messages."
+                "Must specify at least one instance to handle `receipts` messages."
             )
 
         if len(self.writers.events) == 0:

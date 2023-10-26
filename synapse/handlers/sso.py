@@ -1206,10 +1206,7 @@ class SsoHandler:
         # We have no guarantee that all the devices of that session are for the same
         # `user_id`. Hence, we have to iterate over the list of devices and log them out
         # one by one.
-        for device in devices:
-            user_id = device["user_id"]
-            device_id = device["device_id"]
-
+        for user_id, device_id in devices:
             # If the user_id associated with that device/session is not the one we got
             # out of the `sub` claim, skip that device and show log an error.
             if expected_user_id is not None and user_id != expected_user_id:
