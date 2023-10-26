@@ -999,7 +999,14 @@ class EventCreationHandler:
             raise ShadowBanError()
 
         if ratelimit:
-            await self.request_ratelimiter.ratelimit(requester, update=False)
+            is_admin_redaction = await self.is_admin_redaction(
+                event_type=event_dict["type"],
+                sender=event_dict["sender"],
+                redacts=event_dict.get("redacts"),
+            )
+            await self.request_ratelimiter.ratelimit(
+                requester, is_admin_redaction=is_admin_redaction, update=False
+            )
 
         # We limit the number of concurrent event sends in a room so that we
         # don't fork the DAG too much. If we don't limit then we can end up in
@@ -1538,6 +1545,15 @@ class EventCreationHandler:
                     # stream_ordering entry manually (as it was persisted on
                     # another worker).
                     event.internal_metadata.stream_ordering = stream_id
+
+                if ratelimit:
+                    is_admin_redaction = await self.is_admin_redaction(
+                        event.type, event.sender, event.redacts
+                    )
+                    await self.request_ratelimiter.ratelimit(
+                        requester, is_admin_redaction=is_admin_redaction
+                    )
+
                 return event
 
             event = await self.persist_and_notify_client_events(
@@ -1696,21 +1712,9 @@ class EventCreationHandler:
                 # can apply different ratelimiting. We do this by simply checking
                 # it's not a self-redaction (to avoid having to look up whether the
                 # user is actually admin or not).
-                is_admin_redaction = False
-                if event.type == EventTypes.Redaction:
-                    assert event.redacts is not None
-
-                    original_event = await self.store.get_event(
-                        event.redacts,
-                        redact_behaviour=EventRedactBehaviour.as_is,
-                        get_prev_content=False,
-                        allow_rejected=False,
-                        allow_none=True,
-                    )
-
-                    is_admin_redaction = bool(
-                        original_event and event.sender != original_event.sender
-                    )
+                is_admin_redaction = await self.is_admin_redaction(
+                    event.type, event.sender, event.redacts
+                )
 
                 await self.request_ratelimiter.ratelimit(
                     requester, is_admin_redaction=is_admin_redaction
@@ -1929,6 +1933,27 @@ class EventCreationHandler:
         run_in_background(_notify)
 
         return persisted_events[-1]
+
+    async def is_admin_redaction(
+        self, event_type: str, sender: str, redacts: Optional[str]
+    ) -> bool:
+        is_admin_redaction = False
+        if event_type == EventTypes.Redaction:
+            assert redacts is not None
+
+            original_event = await self.store.get_event(
+                redacts,
+                redact_behaviour=EventRedactBehaviour.as_is,
+                get_prev_content=False,
+                allow_rejected=False,
+                allow_none=True,
+            )
+
+            is_admin_redaction = bool(
+                original_event and sender != original_event.sender
+            )
+
+        return is_admin_redaction
 
     async def _maybe_kick_guest_users(
         self, event: EventBase, context: EventContext
