@@ -23,6 +23,7 @@ from typing import (
     Generator,
     Iterable,
     List,
+    Mapping,
     Optional,
     Tuple,
     TypeVar,
@@ -39,6 +40,7 @@ from twisted.web.resource import Resource
 
 from synapse.api import errors
 from synapse.api.errors import SynapseError
+from synapse.api.presence import UserPresenceState
 from synapse.config import ConfigError
 from synapse.events import EventBase
 from synapse.events.presence_router import (
@@ -1183,6 +1185,37 @@ class ModuleApi:
             await presence_handler.get_federation_queue().send_presence_to_destinations(
                 presence_events, [destination]
             )
+
+    async def set_presence_for_users(
+        self, users: Mapping[str, Tuple[str, Optional[str]]]
+    ) -> None:
+        """
+        Update the internal presence state of users.
+
+        This can be used for either local or remote users.
+
+        Note that this method can only be run on the process that is configured to write to the
+        presence stream. By default, this is the main process.
+
+        Added in Synapse v1.96.0.
+        """
+
+        # We pull out the presence handler here to break a cyclic
+        # dependency between the presence router and module API.
+        presence_handler = self._hs.get_presence_handler()
+
+        from synapse.handlers.presence import PresenceHandler
+
+        assert isinstance(presence_handler, PresenceHandler)
+
+        states = await presence_handler.current_state_for_users(users.keys())
+        for user_id, (state, status_msg) in users.items():
+            prev_state = states.setdefault(user_id, UserPresenceState.default(user_id))
+            states[user_id] = prev_state.copy_and_replace(
+                state=state, status_msg=status_msg
+            )
+
+        await presence_handler._update_states(states.values(), force_notify=True)
 
     def looping_background_call(
         self,

@@ -230,6 +230,13 @@ Example configuration:
 presence:
   enabled: false
 ```
+
+`enabled` can also be set to a special value of "untracked" which ignores updates
+received via clients and federation, while still accepting updates from the
+[module API](../../modules/index.md).
+
+*The "untracked" option was added in Synapse 1.96.0.*
+
 ---
 ### `require_auth_for_profile_requests`
 

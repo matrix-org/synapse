@@ -439,7 +439,7 @@ class InitialSyncHandler:
 
         async def get_presence() -> List[JsonDict]:
             # If presence is disabled, return an empty list
-            if not self.hs.config.server.use_presence:
+            if not self.hs.config.server.presence_enabled:
                 return []
 
             states = await presence_handler.get_states(

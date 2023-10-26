@@ -50,7 +50,7 @@ class PresenceTestCase(unittest.HomeserverTestCase):
         PUT to the status endpoint with use_presence enabled will call
         set_state on the presence handler.
         """
-        self.hs.config.server.use_presence = True
+        self.hs.config.server.presence_enabled = True
 
         body = {"presence": "here", "status_msg": "beep boop"}
         channel = self.make_request(
@@ -63,7 +63,22 @@ class PresenceTestCase(unittest.HomeserverTestCase):
     @unittest.override_config({"use_presence": False})
     def test_put_presence_disabled(self) -> None:
         """
-        PUT to the status endpoint with use_presence disabled will NOT call
+        PUT to the status endpoint with presence disabled will NOT call
+        set_state on the presence handler.
+        """
+
+        body = {"presence": "here", "status_msg": "beep boop"}
+        channel = self.make_request(
+            "PUT", "/presence/%s/status" % (self.user_id,), body
+        )
+
+        self.assertEqual(channel.code, HTTPStatus.OK)
+        self.assertEqual(self.presence_handler.set_state.call_count, 0)
+
+    @unittest.override_config({"presence": {"enabled": "untracked"}})
+    def test_put_presence_untracked(self) -> None:
+        """
+        PUT to the status endpoint with presence untracked will NOT call
         set_state on the presence handler.
         """
 
