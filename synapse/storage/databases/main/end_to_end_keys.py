@@ -52,7 +52,7 @@ from synapse.storage.database import (
 from synapse.storage.databases.main.cache import CacheInvalidationWorkerStore
 from synapse.storage.engines import PostgresEngine
 from synapse.storage.util.id_generators import StreamIdGenerator
-from synapse.types import JsonDict, JsonMapping
+from synapse.types import JsonDict, JsonMapping, JsonSerializable
 from synapse.util import json_decoder, json_encoder
 from synapse.util.caches.descriptors import cached, cachedList
 from synapse.util.cancellation import cancellable
@@ -1112,7 +1112,8 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
     async def claim_e2e_one_time_keys(
         self, query_list: Iterable[Tuple[str, str, str, int]]
     ) -> Tuple[
-        Dict[str, Dict[str, Dict[str, JsonDict]]], List[Tuple[str, str, str, int]]
+        Dict[str, Dict[str, Dict[str, JsonSerializable]]],
+        List[Tuple[str, str, str, int]],
     ]:
         """Take a list of one time keys out of the database.
 
@@ -1121,7 +1122,7 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
 
         Returns:
             A tuple pf:
-                A map of user ID -> a map device ID -> a map of key ID -> JSON.
+                A map of user ID -> a map device ID -> a map of key ID -> key
 
                 A copy of the input which has not been fulfilled.
         """
@@ -1214,7 +1215,7 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
                 (f"{algorithm}:{key_id}", key_json) for key_id, key_json in otk_rows
             ]
 
-        results: Dict[str, Dict[str, Dict[str, JsonDict]]] = {}
+        results: Dict[str, Dict[str, Dict[str, JsonSerializable]]] = {}
         missing: List[Tuple[str, str, str, int]] = []
         for user_id, device_id, algorithm, count in query_list:
             if self.database_engine.supports_returning:
@@ -1240,7 +1241,11 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
                     device_id, {}
                 )
                 for claim_row in claim_rows:
-                    device_results[claim_row[0]] = json_decoder.decode(claim_row[1])
+                    # The shape of the key depends on the algorithm: it is a dict for
+                    # signed_curve25519, or a string for curve25519. In general, it
+                    # is whatever the client chose to upload, since we dont validate it.
+                    decoded_key: JsonSerializable = json_decoder.decode(claim_row[1])
+                    device_results[claim_row[0]] = decoded_key
             # Did we get enough OTKs?
             count -= len(claim_rows)
             if count:
@@ -1250,7 +1255,7 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
 
     async def claim_e2e_fallback_keys(
         self, query_list: Iterable[Tuple[str, str, str, bool]]
-    ) -> Dict[str, Dict[str, Dict[str, JsonDict]]]:
+    ) -> Dict[str, Dict[str, Dict[str, JsonSerializable]]]:
         """Take a list of fallback keys out of the database.
 
         Args:
@@ -1260,7 +1265,7 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
         Returns:
             A map of user ID -> a map device ID -> a map of key ID -> JSON.
         """
-        results: Dict[str, Dict[str, Dict[str, JsonDict]]] = {}
+        results: Dict[str, Dict[str, Dict[str, JsonSerializable]]] = {}
         for user_id, device_id, algorithm, mark_as_used in query_list:
             row = await self.db_pool.simple_select_one(
                 table="e2e_fallback_keys_json",
@@ -1298,7 +1303,11 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
                 )
 
             device_results = results.setdefault(user_id, {}).setdefault(device_id, {})
-            device_results[f"{algorithm}:{key_id}"] = json_decoder.decode(key_json)
+            # The shape of the key depends on the algorithm: it is a dict for
+            # signed_curve25519, or a string for curve25519. In general, it
+            # is whatever the client chose to upload, since we dont validate it.
+            decoded_key: JsonSerializable = json_decoder.decode(key_json)
+            device_results[f"{algorithm}:{key_id}"] = decoded_key
 
         return results
 

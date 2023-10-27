@@ -861,7 +861,7 @@ class ApplicationServicesHandler:
 
         Returns:
             A tuple of:
-                A map of user ID -> a map device ID -> a map of key ID -> JSON.
+                A map of user ID -> a map device ID -> a map of key ID -> key.
 
                 A copy of the input which has not been fulfilled (either because
                 they are not appservice users or the appservice does not support

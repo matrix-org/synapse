@@ -32,6 +32,7 @@ from synapse.logging.opentracing import log_kv, set_tag, tag_args, trace
 from synapse.types import (
     JsonDict,
     JsonMapping,
+    JsonSerializable,
     UserID,
     get_domain_from_id,
     get_verify_key_from_cross_signing_key,
@@ -560,7 +561,7 @@ class E2eKeysHandler:
         self,
         local_query: List[Tuple[str, str, str, int]],
         always_include_fallback_keys: bool,
-    ) -> Iterable[Dict[str, Dict[str, Dict[str, JsonDict]]]]:
+    ) -> Iterable[Mapping[str, Mapping[str, Mapping[str, JsonSerializable]]]]:
         """Claim one time keys for local users.
 
         1. Attempt to claim OTKs from the database.
@@ -572,7 +573,7 @@ class E2eKeysHandler:
             always_include_fallback_keys: True to always include fallback keys.
 
         Returns:
-            An iterable of maps of user ID -> a map device ID -> a map of key ID -> JSON bytes.
+            An iterable of maps of user ID -> a map device ID -> a map of key ID -> key.
         """
 
         # Cap the number of OTKs that can be claimed at once to avoid abuse.
@@ -680,7 +681,7 @@ class E2eKeysHandler:
         )
 
         # A map of user ID -> device ID -> key ID -> key.
-        json_result: Dict[str, Dict[str, Dict[str, JsonDict]]] = {}
+        json_result: Dict[str, Dict[str, Dict[str, JsonSerializable]]] = {}
         for result in results:
             for user_id, device_keys in result.items():
                 for device_id, keys in device_keys.items():
