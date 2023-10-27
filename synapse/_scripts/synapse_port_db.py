@@ -191,7 +191,7 @@ IGNORED_TABLES = {
     "user_directory_search_stat",
     "user_directory_search_pos",
     "users_who_share_private_rooms",
-    "users_in_public_room",
+    "users_in_public_rooms",
     # UI auth sessions have foreign keys so additional care needs to be taken,
     # the sessions are transient anyway, so ignore them.
     "ui_auth_sessions",
