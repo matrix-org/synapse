@@ -611,13 +611,13 @@ class ReplicationCommandHandler:
         # Find where we previously streamed up to.
         current_token = stream.current_token(cmd.instance_name)
 
-        # If the position token matches our current token then we're up to date
-        # and there's nothing to do. Otherwise, fetch all updates between then
-        # and now.
+        # If the incoming previous position is less than our current position
+	    # then we're up to date and there's nothing to do. Otherwise, fetch
+	    # all updates between then and now.
         #
-        # Note: We have to check that `current_token` is within the range, to
-        # handle the case where the stream gets "reset" (e.g. for `caches` and
-        # `typing` after the writer's restart).
+        # Note: We also have to check that `current_token` is at least the
+        # new position, to handle the case where the stream gets "reset" 
+        # (e.g. for `caches` and `typing` after the writer's restart).
         missing_updates = not (cmd.prev_token <= current_token <= cmd.new_token)
         while missing_updates:
             # Note: There may very well not be any new updates, but we check to
