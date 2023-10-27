@@ -1128,19 +1128,18 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
                 may be less than the input counts. In this case, the returned counts
                 are the number of claims that were not fulfilled.
         """
-
         results: Dict[str, Dict[str, Dict[str, JsonDict]]] = {}
         missing: List[Tuple[str, str, str, int]] = []
-        if self.database_engine.supports_returning:
-            # If we support RETURNING clause we can use a single query that
-            # allows us to use autocommit mode.
+        if isinstance(self.database_engine, PostgresEngine):
+            # If we can use execute_values we can use a single batch query
+            # in autocommit mode.
             unfulfilled_claim_counts: Dict[Tuple[str, str, str], int] = {}
             for user_id, device_id, algorithm, count in query_list:
                 unfulfilled_claim_counts[user_id, device_id, algorithm] = count
 
             bulk_claims = await self.db_pool.runInteraction(
                 "claim_e2e_one_time_keys",
-                self._claim_e2e_one_time_keys_returning,
+                self._claim_e2e_one_time_keys_bulk,
                 query_list,
                 db_autocommit=True,
             )
@@ -1283,7 +1282,7 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
         return [(f"{algorithm}:{key_id}", key_json) for key_id, key_json in otk_rows]
 
     @trace
-    def _claim_e2e_one_time_keys_returning(
+    def _claim_e2e_one_time_keys_bulk(
         self,
         txn: LoggingTransaction,
         query_list: Iterable[Tuple[str, str, str, int]],
