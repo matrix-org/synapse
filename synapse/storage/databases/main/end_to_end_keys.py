@@ -1217,24 +1217,17 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
         results: Dict[str, Dict[str, Dict[str, JsonDict]]] = {}
         missing: List[Tuple[str, str, str, int]] = []
         if self.database_engine.supports_returning:
+            # If we support RETURNING clause we can use a single query that
+            # allows us to use autocommit mode.
             for user_id, device_id, algorithm, count in query_list:
-                if self.database_engine.supports_returning:
-                    # If we support RETURNING clause we can use a single query that
-                    # allows us to use autocommit mode.
-                    _claim_e2e_one_time_key = _claim_e2e_one_time_key_returning
-                    db_autocommit = True
-                else:
-                    _claim_e2e_one_time_key = _claim_e2e_one_time_key_simple
-                    db_autocommit = False
-
                 claim_rows = await self.db_pool.runInteraction(
                     "claim_e2e_one_time_keys",
-                    _claim_e2e_one_time_key,
+                    _claim_e2e_one_time_key_returning,
                     user_id,
                     device_id,
                     algorithm,
                     count,
-                    db_autocommit=db_autocommit,
+                    db_autocommit=True,
                 )
                 if claim_rows:
                     device_results = results.setdefault(user_id, {}).setdefault(
@@ -1248,23 +1241,14 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
                     missing.append((user_id, device_id, algorithm, count))
         else:
             for user_id, device_id, algorithm, count in query_list:
-                if self.database_engine.supports_returning:
-                    # If we support RETURNING clause we can use a single query that
-                    # allows us to use autocommit mode.
-                    _claim_e2e_one_time_key = _claim_e2e_one_time_key_returning
-                    db_autocommit = True
-                else:
-                    _claim_e2e_one_time_key = _claim_e2e_one_time_key_simple
-                    db_autocommit = False
-
                 claim_rows = await self.db_pool.runInteraction(
                     "claim_e2e_one_time_keys",
-                    _claim_e2e_one_time_key,
+                    _claim_e2e_one_time_key_simple,
                     user_id,
                     device_id,
                     algorithm,
                     count,
-                    db_autocommit=db_autocommit,
+                    db_autocommit=False,
                 )
                 if claim_rows:
                     device_results = results.setdefault(user_id, {}).setdefault(
