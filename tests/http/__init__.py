@@ -15,14 +15,20 @@ import os.path
 import subprocess
 from typing import List
 
+from incremental import Version
 from zope.interface import implementer
 
+import twisted
 from OpenSSL import SSL
 from OpenSSL.SSL import Connection
 from twisted.internet.address import IPv4Address
-from twisted.internet.interfaces import IOpenSSLServerConnectionCreator
+from twisted.internet.interfaces import (
+    IOpenSSLServerConnectionCreator,
+    IProtocolFactory,
+    IReactorTime,
+)
 from twisted.internet.ssl import Certificate, trustRootFromCertificates
-from twisted.protocols.tls import TLSMemoryBIOProtocol
+from twisted.protocols.tls import TLSMemoryBIOFactory, TLSMemoryBIOProtocol
 from twisted.web.client import BrowserLikePolicyForHTTPS  # noqa: F401
 from twisted.web.iweb import IPolicyForHTTPS  # noqa: F401
 
@@ -151,6 +157,33 @@ class TestServerTLSConnectionFactory:
         ctx.use_certificate_file(self._cert_file)
         ctx.use_privatekey_file(get_test_key_file())
         return Connection(ctx, None)
+
+
+def wrap_server_factory_for_tls(
+    factory: IProtocolFactory, clock: IReactorTime, sanlist: List[bytes]
+) -> TLSMemoryBIOFactory:
+    """Wrap an existing Protocol Factory with a test TLSMemoryBIOFactory
+
+    The resultant factory will create a TLS server which presents a certificate
+    signed by our test CA, valid for the domains in `sanlist`
+
+    Args:
+        factory: protocol factory to wrap
+        sanlist: list of domains the cert should be valid for
+
+    Returns:
+        interfaces.IProtocolFactory
+    """
+    connection_creator = TestServerTLSConnectionFactory(sanlist=sanlist)
+    # Twisted > 23.8.0 has a different API that accepts a clock.
+    if twisted.version <= Version("Twisted", 23, 8, 0):
+        return TLSMemoryBIOFactory(
+            connection_creator, isClient=False, wrappedFactory=factory
+        )
+    else:
+        return TLSMemoryBIOFactory(
+            connection_creator, isClient=False, wrappedFactory=factory, clock=clock  # type: ignore[call-arg]
+        )
 
 
 # A dummy address, useful for tests that use FakeTransport and don't care about where

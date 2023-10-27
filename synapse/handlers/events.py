@@ -120,7 +120,7 @@ class EventStreamHandler:
 
             events.extend(to_add)
 
-            chunks = self._event_serializer.serialize_events(
+            chunks = await self._event_serializer.serialize_events(
                 events,
                 time_now,
                 config=SerializeEventConfig(

@@ -45,14 +45,17 @@ class TagsWorkerStore(AccountDataWorkerStore):
             tag content.
         """
 
-        rows = await self.db_pool.simple_select_list(
-            "room_tags", {"user_id": user_id}, ["room_id", "tag", "content"]
+        rows = cast(
+            List[Tuple[str, str, str]],
+            await self.db_pool.simple_select_list(
+                "room_tags", {"user_id": user_id}, ["room_id", "tag", "content"]
+            ),
         )
 
         tags_by_room: Dict[str, Dict[str, JsonDict]] = {}
-        for row in rows:
-            room_tags = tags_by_room.setdefault(row["room_id"], {})
-            room_tags[row["tag"]] = db_to_json(row["content"])
+        for room_id, tag, content in rows:
+            room_tags = tags_by_room.setdefault(room_id, {})
+            room_tags[tag] = db_to_json(content)
         return tags_by_room
 
     async def get_all_updated_tags(
@@ -161,13 +164,16 @@ class TagsWorkerStore(AccountDataWorkerStore):
         Returns:
             A mapping of tags to tag content.
         """
-        rows = await self.db_pool.simple_select_list(
-            table="room_tags",
-            keyvalues={"user_id": user_id, "room_id": room_id},
-            retcols=("tag", "content"),
-            desc="get_tags_for_room",
+        rows = cast(
+            List[Tuple[str, str]],
+            await self.db_pool.simple_select_list(
+                table="room_tags",
+                keyvalues={"user_id": user_id, "room_id": room_id},
+                retcols=("tag", "content"),
+                desc="get_tags_for_room",
+            ),
         )
-        return {row["tag"]: db_to_json(row["content"]) for row in rows}
+        return {tag: db_to_json(content) for tag, content in rows}
 
     async def add_tag_to_room(
         self, user_id: str, room_id: str, tag: str, content: JsonDict

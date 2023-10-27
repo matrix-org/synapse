@@ -940,7 +940,7 @@ class RoomMemberWorkerStore(EventsWorkerStore, CacheInvalidationWorkerStore):
         like_clause = "%:" + host
 
         rows = await self.db_pool.execute(
-            "is_host_joined", None, sql, membership, room_id, like_clause
+            "is_host_joined", sql, membership, room_id, like_clause
         )
 
         if not rows:
@@ -1070,13 +1070,16 @@ class RoomMemberWorkerStore(EventsWorkerStore, CacheInvalidationWorkerStore):
         for fully-joined rooms.
         """
 
-        rows = await self.db_pool.simple_select_list(
-            "current_state_events",
-            keyvalues={"room_id": room_id},
-            retcols=("event_id", "membership"),
-            desc="has_completed_background_updates",
+        rows = cast(
+            List[Tuple[str, Optional[str]]],
+            await self.db_pool.simple_select_list(
+                "current_state_events",
+                keyvalues={"room_id": room_id},
+                retcols=("event_id", "membership"),
+                desc="has_completed_background_updates",
+            ),
         )
-        return {row["event_id"]: row["membership"] for row in rows}
+        return dict(rows)
 
     # TODO This returns a mutable object, which is generally confusing when using a cache.
     @cached(max_entries=10000)  # type: ignore[synapse-@cached-mutable]
@@ -1165,7 +1168,7 @@ class RoomMemberWorkerStore(EventsWorkerStore, CacheInvalidationWorkerStore):
                 AND forgotten = 0;
         """
 
-        rows = await self.db_pool.execute("is_forgotten_room", None, sql, room_id)
+        rows = await self.db_pool.execute("is_forgotten_room", sql, room_id)
 
         # `count(*)` returns always an integer
         # If any rows still exist it means someone has not forgotten this room yet

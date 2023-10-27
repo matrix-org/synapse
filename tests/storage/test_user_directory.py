@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import re
-from typing import Any, Dict, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple, cast
 from unittest import mock
 from unittest.mock import Mock, patch
 
@@ -62,14 +62,13 @@ class GetUserDirectoryTables:
         Returns a list of tuples (user_id, room_id) where room_id is public and
         contains the user with the given id.
         """
-        r = await self.store.db_pool.simple_select_list(
-            "users_in_public_rooms", None, ("user_id", "room_id")
+        r = cast(
+            List[Tuple[str, str]],
+            await self.store.db_pool.simple_select_list(
+                "users_in_public_rooms", None, ("user_id", "room_id")
+            ),
         )
-
-        retval = set()
-        for i in r:
-            retval.add((i["user_id"], i["room_id"]))
-        return retval
+        return set(r)
 
     async def get_users_who_share_private_rooms(self) -> Set[Tuple[str, str, str]]:
         """Fetch the entire `users_who_share_private_rooms` table.
@@ -78,27 +77,30 @@ class GetUserDirectoryTables:
         to the rows of `users_who_share_private_rooms`.
         """
 
-        rows = await self.store.db_pool.simple_select_list(
-            "users_who_share_private_rooms",
-            None,
-            ["user_id", "other_user_id", "room_id"],
+        rows = cast(
+            List[Tuple[str, str, str]],
+            await self.store.db_pool.simple_select_list(
+                "users_who_share_private_rooms",
+                None,
+                ["user_id", "other_user_id", "room_id"],
+            ),
         )
-        rv = set()
-        for row in rows:
-            rv.add((row["user_id"], row["other_user_id"], row["room_id"]))
-        return rv
+        return set(rows)
 
     async def get_users_in_user_directory(self) -> Set[str]:
         """Fetch the set of users in the `user_directory` table.
 
         This is useful when checking we've correctly excluded users from the directory.
         """
-        result = await self.store.db_pool.simple_select_list(
-            "user_directory",
-            None,
-            ["user_id"],
+        result = cast(
+            List[Tuple[str]],
+            await self.store.db_pool.simple_select_list(
+                "user_directory",
+                None,
+                ["user_id"],
+            ),
         )
-        return {row["user_id"] for row in result}
+        return {row[0] for row in result}
 
     async def get_profiles_in_user_directory(self) -> Dict[str, ProfileInfo]:
         """Fetch users and their profiles from the `user_directory` table.
@@ -107,16 +109,17 @@ class GetUserDirectoryTables:
         It's almost the entire contents of the `user_directory` table: the only
         thing missing is an unused room_id column.
         """
-        rows = await self.store.db_pool.simple_select_list(
-            "user_directory",
-            None,
-            ("user_id", "display_name", "avatar_url"),
+        rows = cast(
+            List[Tuple[str, Optional[str], Optional[str]]],
+            await self.store.db_pool.simple_select_list(
+                "user_directory",
+                None,
+                ("user_id", "display_name", "avatar_url"),
+            ),
         )
         return {
-            row["user_id"]: ProfileInfo(
-                display_name=row["display_name"], avatar_url=row["avatar_url"]
-            )
-            for row in rows
+            user_id: ProfileInfo(display_name=display_name, avatar_url=avatar_url)
+            for user_id, display_name, avatar_url in rows
         }
 
     async def get_tables(

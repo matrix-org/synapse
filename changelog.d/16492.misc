@@ -1,0 +1,1 @@
+Improve performance of delete device messages query, cf issue [16479](https://github.com/matrix-org/synapse/issues/16479).
