@@ -682,8 +682,13 @@ class E2eKeysHandler:
                 domain = get_domain_from_id(user_id)
                 remote_queries.setdefault(domain, {})[user_id] = one_time_keys
 
-        set_tag("local_key_query", str(local_query))
-        set_tag("remote_key_query", str(remote_queries))
+        log_kv(
+            {
+                "message": "claiming one time keys",
+                "local query": local_query,
+                "remote queries, by server": remote_queries,
+            }
+        )
 
         # A map of user ID -> device ID -> key ID -> key.
         json_result: Dict[str, Dict[str, Dict[str, JsonSerializable]]] = {}
