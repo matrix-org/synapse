@@ -1110,7 +1110,7 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
         ...
 
     async def claim_e2e_one_time_keys(
-        self, query_list: Iterable[Tuple[str, str, str, int]]
+        self, query_list: Collection[Tuple[str, str, str, int]]
     ) -> Tuple[
         Dict[str, Dict[str, Dict[str, JsonDict]]], List[Tuple[str, str, str, int]]
     ]:
