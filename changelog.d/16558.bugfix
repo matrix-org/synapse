@@ -1,0 +1,1 @@
+Fix ratelimiting of message sending when using workers, where the ratelimit would only be applied after most of the work has been done.
