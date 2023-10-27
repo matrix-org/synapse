@@ -1120,10 +1120,12 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
             query_list: An iterable of tuples of (user ID, device ID, algorithm).
 
         Returns:
-            A tuple pf:
+            A tuple (results, missing) of:
                 A map of user ID -> a map device ID -> a map of key ID -> JSON.
 
-                A copy of the input which has not been fulfilled.
+                A copy of the input which has not been fulfilled. The returned counts
+                may be less than the input counts. In this case, the returned counts
+                are the number of claims that were not fulfilled.
         """
 
         results: Dict[str, Dict[str, Dict[str, JsonDict]]] = {}
