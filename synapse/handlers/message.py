@@ -1003,7 +1003,7 @@ class EventCreationHandler:
             try:
                 room_version = await self.store.get_room_version(room_id)
             except NotFoundError:
-                # If the room doesnt' exist.
+                # The room doesn't exist.
                 raise AuthError(403, f"User {requester.user} not in room {room_id}")
 
             if room_version.updated_redaction_rules:
@@ -1529,7 +1529,7 @@ class EventCreationHandler:
             if writer_instance != self._instance_name:
                 # Ratelimit before sending to the other event persister, to
                 # ensure that we correctly have ratelimits on both the event
-                # creators and event persiters.
+                # creators and event persisters.
                 if ratelimit:
                     for event, _ in events_and_context:
                         is_admin_redaction = await self.is_admin_redaction(
