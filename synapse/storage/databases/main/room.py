@@ -1232,28 +1232,30 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         """
         room_servers: Dict[str, PartialStateResyncInfo] = {}
 
-        rows = await self.db_pool.simple_select_list(
-            table="partial_state_rooms",
-            keyvalues={},
-            retcols=("room_id", "joined_via"),
-            desc="get_server_which_served_partial_join",
+        rows = cast(
+            List[Tuple[str, str]],
+            await self.db_pool.simple_select_list(
+                table="partial_state_rooms",
+                keyvalues={},
+                retcols=("room_id", "joined_via"),
+                desc="get_server_which_served_partial_join",
+            ),
         )
 
-        for row in rows:
-            room_id = row["room_id"]
-            joined_via = row["joined_via"]
+        for room_id, joined_via in rows:
             room_servers[room_id] = PartialStateResyncInfo(joined_via=joined_via)
 
-        rows = await self.db_pool.simple_select_list(
-            "partial_state_rooms_servers",
-            keyvalues=None,
-            retcols=("room_id", "server_name"),
-            desc="get_partial_state_rooms",
+        rows = cast(
+            List[Tuple[str, str]],
+            await self.db_pool.simple_select_list(
+                "partial_state_rooms_servers",
+                keyvalues=None,
+                retcols=("room_id", "server_name"),
+                desc="get_partial_state_rooms",
+            ),
         )
 
-        for row in rows:
-            room_id = row["room_id"]
-            server_name = row["server_name"]
+        for room_id, server_name in rows:
             entry = room_servers.get(room_id)
             if entry is None:
                 # There is a foreign key constraint which enforces that every room_id in

@@ -197,16 +197,21 @@ class ApplicationServiceTransactionWorkerStore(
         Returns:
             A list of ApplicationServices, which may be empty.
         """
-        results = await self.db_pool.simple_select_list(
-            "application_services_state", {"state": state.value}, ["as_id"]
+        results = cast(
+            List[Tuple[str]],
+            await self.db_pool.simple_select_list(
+                table="application_services_state",
+                keyvalues={"state": state.value},
+                retcols=("as_id",),
+            ),
         )
         # NB: This assumes this class is linked with ApplicationServiceStore
         as_list = self.get_app_services()
         services = []
 
-        for res in results:
+        for (as_id,) in results:
             for service in as_list:
-                if service.id == res["as_id"]:
+                if service.id == as_id:
                     services.append(service)
         return services
 

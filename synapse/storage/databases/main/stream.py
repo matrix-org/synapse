@@ -1078,7 +1078,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         """
 
         row = await self.db_pool.execute(
-            "get_current_topological_token", None, sql, room_id, room_id, stream_key
+            "get_current_topological_token", sql, room_id, room_id, stream_key
         )
         return row[0][0] if row else 0
 
@@ -1636,7 +1636,6 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
 
         rows = await self.db_pool.execute(
             "get_timeline_gaps",
-            None,
             sql,
             room_id,
             from_token.stream if from_token else 0,

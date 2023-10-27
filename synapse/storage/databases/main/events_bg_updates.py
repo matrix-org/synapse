@@ -1310,12 +1310,9 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
 
         # ANALYZE the new column to build stats on it, to encourage PostgreSQL to use the
         # indexes on it.
-        # We need to pass execute a dummy function to handle the txn's result otherwise
-        # it tries to call fetchall() on it and fails because there's no result to fetch.
-        await self.db_pool.execute(
+        await self.db_pool.runInteraction(
             "background_analyze_new_stream_ordering_column",
-            lambda txn: None,
-            "ANALYZE events(stream_ordering2)",
+            lambda txn: txn.execute("ANALYZE events(stream_ordering2)"),
         )
 
         await self.db_pool.runInteraction(

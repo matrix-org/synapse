@@ -437,25 +437,24 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
         )
 
     async def get_local_media_thumbnails(self, media_id: str) -> List[ThumbnailInfo]:
-        rows = await self.db_pool.simple_select_list(
-            "local_media_repository_thumbnails",
-            {"media_id": media_id},
-            (
-                "thumbnail_width",
-                "thumbnail_height",
-                "thumbnail_method",
-                "thumbnail_type",
-                "thumbnail_length",
+        rows = cast(
+            List[Tuple[int, int, str, str, int]],
+            await self.db_pool.simple_select_list(
+                "local_media_repository_thumbnails",
+                {"media_id": media_id},
+                (
+                    "thumbnail_width",
+                    "thumbnail_height",
+                    "thumbnail_method",
+                    "thumbnail_type",
+                    "thumbnail_length",
+                ),
+                desc="get_local_media_thumbnails",
             ),
-            desc="get_local_media_thumbnails",
         )
         return [
             ThumbnailInfo(
-                width=row["thumbnail_width"],
-                height=row["thumbnail_height"],
-                method=row["thumbnail_method"],
-                type=row["thumbnail_type"],
-                length=row["thumbnail_length"],
+                width=row[0], height=row[1], method=row[2], type=row[3], length=row[4]
             )
             for row in rows
         ]
@@ -568,25 +567,24 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
     async def get_remote_media_thumbnails(
         self, origin: str, media_id: str
     ) -> List[ThumbnailInfo]:
-        rows = await self.db_pool.simple_select_list(
-            "remote_media_cache_thumbnails",
-            {"media_origin": origin, "media_id": media_id},
-            (
-                "thumbnail_width",
-                "thumbnail_height",
-                "thumbnail_method",
-                "thumbnail_type",
-                "thumbnail_length",
+        rows = cast(
+            List[Tuple[int, int, str, str, int]],
+            await self.db_pool.simple_select_list(
+                "remote_media_cache_thumbnails",
+                {"media_origin": origin, "media_id": media_id},
+                (
+                    "thumbnail_width",
+                    "thumbnail_height",
+                    "thumbnail_method",
+                    "thumbnail_type",
+                    "thumbnail_length",
+                ),
+                desc="get_remote_media_thumbnails",
             ),
-            desc="get_remote_media_thumbnails",
         )
         return [
             ThumbnailInfo(
-                width=row["thumbnail_width"],
-                height=row["thumbnail_height"],
-                method=row["thumbnail_method"],
-                type=row["thumbnail_type"],
-                length=row["thumbnail_length"],
+                width=row[0], height=row[1], method=row[2], type=row[3], length=row[4]
             )
             for row in rows
         ]
@@ -652,7 +650,7 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
 
     async def get_remote_media_ids(
         self, before_ts: int, include_quarantined_media: bool
-    ) -> List[Dict[str, str]]:
+    ) -> List[Tuple[str, str, str]]:
         """
         Retrieve a list of server name, media ID tuples from the remote media cache.
 
@@ -666,12 +664,14 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
             A list of tuples containing:
                 * The server name of homeserver where the media originates from,
                 * The ID of the media.
+                * The filesystem ID.
         """
-        sql = (
-            "SELECT media_origin, media_id, filesystem_id"
-            " FROM remote_media_cache"
-            " WHERE last_access_ts < ?"
-        )
+
+        sql = """
+        SELECT media_origin, media_id, filesystem_id
+        FROM remote_media_cache
+        WHERE last_access_ts < ?
+        """
 
         if include_quarantined_media is False:
             # Only include media that has not been quarantined
@@ -679,8 +679,9 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
             AND quarantined_by IS NULL
             """
 
-        return await self.db_pool.execute(
-            "get_remote_media_ids", self.db_pool.cursor_to_dict, sql, before_ts
+        return cast(
+            List[Tuple[str, str, str]],
+            await self.db_pool.execute("get_remote_media_ids", sql, before_ts),
         )
 
     async def delete_remote_media(self, media_origin: str, media_id: str) -> None:

@@ -161,6 +161,14 @@ class Stream:
             and `limited` is whether there are more updates to fetch.
         """
         current_token = self.current_token(self.local_instance_name)
+
+        # If the minimum current token for the local instance is less than or
+        # equal to the last thing we published, we know that there are no
+        # updates.
+        if self.last_token >= self.minimal_local_current_token():
+            self.last_token = current_token
+            return [], current_token, False
+
         updates, current_token, limited = await self.get_updates_since(
             self.local_instance_name, self.last_token, current_token
         )
@@ -489,6 +497,8 @@ class CachesStream(Stream):
         return self.store.get_cache_stream_token_for_writer(instance_name)
 
     def minimal_local_current_token(self) -> Token:
+        if self.store._cache_id_gen:
+            return self.store._cache_id_gen.get_minimal_local_current_token()
         return self.current_token(self.local_instance_name)
 
 

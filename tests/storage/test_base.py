@@ -146,7 +146,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_select_list(self) -> Generator["defer.Deferred[object]", object, None]:
         self.mock_txn.rowcount = 3
-        self.mock_txn.__iter__ = Mock(return_value=iter([(1,), (2,), (3,)]))
+        self.mock_txn.fetchall.return_value = [(1,), (2,), (3,)]
         self.mock_txn.description = (("colA", None, None, None, None, None, None),)
 
         ret = yield defer.ensureDeferred(
@@ -155,7 +155,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
             )
         )
 
-        self.assertEqual([{"colA": 1}, {"colA": 2}, {"colA": 3}], ret)
+        self.assertEqual([(1,), (2,), (3,)], ret)
         self.mock_txn.execute.assert_called_with(
             "SELECT colA FROM tablename WHERE keycol = ?", ["A set"]
         )

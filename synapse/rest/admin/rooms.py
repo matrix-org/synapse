@@ -444,7 +444,7 @@ class RoomStateRestServlet(RestServlet):
         event_ids = await self._storage_controllers.state.get_current_state_ids(room_id)
         events = await self.store.get_events(event_ids.values())
         now = self.clock.time_msec()
-        room_state = self._event_serializer.serialize_events(events.values(), now)
+        room_state = await self._event_serializer.serialize_events(events.values(), now)
         ret = {"state": room_state}
 
         return HTTPStatus.OK, ret
@@ -724,7 +724,17 @@ class ForwardExtremitiesRestServlet(ResolveRoomIdMixin, RestServlet):
         room_id, _ = await self.resolve_room_id(room_identifier)
 
         extremities = await self.store.get_forward_extremities_for_room(room_id)
-        return HTTPStatus.OK, {"count": len(extremities), "results": extremities}
+        result = [
+            {
+                "event_id": ex[0],
+                "state_group": ex[1],
+                "depth": ex[2],
+                "received_ts": ex[3],
+            }
+            for ex in extremities
+        ]
+
+        return HTTPStatus.OK, {"count": len(extremities), "results": result}
 
 
 class RoomEventContextServlet(RestServlet):
@@ -779,22 +789,22 @@ class RoomEventContextServlet(RestServlet):
 
         time_now = self.clock.time_msec()
         results = {
-            "events_before": self._event_serializer.serialize_events(
+            "events_before": await self._event_serializer.serialize_events(
                 event_context.events_before,
                 time_now,
                 bundle_aggregations=event_context.aggregations,
             ),
-            "event": self._event_serializer.serialize_event(
+            "event": await self._event_serializer.serialize_event(
                 event_context.event,
                 time_now,
                 bundle_aggregations=event_context.aggregations,
             ),
-            "events_after": self._event_serializer.serialize_events(
+            "events_after": await self._event_serializer.serialize_events(
                 event_context.events_after,
                 time_now,
                 bundle_aggregations=event_context.aggregations,
             ),
-            "state": self._event_serializer.serialize_events(
+            "state": await self._event_serializer.serialize_events(
                 event_context.state, time_now
             ),
             "start": event_context.start,
