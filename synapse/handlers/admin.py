@@ -283,7 +283,7 @@ class AdminHandler:
                 start, limit, user_id
             )
             for media in media_ids:
-                writer.write_media_id(media["media_id"], media)
+                writer.write_media_id(media.media_id, attr.asdict(media))
 
             logger.info(
                 "[%s] Written %d media_ids of %s",

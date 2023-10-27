@@ -17,6 +17,8 @@ import logging
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Optional, Tuple
 
+import attr
+
 from synapse.api.constants import Direction
 from synapse.api.errors import Codes, NotFoundError, SynapseError
 from synapse.http.server import HttpServer
@@ -418,7 +420,7 @@ class UserMediaRestServlet(RestServlet):
             start, limit, user_id, order_by, direction
         )
 
-        ret = {"media": media, "total": total}
+        ret = {"media": [attr.asdict(m) for m in media], "total": total}
         if (start + limit) < total:
             ret["next_token"] = start + len(media)
 
@@ -477,7 +479,7 @@ class UserMediaRestServlet(RestServlet):
         )
 
         deleted_media, total = await self.media_repository.delete_local_media_ids(
-            [row["media_id"] for row in media]
+            [m.media_id for m in media]
         )
 
         return HTTPStatus.OK, {"deleted_media": deleted_media, "total": total}
