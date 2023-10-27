@@ -1126,94 +1126,6 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
                 A copy of the input which has not been fulfilled.
         """
 
-        @trace
-        def _claim_e2e_one_time_key_simple(
-            txn: LoggingTransaction,
-            user_id: str,
-            device_id: str,
-            algorithm: str,
-            count: int,
-        ) -> List[Tuple[str, str]]:
-            """Claim OTK for device for DBs that don't support RETURNING.
-
-            Returns:
-                A tuple of key name (algorithm + key ID) and key JSON, if an
-                OTK was found.
-            """
-
-            sql = """
-                SELECT key_id, key_json FROM e2e_one_time_keys_json
-                WHERE user_id = ? AND device_id = ? AND algorithm = ?
-                LIMIT ?
-            """
-
-            txn.execute(sql, (user_id, device_id, algorithm, count))
-            otk_rows = list(txn)
-            if not otk_rows:
-                return []
-
-            self.db_pool.simple_delete_many_txn(
-                txn,
-                table="e2e_one_time_keys_json",
-                column="key_id",
-                values=[otk_row[0] for otk_row in otk_rows],
-                keyvalues={
-                    "user_id": user_id,
-                    "device_id": device_id,
-                    "algorithm": algorithm,
-                },
-            )
-            self._invalidate_cache_and_stream(
-                txn, self.count_e2e_one_time_keys, (user_id, device_id)
-            )
-
-            return [
-                (f"{algorithm}:{key_id}", key_json) for key_id, key_json in otk_rows
-            ]
-
-        @trace
-        def _claim_e2e_one_time_key_returning(
-            txn: LoggingTransaction,
-            user_id: str,
-            device_id: str,
-            algorithm: str,
-            count: int,
-        ) -> List[Tuple[str, str]]:
-            """Claim OTK for device for DBs that support RETURNING.
-
-            Returns:
-                A tuple of key name (algorithm + key ID) and key JSON, if an
-                OTK was found.
-            """
-
-            # We can use RETURNING to do the fetch and DELETE in once step.
-            sql = """
-                DELETE FROM e2e_one_time_keys_json
-                WHERE user_id = ? AND device_id = ? AND algorithm = ?
-                    AND key_id IN (
-                        SELECT key_id FROM e2e_one_time_keys_json
-                        WHERE user_id = ? AND device_id = ? AND algorithm = ?
-                        LIMIT ?
-                    )
-                RETURNING key_id, key_json
-            """
-
-            txn.execute(
-                sql,
-                (user_id, device_id, algorithm, user_id, device_id, algorithm, count),
-            )
-            otk_rows = list(txn)
-            if not otk_rows:
-                return []
-
-            self._invalidate_cache_and_stream(
-                txn, self.count_e2e_one_time_keys, (user_id, device_id)
-            )
-
-            return [
-                (f"{algorithm}:{key_id}", key_json) for key_id, key_json in otk_rows
-            ]
-
         results: Dict[str, Dict[str, Dict[str, JsonDict]]] = {}
         missing: List[Tuple[str, str, str, int]] = []
         if self.database_engine.supports_returning:
@@ -1222,7 +1134,7 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
             for user_id, device_id, algorithm, count in query_list:
                 claim_rows = await self.db_pool.runInteraction(
                     "claim_e2e_one_time_keys",
-                    _claim_e2e_one_time_key_returning,
+                    self._claim_e2e_one_time_key_returning,
                     user_id,
                     device_id,
                     algorithm,
@@ -1243,7 +1155,7 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
             for user_id, device_id, algorithm, count in query_list:
                 claim_rows = await self.db_pool.runInteraction(
                     "claim_e2e_one_time_keys",
-                    _claim_e2e_one_time_key_simple,
+                    self._claim_e2e_one_time_key_simple,
                     user_id,
                     device_id,
                     algorithm,
@@ -1316,6 +1228,92 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
             device_results[f"{algorithm}:{key_id}"] = json_decoder.decode(key_json)
 
         return results
+
+    @trace
+    def _claim_e2e_one_time_key_simple(
+        self,
+        txn: LoggingTransaction,
+        user_id: str,
+        device_id: str,
+        algorithm: str,
+        count: int,
+    ) -> List[Tuple[str, str]]:
+        """Claim OTK for device for DBs that don't support RETURNING.
+
+        Returns:
+            A tuple of key name (algorithm + key ID) and key JSON, if an
+            OTK was found.
+        """
+
+        sql = """
+            SELECT key_id, key_json FROM e2e_one_time_keys_json
+            WHERE user_id = ? AND device_id = ? AND algorithm = ?
+            LIMIT ?
+        """
+
+        txn.execute(sql, (user_id, device_id, algorithm, count))
+        otk_rows = list(txn)
+        if not otk_rows:
+            return []
+
+        self.db_pool.simple_delete_many_txn(
+            txn,
+            table="e2e_one_time_keys_json",
+            column="key_id",
+            values=[otk_row[0] for otk_row in otk_rows],
+            keyvalues={
+                "user_id": user_id,
+                "device_id": device_id,
+                "algorithm": algorithm,
+            },
+        )
+        self._invalidate_cache_and_stream(
+            txn, self.count_e2e_one_time_keys, (user_id, device_id)
+        )
+
+        return [(f"{algorithm}:{key_id}", key_json) for key_id, key_json in otk_rows]
+
+    @trace
+    def _claim_e2e_one_time_key_returning(
+        self,
+        txn: LoggingTransaction,
+        user_id: str,
+        device_id: str,
+        algorithm: str,
+        count: int,
+    ) -> List[Tuple[str, str]]:
+        """Claim OTK for device for DBs that support RETURNING.
+
+        Returns:
+            A tuple of key name (algorithm + key ID) and key JSON, if an
+            OTK was found.
+        """
+
+        # We can use RETURNING to do the fetch and DELETE in once step.
+        sql = """
+           DELETE FROM e2e_one_time_keys_json
+           WHERE user_id = ? AND device_id = ? AND algorithm = ?
+               AND key_id IN (
+                   SELECT key_id FROM e2e_one_time_keys_json
+                   WHERE user_id = ? AND device_id = ? AND algorithm = ?
+                   LIMIT ?
+               )
+           RETURNING key_id, key_json
+       """
+
+        txn.execute(
+            sql,
+            (user_id, device_id, algorithm, user_id, device_id, algorithm, count),
+        )
+        otk_rows = list(txn)
+        if not otk_rows:
+            return []
+
+        self._invalidate_cache_and_stream(
+            txn, self.count_e2e_one_time_keys, (user_id, device_id)
+        )
+
+        return [(f"{algorithm}:{key_id}", key_json) for key_id, key_json in otk_rows]
 
 
 class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
