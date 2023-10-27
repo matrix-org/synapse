@@ -165,6 +165,7 @@ class UsersRestServletV2(RestServlet):
         # If support for MSC3866 is not enabled, don't show the approval flag.
         filter = None
         if not self._msc3866_enabled:
+
             def _filter(a: attr.Attribute) -> bool:
                 return a.name != "approved"
 
