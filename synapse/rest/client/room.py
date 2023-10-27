@@ -859,7 +859,7 @@ class RoomEventServlet(RestServlet):
 
             # per MSC2676, /rooms/{roomId}/event/{eventId}, should return the
             # *original* event, rather than the edited version
-            event_dict = self._event_serializer.serialize_event(
+            event_dict = await self._event_serializer.serialize_event(
                 event,
                 self.clock.time_msec(),
                 bundle_aggregations=aggregations,
@@ -911,25 +911,25 @@ class RoomEventContextServlet(RestServlet):
         time_now = self.clock.time_msec()
         serializer_options = SerializeEventConfig(requester=requester)
         results = {
-            "events_before": self._event_serializer.serialize_events(
+            "events_before": await self._event_serializer.serialize_events(
                 event_context.events_before,
                 time_now,
                 bundle_aggregations=event_context.aggregations,
                 config=serializer_options,
             ),
-            "event": self._event_serializer.serialize_event(
+            "event": await self._event_serializer.serialize_event(
                 event_context.event,
                 time_now,
                 bundle_aggregations=event_context.aggregations,
                 config=serializer_options,
             ),
-            "events_after": self._event_serializer.serialize_events(
+            "events_after": await self._event_serializer.serialize_events(
                 event_context.events_after,
                 time_now,
                 bundle_aggregations=event_context.aggregations,
                 config=serializer_options,
             ),
-            "state": self._event_serializer.serialize_events(
+            "state": await self._event_serializer.serialize_events(
                 event_context.state,
                 time_now,
                 config=serializer_options,

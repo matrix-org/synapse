@@ -48,6 +48,7 @@ from synapse.events.presence_router import (
     GET_USERS_FOR_STATES_CALLBACK,
     PresenceRouter,
 )
+from synapse.events.utils import ADD_EXTRA_FIELDS_TO_UNSIGNED_CLIENT_EVENT_CALLBACK
 from synapse.handlers.account_data import ON_ACCOUNT_DATA_UPDATED_CALLBACK
 from synapse.handlers.auth import (
     CHECK_3PID_AUTH_CALLBACK,
@@ -259,6 +260,7 @@ class ModuleApi:
         self.custom_template_dir = hs.config.server.custom_template_directory
         self._callbacks = hs.get_module_api_callbacks()
         self.msc3861_oauth_delegation_enabled = hs.config.experimental.msc3861.enabled
+        self._event_serializer = hs.get_event_client_serializer()
 
         try:
             app_name = self._hs.config.email.email_app_name
@@ -489,6 +491,25 @@ class ModuleApi:
             resource: The resource to attach to this path.
         """
         self._hs.register_module_web_resource(path, resource)
+
+    def register_add_extra_fields_to_unsigned_client_event_callbacks(
+        self,
+        *,
+        add_field_to_unsigned_callback: Optional[
+            ADD_EXTRA_FIELDS_TO_UNSIGNED_CLIENT_EVENT_CALLBACK
+        ] = None,
+    ) -> None:
+        """Registers a callback that can be used to add fields to the unsigned
+        section of events.
+
+        The callback is called every time an event is sent down to a client.
+
+        Added in Synapse 1.96.0
+        """
+        if add_field_to_unsigned_callback is not None:
+            self._event_serializer.register_add_extra_fields_to_unsigned_client_event_callback(
+                add_field_to_unsigned_callback
+            )
 
     #########################################################################
     # The following methods can be called by the module at any point in time.

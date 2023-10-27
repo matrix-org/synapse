@@ -244,7 +244,7 @@ class MessageHandler:
                 )
                 room_state = room_state_events[membership_event_id]
 
-        events = self._event_serializer.serialize_events(
+        events = await self._event_serializer.serialize_events(
             room_state.values(),
             self.clock.time_msec(),
             config=SerializeEventConfig(requester=requester),
