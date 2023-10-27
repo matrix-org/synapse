@@ -1216,35 +1216,66 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
 
         results: Dict[str, Dict[str, Dict[str, JsonDict]]] = {}
         missing: List[Tuple[str, str, str, int]] = []
-        for user_id, device_id, algorithm, count in query_list:
-            if self.database_engine.supports_returning:
-                # If we support RETURNING clause we can use a single query that
-                # allows us to use autocommit mode.
-                _claim_e2e_one_time_key = _claim_e2e_one_time_key_returning
-                db_autocommit = True
-            else:
-                _claim_e2e_one_time_key = _claim_e2e_one_time_key_simple
-                db_autocommit = False
+        if self.database_engine.supports_returning:
+            for user_id, device_id, algorithm, count in query_list:
+                if self.database_engine.supports_returning:
+                    # If we support RETURNING clause we can use a single query that
+                    # allows us to use autocommit mode.
+                    _claim_e2e_one_time_key = _claim_e2e_one_time_key_returning
+                    db_autocommit = True
+                else:
+                    _claim_e2e_one_time_key = _claim_e2e_one_time_key_simple
+                    db_autocommit = False
 
-            claim_rows = await self.db_pool.runInteraction(
-                "claim_e2e_one_time_keys",
-                _claim_e2e_one_time_key,
-                user_id,
-                device_id,
-                algorithm,
-                count,
-                db_autocommit=db_autocommit,
-            )
-            if claim_rows:
-                device_results = results.setdefault(user_id, {}).setdefault(
-                    device_id, {}
+                claim_rows = await self.db_pool.runInteraction(
+                    "claim_e2e_one_time_keys",
+                    _claim_e2e_one_time_key,
+                    user_id,
+                    device_id,
+                    algorithm,
+                    count,
+                    db_autocommit=db_autocommit,
                 )
-                for claim_row in claim_rows:
-                    device_results[claim_row[0]] = json_decoder.decode(claim_row[1])
-            # Did we get enough OTKs?
-            count -= len(claim_rows)
-            if count:
-                missing.append((user_id, device_id, algorithm, count))
+                if claim_rows:
+                    device_results = results.setdefault(user_id, {}).setdefault(
+                        device_id, {}
+                    )
+                    for claim_row in claim_rows:
+                        device_results[claim_row[0]] = json_decoder.decode(claim_row[1])
+                # Did we get enough OTKs?
+                count -= len(claim_rows)
+                if count:
+                    missing.append((user_id, device_id, algorithm, count))
+        else:
+            for user_id, device_id, algorithm, count in query_list:
+                if self.database_engine.supports_returning:
+                    # If we support RETURNING clause we can use a single query that
+                    # allows us to use autocommit mode.
+                    _claim_e2e_one_time_key = _claim_e2e_one_time_key_returning
+                    db_autocommit = True
+                else:
+                    _claim_e2e_one_time_key = _claim_e2e_one_time_key_simple
+                    db_autocommit = False
+
+                claim_rows = await self.db_pool.runInteraction(
+                    "claim_e2e_one_time_keys",
+                    _claim_e2e_one_time_key,
+                    user_id,
+                    device_id,
+                    algorithm,
+                    count,
+                    db_autocommit=db_autocommit,
+                )
+                if claim_rows:
+                    device_results = results.setdefault(user_id, {}).setdefault(
+                        device_id, {}
+                    )
+                    for claim_row in claim_rows:
+                        device_results[claim_row[0]] = json_decoder.decode(claim_row[1])
+                # Did we get enough OTKs?
+                count -= len(claim_rows)
+                if count:
+                    missing.append((user_id, device_id, algorithm, count))
 
         return results, missing
 
