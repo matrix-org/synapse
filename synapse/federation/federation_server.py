@@ -1000,18 +1000,12 @@ class FederationServer(FederationBase):
         self, query: List[Tuple[str, str, str, int]], always_include_fallback_keys: bool
     ) -> Dict[str, Any]:
         log_kv({"message": "Claiming one time keys.", "user, device pairs": query})
-        results = await self._e2e_keys_handler.claim_local_one_time_keys(
-            query, always_include_fallback_keys=always_include_fallback_keys
-        )
-
         json_result: Dict[str, Dict[str, Dict[str, JsonSerializable]]] = {}
-        for result in results:
-            for user_id, device_keys in result.items():
-                for device_id, keys in device_keys.items():
-                    for key_id, key in keys.items():
-                        json_result.setdefault(user_id, {}).setdefault(device_id, {})[
-                            key_id
-                        ] = key
+        await self._e2e_keys_handler.claim_local_one_time_keys(
+            query,
+            always_include_fallback_keys=always_include_fallback_keys,
+            result_dict=json_result,
+        )
 
         logger.info(
             "Claimed one-time-keys: %s",
