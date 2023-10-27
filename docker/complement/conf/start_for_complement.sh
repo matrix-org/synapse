@@ -68,6 +68,11 @@ if [[ -n "$SYNAPSE_COMPLEMENT_USE_WORKERS" ]]; then
 
   fi
   log "Workers requested: $SYNAPSE_WORKER_TYPES"
+  # adjust connection pool limits on worker mode as otherwise running lots of worker synapses
+  # can make docker unhappy (in GHA)
+  export POSTGRES_CP_MIN=1
+  export POSTGRES_CP_MAX=3
+  echo "using reduced connection pool limits for worker mode"
   # Improve startup times by using a launcher based on fork()
   export SYNAPSE_USE_EXPERIMENTAL_FORKING_LAUNCHER=1
 else
