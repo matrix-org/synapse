@@ -203,6 +203,7 @@ jobs:
       - uses: actions/setup-go@v4
         with:
           cache-dependency-path: complement/go.sum
+          go-version-file: complement/go.mod
 
       - run: |
           set -o pipefail

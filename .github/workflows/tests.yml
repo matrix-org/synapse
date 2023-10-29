@@ -639,6 +639,7 @@ jobs:
       - uses: actions/setup-go@v4
         with:
           cache-dependency-path: complement/go.sum
+          go-version-file: complement/go.mod
 
         # use p=1 concurrency as GHA boxes are underpowered and don't like running tons of synapses at once.
       - run: |
