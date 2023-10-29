@@ -1260,6 +1260,16 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
         Returns:
             A map of user ID -> a map device ID -> a map of key ID -> JSON.
         """
+        if isinstance(self.database_engine, PostgresEngine):
+            raise NotImplementedError()
+        else:
+            return await self._claim_e2e_fallback_keys_simple(query_list)
+
+    async def _claim_e2e_fallback_keys_simple(
+        self,
+        query_list: Iterable[Tuple[str, str, str, bool]],
+    ) -> Dict[str, Dict[str, Dict[str, JsonDict]]]:
+        """Naive, inefficient implementation of claim_e2e_fallback_keys for SQLite."""
         results: Dict[str, Dict[str, Dict[str, JsonDict]]] = {}
         for user_id, device_id, algorithm, mark_as_used in query_list:
             row = await self.db_pool.simple_select_one(
