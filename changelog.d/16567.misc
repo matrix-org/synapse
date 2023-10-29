@@ -1,1 +1,1 @@
-Run actions/setup-go after checking out complement.
+Deal with warnings from running complement in CI.
