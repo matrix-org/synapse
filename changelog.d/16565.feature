@@ -1,1 +1,1 @@
-Improve the performance of claiming multiple one-time-keys.
+Improve the performance of claiming encryption keys.
