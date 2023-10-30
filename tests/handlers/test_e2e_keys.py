@@ -144,35 +144,81 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
             SynapseError,
         )
 
-    def test_claim_one_time_key(self) -> None:
-        local_user = "@boris:" + self.hs.hostname
-        device_id = "xyz"
-        keys = {"alg1:k1": "key1"}
+    @parameterized.expand([(True,), (False,)])
+    def test_claim_one_time_key(self, msc4072: bool) -> None:
+        self.hs.config.experimental.msc4072_empty_dict_for_exhausted_devices = msc4072
 
+        local_known_user = "@boris:" + self.hs.hostname
+        device_id = "xyz"
+        local_unknown_user = "@charlie:" + self.hs.hostname
+
+        remote_known_user = "@dave:xyz"
+        remote_unknown_user = "@errol:xyz"
+
+        # upload a key for the local user
         res = self.get_success(
             self.handler.upload_keys_for_user(
-                local_user, device_id, {"one_time_keys": keys}
+                local_known_user, device_id, {"one_time_keys": {"alg1:k1": "key1"}}
             )
         )
         self.assertDictEqual(
             res, {"one_time_key_counts": {"alg1": 1, "signed_curve25519": 0}}
         )
 
+        # mock out the response for remote users. We pretend that the remote server
+        # hasn't heard of MSC4072 and returns an incomplete result. (Even once
+        # MSC4072 is stable, we still need to handle incomplete results.)
+        #
+        # we also include a spurious result to check it gets filtered out.
+        self.hs.get_federation_client().claim_client_keys = mock.AsyncMock(  # type: ignore[method-assign]
+            return_value={
+                "one_time_keys": {
+                    remote_known_user: {"ghi": {"alg1": "keykey"}},
+                    "@other:xyz": {"zzz": {"alg1": "dodgykey"}},
+                }
+            }
+        )
+
         res2 = self.get_success(
             self.handler.claim_one_time_keys(
-                {local_user: {device_id: {"alg1": 1}}},
+                {
+                    local_known_user: {device_id: {"alg1": 1}, "abc": {"alg2": 1}},
+                    local_unknown_user: {"def": {"alg1": 1}},
+                    remote_known_user: {"ghi": {"alg1": 1}, "jkl": {"alg1": 1}},
+                    remote_unknown_user: {"mno": {"alg1": 1}},
+                },
                 self.requester,
                 timeout=None,
                 always_include_fallback_keys=False,
             )
         )
-        self.assertEqual(
-            res2,
-            {
-                "failures": {},
-                "one_time_keys": {local_user: {device_id: {"alg1:k1": "key1"}}},
-            },
-        )
+
+        if msc4072:
+            # empty result for each unknown device
+            self.assertEqual(
+                res2,
+                {
+                    "failures": {},
+                    "one_time_keys": {
+                        local_known_user: {device_id: {"alg1:k1": "key1"}, "abc": {}},
+                        local_unknown_user: {"def": {}},
+                        remote_known_user: {"ghi": {"alg1": "keykey"}, "jkl": {}},
+                        remote_unknown_user: {"mno": {}},
+                    },
+                },
+            )
+        else:
+            # only known devices
+            self.assertEqual(
+                res2,
+                {
+                    "failures": {},
+                    "one_time_keys": {
+                        local_known_user: {device_id: {"alg1:k1": "key1"}},
+                        remote_known_user: {"ghi": {"alg1": "keykey"}},
+                    },
+                },
+            )
 
     def test_fallback_key(self) -> None:
         local_user = "@boris:" + self.hs.hostname

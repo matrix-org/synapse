@@ -15,7 +15,6 @@
 import enum
 from typing import TYPE_CHECKING, Any, Optional
 
-import attr
 import attr.validators
 
 from synapse.api.errors import LimitExceededError
@@ -418,4 +417,10 @@ class ExperimentalConfig(Config):
 
         self.msc4028_push_encrypted_events = experimental.get(
             "msc4028_push_encrypted_events", False
+        )
+
+        # MSC4072: Return an empty dict from /keys/claim for unknown devices or those
+        # with exhausted OTKs
+        self.msc4072_empty_dict_for_exhausted_devices = experimental.get(
+            "msc4072_empty_dict_for_exhausted_devices", False
         )
