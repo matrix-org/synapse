@@ -1291,7 +1291,7 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
 
         Args:
             query_list: Collection of tuples (user_id, device_id, algorithm, count)
-            as passed to claim_e2e_one_time_keys.
+                as passed to claim_e2e_one_time_keys.
 
         Returns:
             A list of tuples (user_id, device_id, algorithm, key_id, key_json)
