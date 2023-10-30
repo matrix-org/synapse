@@ -303,9 +303,10 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
                 expected_key_json = one_time_keys[user_id][device_id][alg_key]
                 self.assertEqual(key_dict[alg_key], expected_key_json)
 
+        # Expect a single arbitrary key to be returned.
         assertExactlyOneOtk(alice, "alice_dev_1", "alg1:k1", "alg1:k2")
-        assertExactlyOneOtk(alice, "alice_dev_2", "alg2:k7", "alg1:k8")
-        assertExactlyOneOtk(chris, "chris_dev_2", "alg2:k23", "alg1:k24")
+        assertExactlyOneOtk(alice, "alice_dev_2", "alg2:k7", "alg2:k8")
+        assertExactlyOneOtk(chris, "chris_dev_2", "alg2:k23", "alg2:k24")
 
         assertAllOtks(alice, "alice_dev_1", "alg2:k3", "alg2:k4")
         assertAllOtks(brian, "brian_dev_1", "alg1:k9", "alg1:k10")
