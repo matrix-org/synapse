@@ -2580,20 +2580,19 @@ testing-integration = ["build[virtualenv]", "filelock (>=3.4.0)", "jaraco.envs (
 
 [[package]]
 name = "setuptools-rust"
-version = "1.7.0"
+version = "1.8.0"
 description = "Setuptools Rust extension plugin"
 optional = false
-python-versions = ">=3.7"
+python-versions = ">=3.8"
 files = [
-    {file = "setuptools-rust-1.7.0.tar.gz", hash = "sha256:c7100999948235a38ae7e555fe199aa66c253dc384b125f5d85473bf81eae3a3"},
-    {file = "setuptools_rust-1.7.0-py3-none-any.whl", hash = "sha256:071099885949132a2180d16abf907b60837e74b4085047ba7e9c0f5b365310c1"},
+    {file = "setuptools-rust-1.8.0.tar.gz", hash = "sha256:5e02b7a80058853bf64127314f6b97d0efed11e08b94c88ca639a20976f6adc4"},
+    {file = "setuptools_rust-1.8.0-py3-none-any.whl", hash = "sha256:95ec67edee2ca73233c9e75250e9d23a302aa23b4c8413dfd19c14c30d08f703"},
 ]
 
 [package.dependencies]
 semantic-version = ">=2.8.2,<3"
 setuptools = ">=62.4"
 tomli = {version = ">=1.2.1", markers = "python_version < \"3.11\""}
-typing-extensions = ">=3.7.4.3"
 
 [[package]]
 name = "signedjson"

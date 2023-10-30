@@ -659,6 +659,20 @@ class E2eKeysHandler:
         timeout: Optional[int],
         always_include_fallback_keys: bool,
     ) -> JsonDict:
+        """
+        Args:
+            query: A chain of maps from (user_id, device_id, algorithm) to the requested
+                number of keys to claim.
+            user: The user who is claiming these keys.
+            timeout: How long to wait for any federation key claim requests before
+                giving up.
+            always_include_fallback_keys: always include a fallback key for local users'
+                devices, even if we managed to claim a one-time-key.
+
+        Returns: a heterogeneous dict with two keys:
+            one_time_keys: chain of maps user ID -> device ID -> key ID -> key.
+            failures: map from remote destination to a JsonDict describing the error.
+        """
         local_query: List[Tuple[str, str, str, int]] = []
         remote_queries: Dict[str, Dict[str, Dict[str, Dict[str, int]]]] = {}
 
