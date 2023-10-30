@@ -1298,7 +1298,7 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
         """
         claimed_keys = cast(
             List[Tuple[str, str, str, str, str]],
-            list(txn.execute_values(sql, query_list)),
+            txn.execute_values(sql, query_list),
         )
 
         seen_user_device: Set[Tuple[str, str]] = set()
