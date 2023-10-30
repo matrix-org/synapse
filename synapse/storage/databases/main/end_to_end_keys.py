@@ -1152,13 +1152,10 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
                 unfulfilled_claim_counts[(user_id, device_id, algorithm)] -= 1
 
             # Did we get enough OTKs?
-            for (
-                user_id,
-                device_id,
-                algorithm,
-            ), count in unfulfilled_claim_counts.items():
-                if count > 0:
-                    missing.append((user_id, device_id, algorithm, count))
+            missing = [
+                (user, device, alg, count)
+                for (user, device, alg), count in unfulfilled_claim_counts.items()
+            ]
         else:
             for user_id, device_id, algorithm, count in query_list:
                 claim_rows = await self.db_pool.runInteraction(
