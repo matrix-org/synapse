@@ -383,7 +383,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         }
         self.assertEqual(
             claim_res,
-            {"failures": {}, "one_time_keys": {expected_claims}},
+            {"failures": {}, "one_time_keys": expected_claims},
         )
 
         for user_id, devices in fallback_keys.items():
