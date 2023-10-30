@@ -386,7 +386,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
             {"failures": {}, "one_time_keys": {expected_claims}},
         )
 
-        for user_id, device in fallback_keys.items():
+        for user_id, devices in fallback_keys.items():
             for device_id in devices:
                 fallback_res = self.get_success(
                     self.store.get_e2e_unused_fallback_key_types(user_id, device_id)
