@@ -739,6 +739,16 @@ class E2eKeysHandler:
     async def upload_keys_for_user(
         self, user_id: str, device_id: str, keys: JsonDict
     ) -> JsonDict:
+        """
+        Args:
+            user_id: user whose keys are being uploaded.
+            device_id: device whose keys are being uploaded.
+            keys: the body of a /keys/upload request.
+
+        Returns a dictionary with one field:
+            "one_time_keys": A mapping from algorithm to number of keys for that
+                algorithm, including those previously persisted.
+        """
         # This can only be called from the main process.
         assert isinstance(self.device_handler, DeviceHandler)
 
