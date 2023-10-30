@@ -482,6 +482,22 @@ class RoomMemberWorkerStore(EventsWorkerStore, CacheInvalidationWorkerStore):
             desc="get_local_users_in_room",
         )
 
+    async def get_local_users_related_to_room(
+        self, room_id: str
+    ) -> List[Tuple[str, str]]:
+        """
+        Retrieves a list of the current roommembers who are local to the server and their membership status.
+        """
+        return cast(
+            List[Tuple[str, str]],
+            await self.db_pool.simple_select_list(
+                table="local_current_membership",
+                keyvalues={"room_id": room_id},
+                retcols=("user_id", "membership"),
+                desc="get_local_users_in_room",
+            ),
+        )
+
     async def check_local_user_in_room(self, user_id: str, room_id: str) -> bool:
         """
         Check whether a given local user is currently joined to the given room.
