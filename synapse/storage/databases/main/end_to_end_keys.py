@@ -1155,6 +1155,7 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
             missing = [
                 (user, device, alg, count)
                 for (user, device, alg), count in unfulfilled_claim_counts.items()
+                if count > 0
             ]
         else:
             for user_id, device_id, algorithm, count in query_list:
