@@ -1350,11 +1350,12 @@ class PersistEventsStore:
             PartialStateConflictError: if attempting to persist a partial state event in
                 a room that has been un-partial stated.
         """
-        txn.execute(
-            "SELECT event_id, outlier FROM events WHERE event_id in (%s)"
-            % (",".join(["?"] * len(events_and_contexts)),),
+        clause, args = make_in_list_sql_clause(
+            self.db_pool.engine,
+            "event_id",
             [event.event_id for event, _ in events_and_contexts],
         )
+        txn.execute(f"SELECT event_id, outlier FROM events WHERE {clause}", args)
 
         have_persisted = dict(cast(Iterable[Tuple[str, bool]], txn))
 
