@@ -96,8 +96,8 @@ class LargestRoomStats:
 @attr.s(slots=True, frozen=True, auto_attribs=True)
 class RoomStats(LargestRoomStats):
     joined_local_members: int
-    version: str
-    creator: str
+    version: Optional[str]
+    creator: Optional[str]
     encryption: Optional[str]
     federatable: bool
     public: bool

@@ -1634,17 +1634,15 @@ class DeviceBackgroundUpdateStore(SQLBaseStore):
                     ("device_id", last_row["device_id"]),
                 ]
             )
-            sql = """
+            sql = f"""
                 SELECT stream_id, destination, user_id, device_id, MAX(ts) AS ts
                 FROM device_lists_outbound_pokes
-                WHERE %s
+                WHERE {clause}
                 GROUP BY stream_id, destination, user_id, device_id
                 HAVING count(*) > 1
                 ORDER BY stream_id, destination, user_id, device_id
                 LIMIT ?
-                """ % (
-                clause,  # WHERE
-            )
+                """
             txn.execute(sql, args + [batch_size])
             rows = txn.fetchall()
 

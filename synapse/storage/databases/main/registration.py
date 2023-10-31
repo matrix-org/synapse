@@ -1531,7 +1531,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                 * The number of users allowed (or None)
                 * Whether it is pending
                 * Whether it has been completed
-                * An expiry time (or None)
+                * An expiry time (or None if no expiry)
         """
 
         def select_registration_tokens_txn(

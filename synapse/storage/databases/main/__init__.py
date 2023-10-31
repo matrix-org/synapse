@@ -96,7 +96,7 @@ class UserPaginateResponse:
     shadow_banned: bool
     displayname: Optional[str]
     avatar_url: Optional[str]
-    creation_ts: int
+    creation_ts: Optional[int]
     approved: bool
     erased: bool
     last_seen_ts: int
