@@ -122,7 +122,7 @@ You will need to change the server you are logging into from ``matrix.org``
 and instead specify a Homeserver URL of ``https://<server_name>:8448``
 (or just ``https://<server_name>`` if you are using a reverse proxy).
 If you prefer to use another client, refer to our
-`client breakdown <https://matrix.org/docs/projects/clients-matrix>`_.
+`client breakdown <https://matrix.org/ecosystem/clients/>`_.
 
 If all goes well you should at least be able to log in, create a room, and
 start sending messages.
