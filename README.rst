@@ -8,7 +8,7 @@ reaching v1.0.0 in 2019. Development on Synapse and the Matrix protocol itself c
 in earnest today.
 
 Briefly, Matrix is an open standard for communications on the internet, supporting
-federation, encryption and VoIP. Matrix.org has more to say about the `goals of the
+federation, encryption, and VoIP. Matrix.org has more to say about the `goals of the
 Matrix project <https://matrix.org/docs/guides/introduction>`_, and the `formal specification
 <https://spec.matrix.org/>`_ describes the technical details.
 
@@ -25,7 +25,7 @@ The Synapse documentation describes `how to install Synapse <https://matrix-org.
 
 Synapse has a variety of `config options
 <https://matrix-org.github.io/synapse/latest/usage/configuration/config_documentation.html>`_
-which can be used to customise its behaviour after installation.
+which can be used to customise its behavior after installation.
 There are additional details on how to `configure Synapse for federation here
 <https://matrix-org.github.io/synapse/latest/federate.html>`_.
 
@@ -58,7 +58,7 @@ versions of Synapse.
 Platform dependencies
 ---------------------
 
-Synapse uses a number of platform dependencies such as Python and PostgreSQL,
+Synapse uses several platform dependencies such as Python and PostgreSQL,
 and aims to follow supported upstream versions. See the
 `deprecation policy <https://matrix-org.github.io/synapse/latest/deprecation_policy.html>`_
 for more details.
@@ -102,7 +102,7 @@ Note that all of the above refers exclusively to the domain used in Synapse's
 mentioned in MXIDs hosted on that server.
 
 Following this advice ensures that even if an XSS is found in Synapse, the
-impact to other applications will be minimal.
+impact on other applications will be minimal.
 
 
 Testing a new installation
@@ -156,7 +156,7 @@ the form of::
 
 (pronounced "at localpart on my dot domain dot name").
 
-As when logging in, you will need to specify a "Custom server".  Specify your
+When logging in, you will need to specify a "Custom server".  Specify your
 desired ``localpart`` in the 'User name' box.
 
 Troubleshooting and support
@@ -186,9 +186,9 @@ before creating that mapping.
 **They are not where accounts or credentials are stored - these live on home
 servers. Identity Servers are just for mapping 3rd party IDs to matrix IDs.**
 
-This process is very security-sensitive, as there is obvious risk of spam if it
+This process is very security-sensitive, as there is an obvious risk of spam if it
 is too easy to sign up for Matrix accounts or harvest 3PID data. In the longer
-term, we hope to create a decentralised system to manage it (`matrix-doc #712
+the term, we hope to create a decentralised system to manage it (`matrix-doc #712
 <https://github.com/matrix-org/matrix-doc/issues/712>`_), but in the meantime,
 the role of managing trusted identity in the Matrix ecosystem is farmed out to
 a cluster of known trusted ecosystem partners, who run 'Matrix Identity
@@ -196,9 +196,9 @@ Servers' such as `Sydent <https://github.com/matrix-org/sydent>`_, whose role
 is purely to authenticate and track 3PID logins and publish end-user public
 keys.
 
-You can host your own copy of Sydent, but this will prevent you reaching other
-users in the Matrix ecosystem via their email address, and prevent them finding
-you. We therefore recommend that you use one of the centralised identity servers
+You can host your copy of Sydent, but this will prevent you from reaching other
+users in the Matrix ecosystem via their email address, and prevent them from finding
+you. We therefore recommend that you use one of the centralized identity servers
 at ``https://matrix.org`` or ``https://vector.im`` for now.
 
 To reiterate: the Identity server will only be used if you choose to associate
