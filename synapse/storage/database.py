@@ -1486,7 +1486,7 @@ class DatabasePool:
             value_values: A list of each row's value column values.
                 Ignored if value_names is empty.
         """
-        if not value_values:
+        if not key_values:
             return
 
         if table not in self._unsafe_to_upsert_tables:
@@ -2065,7 +2065,7 @@ class DatabasePool:
             raise ValueError(
                 f"{len(key_values)} key rows and {len(value_values)} value rows: should be the same number."
             )
-        if not value_values:
+        if not key_values:
             return
 
         # List of tuples of (value values, then key values)
