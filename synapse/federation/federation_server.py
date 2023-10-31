@@ -84,7 +84,7 @@ from synapse.replication.http.federation import (
 from synapse.storage.databases.main.lock import Lock
 from synapse.storage.databases.main.roommember import extract_heroes_from_room_summary
 from synapse.storage.roommember import MemberSummary
-from synapse.types import JsonDict, StateMap, get_domain_from_id
+from synapse.types import JsonDict, StateMap, get_domain_from_id, UserID
 from synapse.util import unwrapFirstError
 from synapse.util.async_helpers import Linearizer, concurrently_execute, gather_results
 from synapse.util.caches.response_cache import ResponseCache
@@ -999,6 +999,12 @@ class FederationServer(FederationBase):
     async def on_claim_client_keys(
         self, query: List[Tuple[str, str, str, int]], always_include_fallback_keys: bool
     ) -> Dict[str, Any]:
+        if any(
+            not self.hs.is_mine(UserID.from_string(user_id))
+            for user_id, _, _, _ in query
+        ):
+            raise SynapseError(400, "User is not hosted on this homeserver")
+
         log_kv({"message": "Claiming one time keys.", "user, device pairs": query})
         results = await self._e2e_keys_handler.claim_local_one_time_keys(
             query, always_include_fallback_keys=always_include_fallback_keys
