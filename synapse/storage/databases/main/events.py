@@ -1315,23 +1315,27 @@ class PersistEventsStore:
             room_id: The room ID
             events_and_contexts: events we are persisting
         """
+        stream_ordering = 0
         depth_update = 0
         for event, context in events_and_contexts:
-            # Then update the `stream_ordering` position to mark the latest
-            # event as the front of the room. This should not be done for
-            # backfilled events because backfilled events have negative
-            # stream_ordering and happened in the past so we know that we don't
-            # need to update the stream_ordering tip/front for the room.
+            # Don't update the stream ordering for backfilled events because
+            # backfilled events have negative stream_ordering and happened in the
+            # past, so we know that we don't need to update the stream_ordering
+            # tip/front for the room.
             assert event.internal_metadata.stream_ordering is not None
             if event.internal_metadata.stream_ordering >= 0:
-                txn.call_after(
-                    self.store._events_stream_cache.entity_has_changed,
-                    event.room_id,
-                    event.internal_metadata.stream_ordering,
+                stream_ordering = max(
+                    stream_ordering, event.internal_metadata.stream_ordering
                 )
 
             if not event.internal_metadata.is_outlier() and not context.rejected:
                 depth_update = max(event.depth, depth_update)
+
+        # Then update the `stream_ordering` position to mark the latest event as
+        # the front of the room.
+        txn.call_after(
+            self.store._events_stream_cache.entity_has_changed, room_id, stream_ordering
+        )
 
         self._update_min_depth_for_room_txn(txn, room_id, depth_update)
 
