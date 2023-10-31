@@ -28,6 +28,7 @@ from typing import (
     Sequence,
     Tuple,
     Type,
+    cast,
 )
 
 import attr
@@ -488,14 +489,14 @@ class BackgroundUpdater:
             True if we have finished running all the background updates, otherwise False
         """
 
-        def get_background_updates_txn(txn: Cursor) -> List[Dict[str, Any]]:
+        def get_background_updates_txn(txn: Cursor) -> List[Tuple[str, Optional[str]]]:
             txn.execute(
                 """
                 SELECT update_name, depends_on FROM background_updates
                 ORDER BY ordering, update_name
                 """
             )
-            return self.db_pool.cursor_to_dict(txn)
+            return cast(List[Tuple[str, Optional[str]]], txn.fetchall())
 
         if not self._current_background_update:
             all_pending_updates = await self.db_pool.runInteraction(
@@ -507,14 +508,13 @@ class BackgroundUpdater:
                 return True
 
             # find the first update which isn't dependent on another one in the queue.
-            pending = {update["update_name"] for update in all_pending_updates}
-            for upd in all_pending_updates:
-                depends_on = upd["depends_on"]
+            pending = {update_name for update_name, depends_on in all_pending_updates}
+            for update_name, depends_on in all_pending_updates:
                 if not depends_on or depends_on not in pending:
                     break
                 logger.info(
                     "Not starting on bg update %s until %s is done",
-                    upd["update_name"],
+                    update_name,
                     depends_on,
                 )
             else:
@@ -524,7 +524,7 @@ class BackgroundUpdater:
                     "another: dependency cycle?"
                 )
 
-            self._current_background_update = upd["update_name"]
+            self._current_background_update = update_name
 
         # We have a background update to run, otherwise we would have returned
         # early.

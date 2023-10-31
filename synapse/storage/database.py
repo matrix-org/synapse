@@ -18,7 +18,6 @@ import logging
 import time
 import types
 from collections import defaultdict
-from sys import intern
 from time import monotonic as monotonic_time
 from typing import (
     TYPE_CHECKING,
@@ -1041,20 +1040,6 @@ class DatabasePool:
         return await make_deferred_yieldable(
             self._db_pool.runWithConnection(inner_func, *args, **kwargs)
         )
-
-    @staticmethod
-    def cursor_to_dict(cursor: Cursor) -> List[Dict[str, Any]]:
-        """Converts a SQL cursor into an list of dicts.
-
-        Args:
-            cursor: The DBAPI cursor which has executed a query.
-        Returns:
-            A list of dicts where the key is the column header.
-        """
-        assert cursor.description is not None, "cursor.description was None"
-        col_headers = [intern(str(column[0])) for column in cursor.description]
-        results = [dict(zip(col_headers, row)) for row in cursor]
-        return results
 
     async def execute(self, desc: str, query: str, *args: Any) -> List[Tuple[Any, ...]]:
         """Runs a single query for a result set.

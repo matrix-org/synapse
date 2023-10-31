@@ -703,24 +703,24 @@ class RoomSummaryHandler:
         # there should always be an entry
         assert stats is not None, "unable to retrieve stats for %s" % (room_id,)
 
-        entry = {
-            "room_id": stats["room_id"],
-            "name": stats["name"],
-            "topic": stats["topic"],
-            "canonical_alias": stats["canonical_alias"],
-            "num_joined_members": stats["joined_members"],
-            "avatar_url": stats["avatar"],
-            "join_rule": stats["join_rules"],
+        entry: JsonDict = {
+            "room_id": stats.room_id,
+            "name": stats.name,
+            "topic": stats.topic,
+            "canonical_alias": stats.canonical_alias,
+            "num_joined_members": stats.joined_members,
+            "avatar_url": stats.avatar,
+            "join_rule": stats.join_rules,
             "world_readable": (
-                stats["history_visibility"] == HistoryVisibility.WORLD_READABLE
+                stats.history_visibility == HistoryVisibility.WORLD_READABLE
             ),
-            "guest_can_join": stats["guest_access"] == "can_join",
-            "room_type": stats["room_type"],
+            "guest_can_join": stats.guest_access == "can_join",
+            "room_type": stats.room_type,
         }
 
         if self._msc3266_enabled:
-            entry["im.nheko.summary.version"] = stats["version"]
-            entry["im.nheko.summary.encryption"] = stats["encryption"]
+            entry["im.nheko.summary.version"] = stats.version
+            entry["im.nheko.summary.encryption"] = stats.encryption
 
         # Federation requests need to provide additional information so the
         # requested server is able to filter the response appropriately.

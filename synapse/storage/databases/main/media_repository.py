@@ -26,6 +26,8 @@ from typing import (
     cast,
 )
 
+import attr
+
 from synapse.api.constants import Direction
 from synapse.logging.opentracing import trace
 from synapse.media._base import ThumbnailInfo
@@ -43,6 +45,18 @@ if TYPE_CHECKING:
 BG_UPDATE_REMOVE_MEDIA_REPO_INDEX_WITHOUT_METHOD_2 = (
     "media_repository_drop_index_wo_method_2"
 )
+
+
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class LocalMedia:
+    media_id: str
+    media_type: str
+    media_length: int
+    upload_name: str
+    created_ts: int
+    last_access_ts: int
+    quarantined_by: Optional[str]
+    safe_from_quarantine: bool
 
 
 class MediaSortOrder(Enum):
@@ -180,7 +194,7 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
         user_id: str,
         order_by: str = MediaSortOrder.CREATED_TS.value,
         direction: Direction = Direction.FORWARDS,
-    ) -> Tuple[List[Dict[str, Any]], int]:
+    ) -> Tuple[List[LocalMedia], int]:
         """Get a paginated list of metadata for a local piece of media
         which an user_id has uploaded
 
@@ -197,7 +211,7 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
 
         def get_local_media_by_user_paginate_txn(
             txn: LoggingTransaction,
-        ) -> Tuple[List[Dict[str, Any]], int]:
+        ) -> Tuple[List[LocalMedia], int]:
             # Set ordering
             order_by_column = MediaSortOrder(order_by).value
 
@@ -217,14 +231,14 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
 
             sql = """
                 SELECT
-                    "media_id",
-                    "media_type",
-                    "media_length",
-                    "upload_name",
-                    "created_ts",
-                    "last_access_ts",
-                    "quarantined_by",
-                    "safe_from_quarantine"
+                    media_id,
+                    media_type,
+                    media_length,
+                    upload_name,
+                    created_ts,
+                    last_access_ts,
+                    quarantined_by,
+                    safe_from_quarantine
                 FROM local_media_repository
                 WHERE user_id = ?
                 ORDER BY {order_by_column} {order}, media_id ASC
@@ -236,7 +250,19 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
 
             args += [limit, start]
             txn.execute(sql, args)
-            media = self.db_pool.cursor_to_dict(txn)
+            media = [
+                LocalMedia(
+                    media_id=row[0],
+                    media_type=row[1],
+                    media_length=row[2],
+                    upload_name=row[3],
+                    created_ts=row[4],
+                    last_access_ts=row[5],
+                    quarantined_by=row[6],
+                    safe_from_quarantine=bool(row[7]),
+                )
+                for row in txn
+            ]
             return media, count
 
         return await self.db_pool.runInteraction(
