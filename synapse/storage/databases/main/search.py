@@ -106,7 +106,7 @@ class SearchWorkerStore(SQLBaseStore):
                 txn,
                 table="event_search",
                 keys=("event_id", "room_id", "key", "value"),
-                values=(
+                values=[
                     (
                         entry.event_id,
                         entry.room_id,
@@ -114,7 +114,7 @@ class SearchWorkerStore(SQLBaseStore):
                         _clean_value_for_search(entry.value),
                     )
                     for entry in entries
-                ),
+                ],
             )
 
         else:

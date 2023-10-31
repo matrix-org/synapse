@@ -1132,7 +1132,7 @@ class DatabasePool:
         txn: LoggingTransaction,
         table: str,
         keys: Collection[str],
-        values: Iterable[Iterable[Any]],
+        values: Collection[Iterable[Any]],
     ) -> None:
         """Executes an INSERT query on the named table.
 
@@ -1145,6 +1145,9 @@ class DatabasePool:
             keys: list of column names
             values: for each row, a list of values in the same order as `keys`
         """
+        # IF there's nothing to insert, don't send the query.
+        if not values:
+            return
 
         if isinstance(txn.database_engine, PostgresEngine):
             # We use `execute_values` as it can be a lot faster than `execute_batch`,
@@ -1470,7 +1473,7 @@ class DatabasePool:
         key_names: Collection[str],
         key_values: Collection[Iterable[Any]],
         value_names: Collection[str],
-        value_values: Iterable[Iterable[Any]],
+        value_values: Collection[Iterable[Any]],
     ) -> None:
         """
         Upsert, many times.
@@ -1483,6 +1486,9 @@ class DatabasePool:
             value_values: A list of each row's value column values.
                 Ignored if value_names is empty.
         """
+        if not value_values:
+            return
+
         if table not in self._unsafe_to_upsert_tables:
             return self.simple_upsert_many_txn_native_upsert(
                 txn, table, key_names, key_values, value_names, value_values
@@ -2059,6 +2065,8 @@ class DatabasePool:
             raise ValueError(
                 f"{len(key_values)} key rows and {len(value_values)} value rows: should be the same number."
             )
+        if not value_values:
+            return
 
         # List of tuples of (value values, then key values)
         # (This matches the order needed for the query)

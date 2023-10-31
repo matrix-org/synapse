@@ -2216,7 +2216,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
             txn,
             table="partial_state_rooms_servers",
             keys=("room_id", "server_name"),
-            values=((room_id, s) for s in servers),
+            values=[(room_id, s) for s in servers],
         )
         self._invalidate_cache_and_stream(txn, self.is_partial_state_room, (room_id,))
         self._invalidate_cache_and_stream(
