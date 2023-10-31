@@ -345,6 +345,7 @@ async def yieldable_gather_results_delaying_cancellation(
 T1 = TypeVar("T1")
 T2 = TypeVar("T2")
 T3 = TypeVar("T3")
+T4 = TypeVar("T4")
 
 
 @overload
@@ -377,6 +378,19 @@ def gather_results(
     ],
     consumeErrors: bool = ...,
 ) -> "defer.Deferred[Tuple[T1, T2, T3]]":
+    ...
+
+
+@overload
+def gather_results(
+    deferredList: Tuple[
+        "defer.Deferred[T1]",
+        "defer.Deferred[T2]",
+        "defer.Deferred[T3]",
+        "defer.Deferred[T4]",
+    ],
+    consumeErrors: bool = ...,
+) -> "defer.Deferred[Tuple[T1, T2, T3, T4]]":
     ...
 
 

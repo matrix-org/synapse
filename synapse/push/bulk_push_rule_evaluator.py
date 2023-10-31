@@ -29,6 +29,8 @@ from typing import (
 
 from prometheus_client import Counter
 
+from twisted.internet import defer
+
 from synapse.api.constants import (
     MAIN_TIMELINE,
     EventContentFields,
@@ -40,11 +42,14 @@ from synapse.api.room_versions import PushRuleRoomFlag
 from synapse.event_auth import auth_types_for_event, get_user_power_level
 from synapse.events import EventBase, relation_from_event
 from synapse.events.snapshot import EventContext
+from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.state import POWER_KEY
 from synapse.storage.databases.main.roommember import EventIdMembership
 from synapse.synapse_rust.push import FilteredPushRules, PushRuleEvaluator
 from synapse.types import JsonValue
 from synapse.types.state import StateFilter
+from synapse.util import unwrapFirstError
+from synapse.util.async_helpers import gather_results
 from synapse.util.caches import register_cache
 from synapse.util.metrics import measure_func
 from synapse.visibility import filter_event_for_clients_with_state
@@ -342,15 +347,33 @@ class BulkPushRuleEvaluator:
         rules_by_user = await self._get_rules_for_event(event)
         actions_by_user: Dict[str, Collection[Union[Mapping, str]]] = {}
 
-        room_member_count = await self.store.get_number_joined_users_in_room(
-            event.room_id
-        )
-
+        # Gather a bunch of info in parallel.
         (
-            power_levels,
-            sender_power_level,
-        ) = await self._get_power_levels_and_sender_level(
-            event, context, event_id_to_event
+            room_member_count,
+            (power_levels, sender_power_level),
+            related_events,
+            profiles,
+        ) = await make_deferred_yieldable(
+            gather_results(
+                (
+                    run_in_background(
+                        self.store.get_number_joined_users_in_room, event.room_id
+                    ),
+                    run_in_background(
+                        self._get_power_levels_and_sender_level,
+                        event,
+                        context,
+                        event_id_to_event,
+                    ),
+                    run_in_background(self._related_events, event),
+                    run_in_background(
+                        self.store.get_subset_users_in_room_with_profiles,
+                        event.room_id,
+                        rules_by_user.keys(),
+                    ),
+                ),
+                consumeErrors=True,
+            )#.addErrback(unwrapFirstError)
         )
 
         # Find the event's thread ID.
@@ -365,8 +388,6 @@ class BulkPushRuleEvaluator:
                 # Since the event has not yet been persisted we check whether
                 # the parent is part of a thread.
                 thread_id = await self.store.get_thread_id(relation.parent_id)
-
-        related_events = await self._related_events(event)
 
         # It's possible that old room versions have non-integer power levels (floats or
         # strings; even the occasional `null`). For old rooms, we interpret these as if
@@ -398,11 +419,6 @@ class BulkPushRuleEvaluator:
             self._related_event_match_enabled,
             event.room_version.msc3931_push_features,
             self.hs.config.experimental.msc1767_enabled,  # MSC3931 flag
-        )
-
-        users = rules_by_user.keys()
-        profiles = await self.store.get_subset_users_in_room_with_profiles(
-            event.room_id, users
         )
 
         for uid, rules in rules_by_user.items():
