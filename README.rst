@@ -8,7 +8,7 @@ reaching v1.0.0 in 2019. Development on Synapse and the Matrix protocol itself c
 in earnest today.
 
 Briefly, Matrix is an open standard for communications on the internet, supporting
-federation, encryption, and VoIP. Matrix.org has more to say about the `goals of the
+federation, encryption and VoIP. Matrix.org has more to say about the `goals of the
 Matrix project <https://matrix.org/docs/guides/introduction>`_, and the `formal specification
 <https://spec.matrix.org/>`_ describes the technical details.
 
