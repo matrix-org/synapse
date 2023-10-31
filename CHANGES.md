@@ -1,3 +1,17 @@
+# Synapse 1.95.1 (2023-10-31)
+
+## Security advisory
+
+The following issue is fixed in 1.95.1.
+
+- [GHSA-mp92-3jfm-3575](https://github.com/matrix-org/synapse/security/advisories/GHSA-mp92-3jfm-3575) / [CVE-2023-43796](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2023-43796) — Moderate Severity
+
+  Cached device information of remote users can be queried from Synapse. This can be used to enumerate the remote users known to a homeserver.
+
+See the advisory for more details. If you have any questions, email security@matrix.org.
+
+
+
 # Synapse 1.95.0 (2023-10-24)
 
 ### Internal Changes
