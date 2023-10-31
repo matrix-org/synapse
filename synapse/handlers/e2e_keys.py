@@ -542,6 +542,12 @@ class E2eKeysHandler:
         device_keys_query: Dict[str, Optional[List[str]]] = query_body.get(
             "device_keys", {}
         )
+        if any(
+            not self.is_mine(UserID.from_string(user_id))
+            for user_id in device_keys_query
+        ):
+            raise SynapseError(400, "User is not hosted on this homeserver")
+
         res = await self.query_local_devices(
             device_keys_query,
             include_displaynames=(
