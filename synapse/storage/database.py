@@ -419,6 +419,16 @@ class LoggingTransaction:
         self._do_execute(self.txn.execute, sql, parameters)
 
     def executemany(self, sql: str, *args: Any) -> None:
+        """Repeatedly execute the same piece of SQL with different parameters.
+
+        See https://peps.python.org/pep-0249/#executemany. Note in particular that
+
+        > Use of this method for an operation which produces one or more result sets
+        > constitutes undefined behavior
+
+        so you can't use this for e.g. a SELECT, an UPDATE ... RETURNING, or a
+        DELETE FROM... RETURNING.
+        """
         # TODO: we should add a type for *args here. Looking at Cursor.executemany
         # and DBAPI2 it ought to be Sequence[_Parameter], but we pass in
         # Iterable[Iterable[Any]] in execute_batch and execute_values above, which mypy

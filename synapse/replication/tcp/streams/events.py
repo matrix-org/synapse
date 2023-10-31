@@ -157,6 +157,12 @@ class EventsStream(_StreamFromIdGen):
         current_token: Token,
         target_row_count: int,
     ) -> StreamUpdateResult:
+        # The events stream cannot be "reset", so its safe to return early if
+        # the from token is larger than the current token (the DB query will
+        # trivially return 0 rows anyway).
+        if from_token >= current_token:
+            return [], current_token, False
+
         # the events stream merges together three separate sources:
         #  * new events
         #  * current_state changes
