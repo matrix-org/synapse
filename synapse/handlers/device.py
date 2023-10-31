@@ -328,6 +328,9 @@ class DeviceWorkerHandler:
         return result
 
     async def on_federation_query_user_devices(self, user_id: str) -> JsonDict:
+        if not self.hs.is_mine(UserID.from_string(user_id)):
+            raise SynapseError(400, "User is not hosted on this homeserver")
+
         stream_id, devices = await self.store.get_e2e_device_keys_for_federation_query(
             user_id
         )
