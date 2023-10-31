@@ -542,12 +542,14 @@ class EventsPersistenceStorageController:
         return await res.get_state(self._state_controller, StateFilter.all())
 
     async def _persist_event_batch(
-        self, _room_id: str, task: _PersistEventsTask
+        self, room_id: str, task: _PersistEventsTask
     ) -> Dict[str, str]:
         """Callback for the _event_persist_queue
 
         Calculates the change to current state and forward extremities, and
         persists the given events and with those updates.
+
+        Assumes that we are only persisting events for one room at a time.
 
         Returns:
             A dictionary of event ID to event ID we didn't persist as we already
@@ -594,45 +596,23 @@ class EventsPersistenceStorageController:
             # We can't easily parallelize these since different chunks
             # might contain the same event. :(
 
-            # NB: Assumes that we are only persisting events for one room
-            # at a time.
-
-            # map room_id->set[event_ids] giving the new forward
-            # extremities in each room
-            new_forward_extremities: Dict[str, Set[str]] = {}
-
-            # map room_id->(to_delete, to_insert) where to_delete is a list
-            # of type/state keys to remove from current state, and to_insert
-            # is a map (type,key)->event_id giving the state delta in each
-            # room
-            state_delta_for_room: Dict[str, DeltaState] = {}
+            new_forward_extremities = None
+            state_delta_for_room = None
 
             if not backfilled:
                 with Measure(self._clock, "_calculate_state_and_extrem"):
-                    # Work out the new "current state" for each room.
+                    # Work out the new "current state" for the room.
                     # We do this by working out what the new extremities are and then
                     # calculating the state from that.
-                    events_by_room: Dict[str, List[Tuple[EventBase, EventContext]]] = {}
-                    for event, context in chunk:
-                        events_by_room.setdefault(event.room_id, []).append(
-                            (event, context)
-                        )
-
-                    for room_id, ev_ctx_rm in events_by_room.items():
-                        (
-                            new_forward_extremities_for_room,
-                            delta,
-                        ) = await self._calculate_new_forward_extremities_and_state_delta(
-                            room_id, ev_ctx_rm
-                        )
-                        if new_forward_extremities_for_room:
-                            new_forward_extremities[
-                                room_id
-                            ] = new_forward_extremities_for_room
-                        if delta:
-                            state_delta_for_room[room_id] = delta
+                    (
+                        new_forward_extremities,
+                        state_delta_for_room,
+                    ) = await self._calculate_new_forward_extremities_and_state_delta(
+                        room_id, chunk
+                    )
 
             await self.persist_events_store._persist_events_and_state_updates(
+                room_id,
                 chunk,
                 state_delta_for_room=state_delta_for_room,
                 new_forward_extremities=new_forward_extremities,
