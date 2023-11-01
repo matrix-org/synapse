@@ -1359,7 +1359,7 @@ class PersistEventsStore:
                 [event.event_id for event, _ in events_and_contexts],
                 keyvalues={},
                 retcols=("event_id", "outlier"),
-            )
+            ),
         )
 
         have_persisted = dict(rows)
