@@ -1,1 +1,1 @@
-Use `make_in_list_sql_clause` in persistance path.
+Use standard SQL helpers in persistence code.
