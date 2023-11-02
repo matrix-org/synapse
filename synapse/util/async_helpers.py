@@ -395,9 +395,9 @@ def gather_results(
 
 
 def gather_results(  # type: ignore[misc]
-    deferredList: Tuple["defer.Deferred[T1]", ...],
+    deferredList: Tuple["defer.Deferred[Any]", ...],
     consumeErrors: bool = False,
-) -> "defer.Deferred[Tuple[T1, ...]]":
+) -> "defer.Deferred[Tuple[Any, ...]]":
     """Combines a tuple of `Deferred`s into a single `Deferred`.
 
     Wraps `defer.gatherResults` to provide type annotations that support heterogenous
