@@ -18,7 +18,6 @@ import logging
 import time
 import types
 from collections import defaultdict
-from sys import intern
 from time import monotonic as monotonic_time
 from typing import (
     TYPE_CHECKING,
@@ -35,7 +34,6 @@ from typing import (
     Tuple,
     Type,
     TypeVar,
-    Union,
     cast,
     overload,
 )
@@ -421,6 +419,16 @@ class LoggingTransaction:
         self._do_execute(self.txn.execute, sql, parameters)
 
     def executemany(self, sql: str, *args: Any) -> None:
+        """Repeatedly execute the same piece of SQL with different parameters.
+
+        See https://peps.python.org/pep-0249/#executemany. Note in particular that
+
+        > Use of this method for an operation which produces one or more result sets
+        > constitutes undefined behavior
+
+        so you can't use this for e.g. a SELECT, an UPDATE ... RETURNING, or a
+        DELETE FROM... RETURNING.
+        """
         # TODO: we should add a type for *args here. Looking at Cursor.executemany
         # and DBAPI2 it ought to be Sequence[_Parameter], but we pass in
         # Iterable[Iterable[Any]] in execute_batch and execute_values above, which mypy
@@ -606,13 +614,16 @@ class DatabasePool:
 
         If the background updates have not completed, wait 15 sec and check again.
         """
-        updates = await self.simple_select_list(
-            "background_updates",
-            keyvalues=None,
-            retcols=["update_name"],
-            desc="check_background_updates",
+        updates = cast(
+            List[Tuple[str]],
+            await self.simple_select_list(
+                "background_updates",
+                keyvalues=None,
+                retcols=["update_name"],
+                desc="check_background_updates",
+            ),
         )
-        background_update_names = [x["update_name"] for x in updates]
+        background_update_names = [x[0] for x in updates]
 
         for table, update_name in UNIQUE_INDEX_BACKGROUND_UPDATES.items():
             if update_name not in background_update_names:
@@ -1030,57 +1041,20 @@ class DatabasePool:
             self._db_pool.runWithConnection(inner_func, *args, **kwargs)
         )
 
-    @staticmethod
-    def cursor_to_dict(cursor: Cursor) -> List[Dict[str, Any]]:
-        """Converts a SQL cursor into an list of dicts.
-
-        Args:
-            cursor: The DBAPI cursor which has executed a query.
-        Returns:
-            A list of dicts where the key is the column header.
-        """
-        assert cursor.description is not None, "cursor.description was None"
-        col_headers = [intern(str(column[0])) for column in cursor.description]
-        results = [dict(zip(col_headers, row)) for row in cursor]
-        return results
-
-    @overload
-    async def execute(
-        self, desc: str, decoder: Literal[None], query: str, *args: Any
-    ) -> List[Tuple[Any, ...]]:
-        ...
-
-    @overload
-    async def execute(
-        self, desc: str, decoder: Callable[[Cursor], R], query: str, *args: Any
-    ) -> R:
-        ...
-
-    async def execute(
-        self,
-        desc: str,
-        decoder: Optional[Callable[[Cursor], R]],
-        query: str,
-        *args: Any,
-    ) -> Union[List[Tuple[Any, ...]], R]:
+    async def execute(self, desc: str, query: str, *args: Any) -> List[Tuple[Any, ...]]:
         """Runs a single query for a result set.
 
         Args:
             desc: description of the transaction, for logging and metrics
-            decoder - The function which can resolve the cursor results to
-                something meaningful.
             query - The query string to execute
             *args - Query args.
         Returns:
             The result of decoder(results)
         """
 
-        def interaction(txn: LoggingTransaction) -> Union[List[Tuple[Any, ...]], R]:
+        def interaction(txn: LoggingTransaction) -> List[Tuple[Any, ...]]:
             txn.execute(query, args)
-            if decoder:
-                return decoder(txn)
-            else:
-                return txn.fetchall()
+            return txn.fetchall()
 
         return await self.runInteraction(desc, interaction)
 
@@ -1804,9 +1778,9 @@ class DatabasePool:
         keyvalues: Optional[Dict[str, Any]],
         retcols: Collection[str],
         desc: str = "simple_select_list",
-    ) -> List[Dict[str, Any]]:
+    ) -> List[Tuple[Any, ...]]:
         """Executes a SELECT query on the named table, which may return zero or
-        more rows, returning the result as a list of dicts.
+        more rows, returning the result as a list of tuples.
 
         Args:
             table: the table name
@@ -1817,8 +1791,7 @@ class DatabasePool:
             desc: description of the transaction, for logging and metrics
 
         Returns:
-            A list of dictionaries, one per result row, each a mapping between the
-            column names from `retcols` and that column's value for the row.
+            A list of tuples, one per result row, each the retcolumn's value for the row.
         """
         return await self.runInteraction(
             desc,
@@ -1836,9 +1809,9 @@ class DatabasePool:
         table: str,
         keyvalues: Optional[Dict[str, Any]],
         retcols: Iterable[str],
-    ) -> List[Dict[str, Any]]:
+    ) -> List[Tuple[Any, ...]]:
         """Executes a SELECT query on the named table, which may return zero or
-        more rows, returning the result as a list of dicts.
+        more rows, returning the result as a list of tuples.
 
         Args:
             txn: Transaction object
@@ -1849,8 +1822,7 @@ class DatabasePool:
             retcols: the names of the columns to return
 
         Returns:
-            A list of dictionaries, one per result row, each a mapping between the
-            column names from `retcols` and that column's value for the row.
+            A list of tuples, one per result row, each the retcolumn's value for the row.
         """
         if keyvalues:
             sql = "SELECT %s FROM %s WHERE %s" % (
@@ -1863,7 +1835,7 @@ class DatabasePool:
             sql = "SELECT %s FROM %s" % (", ".join(retcols), table)
             txn.execute(sql)
 
-        return cls.cursor_to_dict(txn)
+        return txn.fetchall()
 
     async def simple_select_many_batch(
         self,

@@ -230,6 +230,13 @@ Example configuration:
 presence:
   enabled: false
 ```
+
+`enabled` can also be set to a special value of "untracked" which ignores updates
+received via clients and federation, while still accepting updates from the
+[module API](../../modules/index.md).
+
+*The "untracked" option was added in Synapse 1.96.0.*
+
 ---
 ### `require_auth_for_profile_requests`
 
@@ -3797,62 +3804,160 @@ enable_room_list_search: false
 ---
 ### `alias_creation_rules`
 
-The `alias_creation_rules` option controls who is allowed to create aliases
-on this server.
+The `alias_creation_rules` option allows server admins to prevent unwanted
+alias creation on this server.
 
-The format of this option is a list of rules that contain globs that
-match against user_id, room_id and the new alias (fully qualified with
-server name). The action in the first rule that matches is taken,
-which can currently either be "allow" or "deny".
+This setting is an optional list of 0 or more rules. By default, no list is
+provided, meaning that all alias creations are permitted.
 
-Missing user_id/room_id/alias fields default to "*".
+Otherwise, requests to create aliases are matched against each rule in order.
+The first rule that matches decides if the request is allowed or denied. If no 
+rule matches, the request is denied. In particular, this means that configuring
+an empty list of rules will deny every alias creation request.
 
-If no rules match the request is denied. An empty list means no one
-can create aliases.
+Each rule is a YAML object containing four fields, each of which is an optional string:
 
-Options for the rules include:
-* `user_id`: Matches against the creator of the alias. Defaults to "*".
-* `alias`: Matches against the alias being created. Defaults to "*".
-* `room_id`: Matches against the room ID the alias is being pointed at. Defaults to "*"
-* `action`: Whether to "allow" or "deny" the request if the rule matches. Defaults to allow.
+* `user_id`: a glob pattern that matches against the creator of the alias.
+* `alias`: a glob pattern that matches against the alias being created.
+* `room_id`: a glob pattern that matches against the room ID the alias is being pointed at.
+* `action`: either `allow` or `deny`. What to do with the request if the rule matches. Defaults to `allow`.
+
+Each of the glob patterns is optional, defaulting to `*` ("match anything").
+Note that the patterns match against fully qualified IDs, e.g. against 
+`@alice:example.com`, `#room:example.com` and `!abcdefghijk:example.com` instead
+of `alice`, `room` and `abcedgghijk`.
 
 Example configuration:
+
 ```yaml
+# No rule list specified. All alias creations are allowed.
+# This is the default behaviour.
 alias_creation_rules:
-  - user_id: "bad_user"
-    alias: "spammy_alias"
-    room_id: "*"
-    action: deny
 ```
+
+```yaml
+# A list of one rule which allows everything.
+# This has the same effect as the previous example.
+alias_creation_rules:
+  - "action": "allow"
+```
+
+```yaml
+# An empty list of rules. All alias creations are denied.
+alias_creation_rules: []
+```
+
+```yaml
+# A list of one rule which denies everything.
+# This has the same effect as the previous example.
+alias_creation_rules:
+  - "action": "deny"
+```
+
+```yaml
+# Prevent a specific user from creating aliases.
+# Allow other users to create any alias
+alias_creation_rules:
+  - user_id: "@bad_user:example.com"
+    action: deny
+    
+  - action: allow
+```
+
+```yaml
+# Prevent aliases being created which point to a specific room.
+alias_creation_rules:
+  - room_id: "!forbiddenRoom:example.com"
+    action: deny
+
+  - action: allow
+```
+
 ---
 ### `room_list_publication_rules`
 
-The `room_list_publication_rules` option controls who can publish and
-which rooms can be published in the public room list.
+The `room_list_publication_rules` option allows server admins to prevent
+unwanted entries from being published in the public room list.
 
 The format of this option is the same as that for
-`alias_creation_rules`.
+[`alias_creation_rules`](#alias_creation_rules): an optional list of 0 or more
+rules. By default, no list is provided, meaning that all rooms may be
+published to the room list.
 
-If the room has one or more aliases associated with it, only one of
-the aliases needs to match the alias rule. If there are no aliases
-then only rules with `alias: *` match.
+Otherwise, requests to publish a room are matched against each rule in order.
+The first rule that matches decides if the request is allowed or denied. If no
+rule matches, the request is denied. In particular, this means that configuring
+an empty list of rules will deny every alias creation request.
 
-If no rules match the request is denied. An empty list means no one
-can publish rooms.
+Each rule is a YAML object containing four fields, each of which is an optional string:
 
-Options for the rules include:
-* `user_id`: Matches against the creator of the alias. Defaults to "*".
-* `alias`: Matches against any current local or canonical aliases associated with the room. Defaults to "*".
-* `room_id`: Matches against the room ID being published. Defaults to "*".
-* `action`: Whether to "allow" or "deny" the request if the rule matches. Defaults to allow.
+* `user_id`: a glob pattern that matches against the user publishing the room.
+* `alias`: a glob pattern that matches against one of published room's aliases.
+  - If the room has no aliases, the alias match fails unless `alias` is unspecified or `*`.
+  - If the room has exactly one alias, the alias match succeeds if the `alias` pattern matches that alias.
+  - If the room has two or more aliases, the alias match succeeds if the pattern matches at least one of the aliases.
+* `room_id`: a glob pattern that matches against the room ID of the room being published.
+* `action`: either `allow` or `deny`. What to do with the request if the rule matches. Defaults to `allow`.
+
+Each of the glob patterns is optional, defaulting to `*` ("match anything").
+Note that the patterns match against fully qualified IDs, e.g. against
+`@alice:example.com`, `#room:example.com` and `!abcdefghijk:example.com` instead
+of `alice`, `room` and `abcedgghijk`.
+
 
 Example configuration:
+
 ```yaml
+# No rule list specified. Anyone may publish any room to the public list.
+# This is the default behaviour.
 room_list_publication_rules:
-  - user_id: "*"
-    alias: "*"
-    room_id: "*"
-    action: allow
+```
+
+```yaml
+# A list of one rule which allows everything.
+# This has the same effect as the previous example.
+room_list_publication_rules:
+  - "action": "allow"
+```
+
+```yaml
+# An empty list of rules. No-one may publish to the room list.
+room_list_publication_rules: []
+```
+
+```yaml
+# A list of one rule which denies everything.
+# This has the same effect as the previous example.
+room_list_publication_rules:
+  - "action": "deny"
+```
+
+```yaml
+# Prevent a specific user from publishing rooms.
+# Allow other users to publish anything.
+room_list_publication_rules:
+  - user_id: "@bad_user:example.com"
+    action: deny
+    
+  - action: allow
+```
+
+```yaml
+# Prevent publication of a specific room.
+room_list_publication_rules:
+  - room_id: "!forbiddenRoom:example.com"
+    action: deny
+
+  - action: allow
+```
+
+```yaml
+# Prevent publication of rooms with at least one alias containing the word "potato".
+room_list_publication_rules:
+  - alias: "#*potato*:example.com"
+    action: deny
+
+  - action: allow
 ```
 
 ---

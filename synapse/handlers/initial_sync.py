@@ -145,7 +145,7 @@ class InitialSyncHandler:
         joined_rooms = [r.room_id for r in room_list if r.membership == Membership.JOIN]
         receipt = await self.store.get_linearized_receipts_for_rooms(
             joined_rooms,
-            to_key=int(now_token.receipt_key),
+            to_key=now_token.receipt_key,
         )
 
         receipt = ReceiptEventSource.filter_out_private_receipts(receipt, user_id)
@@ -173,7 +173,7 @@ class InitialSyncHandler:
                 d["inviter"] = event.sender
 
                 invite_event = await self.store.get_event(event.event_id)
-                d["invite"] = self._event_serializer.serialize_event(
+                d["invite"] = await self._event_serializer.serialize_event(
                     invite_event,
                     time_now,
                     config=serializer_options,
@@ -225,7 +225,7 @@ class InitialSyncHandler:
 
                 d["messages"] = {
                     "chunk": (
-                        self._event_serializer.serialize_events(
+                        await self._event_serializer.serialize_events(
                             messages,
                             time_now=time_now,
                             config=serializer_options,
@@ -235,7 +235,7 @@ class InitialSyncHandler:
                     "end": await end_token.to_string(self.store),
                 }
 
-                d["state"] = self._event_serializer.serialize_events(
+                d["state"] = await self._event_serializer.serialize_events(
                     current_state.values(),
                     time_now=time_now,
                     config=serializer_options,
@@ -387,7 +387,7 @@ class InitialSyncHandler:
             "messages": {
                 "chunk": (
                     # Don't bundle aggregations as this is a deprecated API.
-                    self._event_serializer.serialize_events(
+                    await self._event_serializer.serialize_events(
                         messages, time_now, config=serialize_options
                     )
                 ),
@@ -396,7 +396,7 @@ class InitialSyncHandler:
             },
             "state": (
                 # Don't bundle aggregations as this is a deprecated API.
-                self._event_serializer.serialize_events(
+                await self._event_serializer.serialize_events(
                     room_state.values(), time_now, config=serialize_options
                 )
             ),
@@ -420,7 +420,7 @@ class InitialSyncHandler:
         time_now = self.clock.time_msec()
         serialize_options = SerializeEventConfig(requester=requester)
         # Don't bundle aggregations as this is a deprecated API.
-        state = self._event_serializer.serialize_events(
+        state = await self._event_serializer.serialize_events(
             current_state.values(),
             time_now,
             config=serialize_options,
@@ -439,7 +439,7 @@ class InitialSyncHandler:
 
         async def get_presence() -> List[JsonDict]:
             # If presence is disabled, return an empty list
-            if not self.hs.config.server.use_presence:
+            if not self.hs.config.server.presence_enabled:
                 return []
 
             states = await presence_handler.get_states(
@@ -497,7 +497,7 @@ class InitialSyncHandler:
             "messages": {
                 "chunk": (
                     # Don't bundle aggregations as this is a deprecated API.
-                    self._event_serializer.serialize_events(
+                    await self._event_serializer.serialize_events(
                         messages, time_now, config=serialize_options
                     )
                 ),

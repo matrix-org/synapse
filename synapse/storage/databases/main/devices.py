@@ -283,7 +283,9 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
             allow_none=True,
         )
 
-    async def get_devices_by_user(self, user_id: str) -> Dict[str, Dict[str, str]]:
+    async def get_devices_by_user(
+        self, user_id: str
+    ) -> Dict[str, Dict[str, Optional[str]]]:
         """Retrieve all of a user's registered devices. Only returns devices
         that are not marked as hidden.
 
@@ -291,20 +293,26 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
             user_id:
         Returns:
             A mapping from device_id to a dict containing "device_id", "user_id"
-            and "display_name" for each device.
+            and "display_name" for each device. Display name may be null.
         """
-        devices = await self.db_pool.simple_select_list(
-            table="devices",
-            keyvalues={"user_id": user_id, "hidden": False},
-            retcols=("user_id", "device_id", "display_name"),
-            desc="get_devices_by_user",
+        devices = cast(
+            List[Tuple[str, str, Optional[str]]],
+            await self.db_pool.simple_select_list(
+                table="devices",
+                keyvalues={"user_id": user_id, "hidden": False},
+                retcols=("user_id", "device_id", "display_name"),
+                desc="get_devices_by_user",
+            ),
         )
 
-        return {d["device_id"]: d for d in devices}
+        return {
+            d[1]: {"user_id": d[0], "device_id": d[1], "display_name": d[2]}
+            for d in devices
+        }
 
     async def get_devices_by_auth_provider_session_id(
         self, auth_provider_id: str, auth_provider_session_id: str
-    ) -> List[Dict[str, Any]]:
+    ) -> List[Tuple[str, str]]:
         """Retrieve the list of devices associated with a SSO IdP session ID.
 
         Args:
@@ -313,14 +321,17 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
         Returns:
             A list of dicts containing the device_id and the user_id of each device
         """
-        return await self.db_pool.simple_select_list(
-            table="device_auth_providers",
-            keyvalues={
-                "auth_provider_id": auth_provider_id,
-                "auth_provider_session_id": auth_provider_session_id,
-            },
-            retcols=("user_id", "device_id"),
-            desc="get_devices_by_auth_provider_session_id",
+        return cast(
+            List[Tuple[str, str]],
+            await self.db_pool.simple_select_list(
+                table="device_auth_providers",
+                keyvalues={
+                    "auth_provider_id": auth_provider_id,
+                    "auth_provider_session_id": auth_provider_session_id,
+                },
+                retcols=("user_id", "device_id"),
+                desc="get_devices_by_auth_provider_session_id",
+            ),
         )
 
     @trace
@@ -821,15 +832,16 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
     async def get_cached_devices_for_user(
         self, user_id: str
     ) -> Mapping[str, JsonMapping]:
-        devices = await self.db_pool.simple_select_list(
-            table="device_lists_remote_cache",
-            keyvalues={"user_id": user_id},
-            retcols=("device_id", "content"),
-            desc="get_cached_devices_for_user",
+        devices = cast(
+            List[Tuple[str, str]],
+            await self.db_pool.simple_select_list(
+                table="device_lists_remote_cache",
+                keyvalues={"user_id": user_id},
+                retcols=("device_id", "content"),
+                desc="get_cached_devices_for_user",
+            ),
         )
-        return {
-            device["device_id"]: db_to_json(device["content"]) for device in devices
-        }
+        return {device[0]: db_to_json(device[1]) for device in devices}
 
     def get_cached_device_list_changes(
         self,
@@ -882,7 +894,6 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
 
         rows = await self.db_pool.execute(
             "get_all_devices_changed",
-            None,
             sql,
             from_key,
             to_key,
@@ -966,7 +977,7 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
                 WHERE from_user_id = ? AND stream_id > ?
             """
             rows = await self.db_pool.execute(
-                "get_users_whose_signatures_changed", None, sql, user_id, from_key
+                "get_users_whose_signatures_changed", sql, user_id, from_key
             )
             return {user for row in rows for user in db_to_json(row[0])}
         else:
@@ -1080,7 +1091,7 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
             The IDs of users whose device lists need resync.
         """
         if user_ids:
-            row_tuples = cast(
+            rows = cast(
                 List[Tuple[str]],
                 await self.db_pool.simple_select_many_batch(
                     table="device_lists_remote_resync",
@@ -1090,11 +1101,9 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
                     desc="get_user_ids_requiring_device_list_resync_with_iterable",
                 ),
             )
-
-            return {row[0] for row in row_tuples}
         else:
             rows = cast(
-                List[Dict[str, str]],
+                List[Tuple[str]],
                 await self.db_pool.simple_select_list(
                     table="device_lists_remote_resync",
                     keyvalues=None,
@@ -1103,7 +1112,7 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
                 ),
             )
 
-            return {row["user_id"] for row in rows}
+        return {row[0] for row in rows}
 
     async def mark_remote_users_device_caches_as_stale(
         self, user_ids: StrCollection
@@ -1611,7 +1620,6 @@ class DeviceBackgroundUpdateStore(SQLBaseStore):
         #
         # For each duplicate, we delete all the existing rows and put one back.
 
-        KEY_COLS = ["stream_id", "destination", "user_id", "device_id"]
         last_row = progress.get(
             "last_row",
             {"stream_id": 0, "destination": "", "user_id": "", "device_id": ""},
@@ -1619,44 +1627,62 @@ class DeviceBackgroundUpdateStore(SQLBaseStore):
 
         def _txn(txn: LoggingTransaction) -> int:
             clause, args = make_tuple_comparison_clause(
-                [(x, last_row[x]) for x in KEY_COLS]
+                [
+                    ("stream_id", last_row["stream_id"]),
+                    ("destination", last_row["destination"]),
+                    ("user_id", last_row["user_id"]),
+                    ("device_id", last_row["device_id"]),
+                ]
             )
-            sql = """
+            sql = f"""
                 SELECT stream_id, destination, user_id, device_id, MAX(ts) AS ts
                 FROM device_lists_outbound_pokes
-                WHERE %s
-                GROUP BY %s
+                WHERE {clause}
+                GROUP BY stream_id, destination, user_id, device_id
                 HAVING count(*) > 1
-                ORDER BY %s
+                ORDER BY stream_id, destination, user_id, device_id
                 LIMIT ?
-                """ % (
-                clause,  # WHERE
-                ",".join(KEY_COLS),  # GROUP BY
-                ",".join(KEY_COLS),  # ORDER BY
-            )
+                """
             txn.execute(sql, args + [batch_size])
-            rows = self.db_pool.cursor_to_dict(txn)
+            rows = txn.fetchall()
 
-            row = None
-            for row in rows:
+            stream_id, destination, user_id, device_id = None, None, None, None
+            for stream_id, destination, user_id, device_id, _ in rows:
                 self.db_pool.simple_delete_txn(
                     txn,
                     "device_lists_outbound_pokes",
-                    {x: row[x] for x in KEY_COLS},
+                    {
+                        "stream_id": stream_id,
+                        "destination": destination,
+                        "user_id": user_id,
+                        "device_id": device_id,
+                    },
                 )
 
-                row["sent"] = False
                 self.db_pool.simple_insert_txn(
                     txn,
                     "device_lists_outbound_pokes",
-                    row,
+                    {
+                        "stream_id": stream_id,
+                        "destination": destination,
+                        "user_id": user_id,
+                        "device_id": device_id,
+                        "sent": False,
+                    },
                 )
 
-            if row:
+            if rows:
                 self.db_pool.updates._background_update_progress_txn(
                     txn,
                     BG_UPDATE_REMOVE_DUP_OUTBOUND_POKES,
-                    {"last_row": row},
+                    {
+                        "last_row": {
+                            "stream_id": stream_id,
+                            "destination": destination,
+                            "user_id": user_id,
+                            "device_id": device_id,
+                        }
+                    },
                 )
 
             return len(rows)

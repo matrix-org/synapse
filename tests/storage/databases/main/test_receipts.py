@@ -117,7 +117,7 @@ class ReceiptsBackgroundUpdateStoreTestCase(HomeserverTestCase):
             if expected_row is not None:
                 columns += expected_row.keys()
 
-            rows = self.get_success(
+            row_tuples = self.get_success(
                 self.store.db_pool.simple_select_list(
                     table=table,
                     keyvalues={
@@ -134,22 +134,22 @@ class ReceiptsBackgroundUpdateStoreTestCase(HomeserverTestCase):
 
             if expected_row is not None:
                 self.assertEqual(
-                    len(rows),
+                    len(row_tuples),
                     1,
                     f"Background update did not leave behind latest receipt in {table}",
                 )
                 self.assertEqual(
-                    rows[0],
-                    {
-                        "room_id": room_id,
-                        "receipt_type": receipt_type,
-                        "user_id": user_id,
-                        **expected_row,
-                    },
+                    row_tuples[0],
+                    (
+                        room_id,
+                        receipt_type,
+                        user_id,
+                        *expected_row.values(),
+                    ),
                 )
             else:
                 self.assertEqual(
-                    len(rows),
+                    len(row_tuples),
                     0,
                     f"Background update did not remove all duplicate receipts from {table}",
                 )

@@ -844,7 +844,7 @@ class FederationSender(AbstractFederationSender):
         destinations (list[str])
         """
 
-        if not states or not self.hs.config.server.use_presence:
+        if not states or not self.hs.config.server.track_presence:
             # No-op if presence is disabled.
             return
 

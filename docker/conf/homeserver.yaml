@@ -67,8 +67,8 @@ database:
     host: "{{ POSTGRES_HOST or "db" }}"
     port: "{{ POSTGRES_PORT or "5432" }}"
 {% endif %}
-    cp_min: 5
-    cp_max: 10
+    cp_min: {{ POSTGRES_CP_MIN or 5 }}
+    cp_max: {{ POSTGRES_CP_MAX or 10 }}
 {% else %}
 database:
   name: "sqlite3"

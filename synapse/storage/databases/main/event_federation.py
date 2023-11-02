@@ -1898,21 +1898,23 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         # keeping only the forward extremities (i.e. the events not referenced
         # by other events in the queue). We do this so that we can always
         # backpaginate in all the events we have dropped.
-        rows = await self.db_pool.simple_select_list(
-            table="federation_inbound_events_staging",
-            keyvalues={"room_id": room_id},
-            retcols=("event_id", "event_json"),
-            desc="prune_staged_events_in_room_fetch",
+        rows = cast(
+            List[Tuple[str, str]],
+            await self.db_pool.simple_select_list(
+                table="federation_inbound_events_staging",
+                keyvalues={"room_id": room_id},
+                retcols=("event_id", "event_json"),
+                desc="prune_staged_events_in_room_fetch",
+            ),
         )
 
         # Find the set of events referenced by those in the queue, as well as
         # collecting all the event IDs in the queue.
         referenced_events: Set[str] = set()
         seen_events: Set[str] = set()
-        for row in rows:
-            event_id = row["event_id"]
+        for event_id, event_json in rows:
             seen_events.add(event_id)
-            event_d = db_to_json(row["event_json"])
+            event_d = db_to_json(event_json)
 
             # We don't bother parsing the dicts into full blown event objects,
             # as that is needlessly expensive.

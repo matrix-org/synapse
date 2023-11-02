@@ -93,7 +93,7 @@ class CensorEventsStore(EventsWorkerStore, CacheInvalidationWorkerStore, SQLBase
         """
 
         rows = await self.db_pool.execute(
-            "_censor_redactions_fetch", None, sql, before_ts, 100
+            "_censor_redactions_fetch", sql, before_ts, 100
         )
 
         updates = []

@@ -384,7 +384,7 @@ class SyncRestServlet(RestServlet):
         """
         invited = {}
         for room in rooms:
-            invite = self._event_serializer.serialize_event(
+            invite = await self._event_serializer.serialize_event(
                 room.invite, time_now, config=serialize_options
             )
             unsigned = dict(invite.get("unsigned", {}))
@@ -415,7 +415,7 @@ class SyncRestServlet(RestServlet):
         """
         knocked = {}
         for room in rooms:
-            knock = self._event_serializer.serialize_event(
+            knock = await self._event_serializer.serialize_event(
                 room.knock, time_now, config=serialize_options
             )
 
@@ -506,10 +506,10 @@ class SyncRestServlet(RestServlet):
                     event.room_id,
                 )
 
-        serialized_state = self._event_serializer.serialize_events(
+        serialized_state = await self._event_serializer.serialize_events(
             state_events, time_now, config=serialize_options
         )
-        serialized_timeline = self._event_serializer.serialize_events(
+        serialized_timeline = await self._event_serializer.serialize_events(
             timeline_events,
             time_now,
             config=serialize_options,

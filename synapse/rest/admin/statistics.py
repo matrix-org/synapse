@@ -108,7 +108,18 @@ class UserMediaStatisticsRestServlet(RestServlet):
         users_media, total = await self.store.get_users_media_usage_paginate(
             start, limit, from_ts, until_ts, order_by, direction, search_term
         )
-        ret = {"users": users_media, "total": total}
+        ret = {
+            "users": [
+                {
+                    "user_id": r[0],
+                    "displayname": r[1],
+                    "media_count": r[2],
+                    "media_length": r[3],
+                }
+                for r in users_media
+            ],
+            "total": total,
+        }
         if (start + limit) < total:
             ret["next_token"] = start + len(users_media)
 

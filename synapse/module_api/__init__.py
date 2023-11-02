@@ -23,6 +23,7 @@ from typing import (
     Generator,
     Iterable,
     List,
+    Mapping,
     Optional,
     Tuple,
     TypeVar,
@@ -39,6 +40,7 @@ from twisted.web.resource import Resource
 
 from synapse.api import errors
 from synapse.api.errors import SynapseError
+from synapse.api.presence import UserPresenceState
 from synapse.config import ConfigError
 from synapse.events import EventBase
 from synapse.events.presence_router import (
@@ -46,6 +48,7 @@ from synapse.events.presence_router import (
     GET_USERS_FOR_STATES_CALLBACK,
     PresenceRouter,
 )
+from synapse.events.utils import ADD_EXTRA_FIELDS_TO_UNSIGNED_CLIENT_EVENT_CALLBACK
 from synapse.handlers.account_data import ON_ACCOUNT_DATA_UPDATED_CALLBACK
 from synapse.handlers.auth import (
     CHECK_3PID_AUTH_CALLBACK,
@@ -257,6 +260,7 @@ class ModuleApi:
         self.custom_template_dir = hs.config.server.custom_template_directory
         self._callbacks = hs.get_module_api_callbacks()
         self.msc3861_oauth_delegation_enabled = hs.config.experimental.msc3861.enabled
+        self._event_serializer = hs.get_event_client_serializer()
 
         try:
             app_name = self._hs.config.email.email_app_name
@@ -487,6 +491,25 @@ class ModuleApi:
             resource: The resource to attach to this path.
         """
         self._hs.register_module_web_resource(path, resource)
+
+    def register_add_extra_fields_to_unsigned_client_event_callbacks(
+        self,
+        *,
+        add_field_to_unsigned_callback: Optional[
+            ADD_EXTRA_FIELDS_TO_UNSIGNED_CLIENT_EVENT_CALLBACK
+        ] = None,
+    ) -> None:
+        """Registers a callback that can be used to add fields to the unsigned
+        section of events.
+
+        The callback is called every time an event is sent down to a client.
+
+        Added in Synapse 1.96.0
+        """
+        if add_field_to_unsigned_callback is not None:
+            self._event_serializer.register_add_extra_fields_to_unsigned_client_event_callback(
+                add_field_to_unsigned_callback
+            )
 
     #########################################################################
     # The following methods can be called by the module at any point in time.
@@ -1183,6 +1206,37 @@ class ModuleApi:
             await presence_handler.get_federation_queue().send_presence_to_destinations(
                 presence_events, [destination]
             )
+
+    async def set_presence_for_users(
+        self, users: Mapping[str, Tuple[str, Optional[str]]]
+    ) -> None:
+        """
+        Update the internal presence state of users.
+
+        This can be used for either local or remote users.
+
+        Note that this method can only be run on the process that is configured to write to the
+        presence stream. By default, this is the main process.
+
+        Added in Synapse v1.96.0.
+        """
+
+        # We pull out the presence handler here to break a cyclic
+        # dependency between the presence router and module API.
+        presence_handler = self._hs.get_presence_handler()
+
+        from synapse.handlers.presence import PresenceHandler
+
+        assert isinstance(presence_handler, PresenceHandler)
+
+        states = await presence_handler.current_state_for_users(users.keys())
+        for user_id, (state, status_msg) in users.items():
+            prev_state = states.setdefault(user_id, UserPresenceState.default(user_id))
+            states[user_id] = prev_state.copy_and_replace(
+                state=state, status_msg=status_msg
+            )
+
+        await presence_handler._update_states(states.values(), force_notify=True)
 
     def looping_background_call(
         self,
