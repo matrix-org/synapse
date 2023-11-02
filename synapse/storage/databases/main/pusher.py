@@ -601,7 +601,7 @@ class PusherBackgroundUpdatesStore(SQLBaseStore):
                 (last_pusher_id, batch_size),
             )
 
-            rows = txn.fetchall()
+            rows = cast(List[Tuple[int, Optional[str], Optional[str]]], txn.fetchall())
             if len(rows) == 0:
                 return 0
 
@@ -617,7 +617,7 @@ class PusherBackgroundUpdatesStore(SQLBaseStore):
                 txn=txn,
                 table="pushers",
                 key_names=("id",),
-                key_values=[row[0] for row in rows],
+                key_values=[(row[0],) for row in rows],
                 value_names=("device_id", "access_token"),
                 # If there was already a device_id on the pusher, we only want to clear
                 # the access_token column, so we keep the existing device_id. Otherwise,
