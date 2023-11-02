@@ -118,20 +118,19 @@ class ReactorLastSeenMetric(Collector):
 # Twisted has already select a reasonable reactor for us, so assumptions can be
 # made about the shape.
 wrapper = None
-if isinstance(reactor, (PollReactor, EPollReactor)):
-    reactor._poller = ObjWrapper(reactor._poller, "poll")  # type: ignore[attr-defined]
-    wrapper = reactor._poller._wrapped_method  # type: ignore[attr-defined]
+try:
+    if isinstance(reactor, (PollReactor, EPollReactor)):
+        reactor._poller = ObjWrapper(reactor._poller, "poll")  # type: ignore[attr-defined]
+        wrapper = reactor._poller._wrapped_method  # type: ignore[attr-defined]
 
-elif isinstance(reactor, selectreactor.SelectReactor):
-    # Twisted uses a module-level _select function.
-    wrapper = selectreactor._select = CallWrapper(selectreactor._select)
+    elif isinstance(reactor, selectreactor.SelectReactor):
+        # Twisted uses a module-level _select function.
+        wrapper = selectreactor._select = CallWrapper(selectreactor._select)
 
-elif isinstance(reactor, AsyncioSelectorReactor):
-    # For asyncio look at the underlying asyncio event loop.
-    asyncio_loop = reactor._asyncioEventloop  # A sub-class of BaseEventLoop,
+    elif isinstance(reactor, AsyncioSelectorReactor):
+        # For asyncio look at the underlying asyncio event loop.
+        asyncio_loop = reactor._asyncioEventloop  # A sub-class of BaseEventLoop,
 
-    # If an unexpected asyncio loop implementation is used, these might fail.
-    try:
         # A sub-class of BaseSelector.
         selector = asyncio_loop._selector  # type: ignore[attr-defined]
 
@@ -147,9 +146,16 @@ elif isinstance(reactor, AsyncioSelectorReactor):
             selector._selector = ObjWrapper(selector._selector, "control")  # type: ignore[attr-defined]
             wrapper = selector._selector._wrapped_method  # type: ignore[attr-defined]
 
-        # XXX Will not work on (Windows-only) ProactorEventLoop.
-    except AttributeError:
-        logger.warn("Unexpected asyncio loop: %r", asyncio_loop)
+        else:
+            # E.g. this does not support the (Windows-only) ProactorEventLoop.
+            logger.warning(
+                "Skipping configuring ReactorLastSeenMetric: unexpected asyncio loop selector: %r via %r",
+                selector,
+                asyncio_loop,
+            )
+except Exception as e:
+    logger.warning("Configuring ReactorLastSeenMetric failed: %r", e)
+
 
 if wrapper:
     REGISTRY.register(ReactorLastSeenMetric(wrapper))
