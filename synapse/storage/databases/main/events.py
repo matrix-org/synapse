@@ -1315,7 +1315,7 @@ class PersistEventsStore:
             room_id: The room ID
             events_and_contexts: events we are persisting
         """
-        stream_ordering = 0
+        stream_ordering: Optional[int] = None
         depth_update = 0
         for event, context in events_and_contexts:
             # Don't update the stream ordering for backfilled events because
@@ -1324,18 +1324,24 @@ class PersistEventsStore:
             # tip/front for the room.
             assert event.internal_metadata.stream_ordering is not None
             if event.internal_metadata.stream_ordering >= 0:
-                stream_ordering = max(
-                    stream_ordering, event.internal_metadata.stream_ordering
-                )
+                if stream_ordering is None:
+                    stream_ordering = event.internal_metadata.stream_ordering
+                else:
+                    stream_ordering = max(
+                        stream_ordering, event.internal_metadata.stream_ordering
+                    )
 
             if not event.internal_metadata.is_outlier() and not context.rejected:
                 depth_update = max(event.depth, depth_update)
 
         # Then update the `stream_ordering` position to mark the latest event as
         # the front of the room.
-        txn.call_after(
-            self.store._events_stream_cache.entity_has_changed, room_id, stream_ordering
-        )
+        if stream_ordering is not None:
+            txn.call_after(
+                self.store._events_stream_cache.entity_has_changed,
+                room_id,
+                stream_ordering,
+            )
 
         self._update_min_depth_for_room_txn(txn, room_id, depth_update)
 
