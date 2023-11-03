@@ -269,3 +269,45 @@ class SQLBaseStoreTestCase(unittest.TestCase):
             ["oldvalue", "newvalue"],
         )
         self.assertTrue(result)
+
+    @defer.inlineCallbacks
+    def test_upsert_many(self) -> Generator["defer.Deferred[object]", object, None]:
+        yield defer.ensureDeferred(
+            self.datastore.db_pool.simple_upsert_many(
+                table="tablename",
+                key_names=["columnname"],
+                key_values=[["oldvalue"]],
+                value_names=["othercol"],
+                value_values=[["newvalue"]],
+                desc="",
+            )
+        )
+
+        # TODO Test postgres variant.
+
+        self.mock_txn.executemany.assert_called_with(
+            "INSERT INTO tablename (columnname, othercol) VALUES (?, ?) ON CONFLICT (columnname) DO UPDATE SET othercol=EXCLUDED.othercol",
+            [("oldvalue", "newvalue")],
+        )
+
+    @defer.inlineCallbacks
+    def test_upsert_many_no_values(
+        self,
+    ) -> Generator["defer.Deferred[object]", object, None]:
+        yield defer.ensureDeferred(
+            self.datastore.db_pool.simple_upsert_many(
+                table="tablename",
+                key_names=["columnname"],
+                key_values=[["oldvalue"]],
+                value_names=[],
+                value_values=[],
+                desc="",
+            )
+        )
+
+        # TODO Test postgres variant.
+
+        self.mock_txn.executemany.assert_called_with(
+            "INSERT INTO tablename (columnname) VALUES (?) ON CONFLICT (columnname) DO NOTHING",
+            [("oldvalue",)],
+        )
