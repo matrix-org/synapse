@@ -221,6 +221,22 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         )
         self.assertEqual([(1,), (2,), (3,)], ret)
 
+    def test_select_many_no_iterable(self) -> None:
+        self.mock_txn.rowcount = 3
+        self.mock_txn.fetchall.side_effect = [(1,), (2,)]
+
+        ret = self.datastore.db_pool.simple_select_many_txn(
+            self.mock_txn,
+            table="tablename",
+            column="col1",
+            iterable=(),
+            retcols=("col2",),
+            keyvalues={"col3": "val4"},
+        )
+
+        self.mock_txn.execute.assert_not_called()
+        self.assertEqual([], ret)
+
     @defer.inlineCallbacks
     def test_update_one_1col(self) -> Generator["defer.Deferred[object]", object, None]:
         self.mock_txn.rowcount = 1
@@ -321,6 +337,23 @@ class SQLBaseStoreTestCase(unittest.TestCase):
             [["val1", "val2"], "val3"],
         )
         self.assertEqual(result, 2)
+
+    @defer.inlineCallbacks
+    def test_delete_many_no_iterable(
+        self,
+    ) -> Generator["defer.Deferred[object]", object, None]:
+        result = yield defer.ensureDeferred(
+            self.datastore.db_pool.simple_delete_many(
+                table="tablename",
+                column="col1",
+                iterable=(),
+                keyvalues={"col2": "val3"},
+                desc="",
+            )
+        )
+
+        self.mock_txn.execute.assert_not_called()
+        self.assertEqual(result, 0)
 
     @defer.inlineCallbacks
     def test_delete_many_no_keyvalues(
