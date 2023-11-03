@@ -2281,8 +2281,6 @@ class DatabasePool:
         if not values:
             return 0
 
-        sql = "DELETE FROM %s" % table
-
         clause, values = make_in_list_sql_clause(txn.database_engine, column, values)
         clauses = [clause]
 
@@ -2290,8 +2288,7 @@ class DatabasePool:
             clauses.append("%s = ?" % (key,))
             values.append(value)
 
-        if clauses:
-            sql = "%s WHERE %s" % (sql, " AND ".join(clauses))
+        sql = "DELETE FROM %s WHERE %s" % (table, " AND ".join(clauses))
         txn.execute(sql, values)
 
         return txn.rowcount

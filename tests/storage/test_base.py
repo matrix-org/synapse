@@ -271,6 +271,47 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         )
 
     @defer.inlineCallbacks
+    def test_delete_many(self) -> Generator["defer.Deferred[object]", object, None]:
+        self.mock_txn.rowcount = 2
+
+        result = yield defer.ensureDeferred(
+            self.datastore.db_pool.simple_delete_many(
+                table="tablename",
+                column="col1",
+                iterable=("val1", "val2"),
+                keyvalues={"col2": "val3"},
+                desc="",
+            )
+        )
+
+        self.mock_txn.execute.assert_called_with(
+            "DELETE FROM tablename WHERE col1 = ANY(?) AND col2 = ?",
+            [["val1", "val2"], "val3"],
+        )
+        self.assertEqual(result, 2)
+
+    @defer.inlineCallbacks
+    def test_delete_many_no_keyvalues(
+        self,
+    ) -> Generator["defer.Deferred[object]", object, None]:
+        self.mock_txn.rowcount = 2
+
+        result = yield defer.ensureDeferred(
+            self.datastore.db_pool.simple_delete_many(
+                table="tablename",
+                column="col1",
+                iterable=("val1", "val2"),
+                keyvalues={},
+                desc="",
+            )
+        )
+
+        self.mock_txn.execute.assert_called_with(
+            "DELETE FROM tablename WHERE col1 = ANY(?)", [["val1", "val2"]]
+        )
+        self.assertEqual(result, 2)
+
+    @defer.inlineCallbacks
     def test_upsert(self) -> Generator["defer.Deferred[object]", object, None]:
         self.mock_txn.rowcount = 1
 
