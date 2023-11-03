@@ -14,7 +14,7 @@
 
 from collections import OrderedDict
 from typing import Generator
-from unittest.mock import Mock
+from unittest.mock import Mock, call
 
 from twisted.internet import defer
 
@@ -188,6 +188,38 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         self.mock_txn.execute.assert_called_with(
             "SELECT colA FROM tablename WHERE keycol = ?", ["A set"]
         )
+
+    @defer.inlineCallbacks
+    def test_select_many_batch(
+        self,
+    ) -> Generator["defer.Deferred[object]", object, None]:
+        self.mock_txn.rowcount = 3
+        self.mock_txn.fetchall.side_effect = [[(1,), (2,)], [(3,)]]
+
+        ret = yield defer.ensureDeferred(
+            self.datastore.db_pool.simple_select_many_batch(
+                table="tablename",
+                column="col1",
+                iterable=("val1", "val2", "val3"),
+                retcols=("col2",),
+                keyvalues={"col3": "val4"},
+                batch_size=2,
+            )
+        )
+
+        self.mock_txn.execute.assert_has_calls(
+            [
+                call(
+                    "SELECT col2 FROM tablename WHERE col1 = ANY(?) AND col3 = ?",
+                    [["val1", "val2"], "val4"],
+                ),
+                call(
+                    "SELECT col2 FROM tablename WHERE col1 = ANY(?) AND col3 = ?",
+                    [["val3"], "val4"],
+                ),
+            ],
+        )
+        self.assertEqual([(1,), (2,), (3,)], ret)
 
     @defer.inlineCallbacks
     def test_update_one_1col(self) -> Generator["defer.Deferred[object]", object, None]:
