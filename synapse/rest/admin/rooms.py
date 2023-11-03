@@ -16,6 +16,8 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, List, Optional, Tuple, cast
 from urllib import parse as urlparse
 
+import attr
+
 from synapse.api.constants import Direction, EventTypes, JoinRules, Membership
 from synapse.api.errors import AuthError, Codes, NotFoundError, SynapseError
 from synapse.api.filtering import Filter
@@ -306,10 +308,13 @@ class RoomRestServlet(RestServlet):
             raise NotFoundError("Room not found")
 
         members = await self.store.get_users_in_room(room_id)
-        ret["joined_local_devices"] = await self.store.count_devices_by_users(members)
-        ret["forgotten"] = await self.store.is_locally_forgotten_room(room_id)
+        result = attr.asdict(ret)
+        result["joined_local_devices"] = await self.store.count_devices_by_users(
+            members
+        )
+        result["forgotten"] = await self.store.is_locally_forgotten_room(room_id)
 
-        return HTTPStatus.OK, ret
+        return HTTPStatus.OK, result
 
     async def on_DELETE(
         self, request: SynapseRequest, room_id: str

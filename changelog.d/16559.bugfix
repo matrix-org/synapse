@@ -1,1 +1,0 @@
-Fix a long-standing bug where invited/knocking users would not leave during a room purge.

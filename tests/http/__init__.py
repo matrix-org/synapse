@@ -182,7 +182,7 @@ def wrap_server_factory_for_tls(
         )
     else:
         return TLSMemoryBIOFactory(
-            connection_creator, isClient=False, wrappedFactory=factory, clock=clock  # type: ignore[call-arg]
+            connection_creator, isClient=False, wrappedFactory=factory, clock=clock
         )
 
 

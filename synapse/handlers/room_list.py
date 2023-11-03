@@ -33,6 +33,7 @@ from synapse.api.errors import (
     RequestSendFailed,
     SynapseError,
 )
+from synapse.storage.databases.main.room import LargestRoomStats
 from synapse.types import JsonDict, JsonMapping, ThirdPartyInstanceID
 from synapse.util.caches.descriptors import _CacheContext, cached
 from synapse.util.caches.response_cache import ResponseCache
@@ -170,25 +171,23 @@ class RoomListHandler:
             ignore_non_federatable=from_federation,
         )
 
-        def build_room_entry(room: JsonDict) -> JsonDict:
+        def build_room_entry(room: LargestRoomStats) -> JsonDict:
             entry = {
-                "room_id": room["room_id"],
-                "name": room["name"],
-                "topic": room["topic"],
-                "canonical_alias": room["canonical_alias"],
-                "num_joined_members": room["joined_members"],
-                "avatar_url": room["avatar"],
-                "world_readable": room["history_visibility"]
+                "room_id": room.room_id,
+                "name": room.name,
+                "topic": room.topic,
+                "canonical_alias": room.canonical_alias,
+                "num_joined_members": room.joined_members,
+                "avatar_url": room.avatar,
+                "world_readable": room.history_visibility
                 == HistoryVisibility.WORLD_READABLE,
-                "guest_can_join": room["guest_access"] == "can_join",
-                "join_rule": room["join_rules"],
-                "room_type": room["room_type"],
+                "guest_can_join": room.guest_access == "can_join",
+                "join_rule": room.join_rules,
+                "room_type": room.room_type,
             }
 
             # Filter out Nones – rather omit the field altogether
             return {k: v for k, v in entry.items() if v is not None}
-
-        results = [build_room_entry(r) for r in results]
 
         response: JsonDict = {}
         num_results = len(results)
@@ -212,33 +211,33 @@ class RoomListHandler:
                     # If there was a token given then we assume that there
                     # must be previous results.
                     response["prev_batch"] = RoomListNextBatch(
-                        last_joined_members=initial_entry["num_joined_members"],
-                        last_room_id=initial_entry["room_id"],
+                        last_joined_members=initial_entry.joined_members,
+                        last_room_id=initial_entry.room_id,
                         direction_is_forward=False,
                     ).to_token()
 
                 if more_to_come:
                     response["next_batch"] = RoomListNextBatch(
-                        last_joined_members=final_entry["num_joined_members"],
-                        last_room_id=final_entry["room_id"],
+                        last_joined_members=final_entry.joined_members,
+                        last_room_id=final_entry.room_id,
                         direction_is_forward=True,
                     ).to_token()
             else:
                 if has_batch_token:
                     response["next_batch"] = RoomListNextBatch(
-                        last_joined_members=final_entry["num_joined_members"],
-                        last_room_id=final_entry["room_id"],
+                        last_joined_members=final_entry.joined_members,
+                        last_room_id=final_entry.room_id,
                         direction_is_forward=True,
                     ).to_token()
 
                 if more_to_come:
                     response["prev_batch"] = RoomListNextBatch(
-                        last_joined_members=initial_entry["num_joined_members"],
-                        last_room_id=initial_entry["room_id"],
+                        last_joined_members=initial_entry.joined_members,
+                        last_room_id=initial_entry.room_id,
                         direction_is_forward=False,
                     ).to_token()
 
-        response["chunk"] = results
+        response["chunk"] = [build_room_entry(r) for r in results]
 
         response["total_room_count_estimate"] = await self.store.count_public_rooms(
             network_tuple,
