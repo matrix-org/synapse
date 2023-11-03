@@ -2062,9 +2062,7 @@ class DatabasePool:
             where_clause = ""
 
         # UPDATE mytable SET col1 = ?, col2 = ? WHERE col3 = ? AND col4 = ?
-        sql = f"""
-            UPDATE {table} SET {set_clause} {where_clause}
-        """
+        sql = f"UPDATE {table} SET {set_clause} {where_clause}"
 
         txn.execute_batch(sql, args)
 

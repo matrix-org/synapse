@@ -55,6 +55,8 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         engine = create_engine(sqlite_config)
         fake_engine = Mock(wraps=engine)
         fake_engine.in_transaction.return_value = False
+        fake_engine.module.OperationalError = engine.module.OperationalError
+        fake_engine.module.DatabaseError = engine.module.DatabaseError
 
         db = DatabasePool(Mock(), Mock(config=sqlite_config), fake_engine)
         db._db_pool = self.db_pool
@@ -89,6 +91,33 @@ class SQLBaseStoreTestCase(unittest.TestCase):
 
         self.mock_txn.execute.assert_called_with(
             "INSERT INTO tablename (colA, colB, colC) VALUES(?, ?, ?)", (1, 2, 3)
+        )
+
+    @defer.inlineCallbacks
+    def test_insert_many(self) -> Generator["defer.Deferred[object]", object, None]:
+        yield defer.ensureDeferred(
+            self.datastore.db_pool.simple_insert_many(
+                table="tablename",
+                keys=(
+                    "col1",
+                    "col2",
+                ),
+                values=[
+                    (
+                        "val1",
+                        "val2",
+                    ),
+                    ("val3", "val4"),
+                ],
+                desc="",
+            )
+        )
+
+        # TODO Test postgres variant.
+
+        self.mock_txn.executemany.assert_called_with(
+            "INSERT INTO tablename (col1, col2) VALUES(?, ?)",
+            [("val1", "val2"), ("val3", "val4")],
         )
 
     @defer.inlineCallbacks
@@ -195,6 +224,37 @@ class SQLBaseStoreTestCase(unittest.TestCase):
             "UPDATE tablename SET colC = ?, colD = ? WHERE" " colA = ? AND colB = ?",
             [3, 4, 1, 2],
         )
+
+    @defer.inlineCallbacks
+    def test_update_many(self) -> Generator["defer.Deferred[object]", object, None]:
+        yield defer.ensureDeferred(
+            self.datastore.db_pool.simple_update_many(
+                table="tablename",
+                key_names=("col1", "col2"),
+                key_values=[("val1", "val2")],
+                value_names=("col3",),
+                value_values=[("val3",)],
+                desc="",
+            )
+        )
+
+        self.mock_txn.executemany.assert_called_with(
+            "UPDATE tablename SET col3 = ? WHERE col1 = ? AND col2 = ?",
+            [("val3", "val1", "val2"), ("val3", "val1", "val2")],
+        )
+
+        # key_values and value_values must be the same length.
+        with self.assertRaises(ValueError):
+            yield defer.ensureDeferred(
+                self.datastore.db_pool.simple_update_many(
+                    table="tablename",
+                    key_names=("col1", "col2"),
+                    key_values=[("val1", "val2")],
+                    value_names=("col3",),
+                    value_values=[],
+                    desc="",
+                )
+            )
 
     @defer.inlineCallbacks
     def test_delete_one(self) -> Generator["defer.Deferred[object]", object, None]:
