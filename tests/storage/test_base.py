@@ -209,3 +209,63 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         self.mock_txn.execute.assert_called_with(
             "DELETE FROM tablename WHERE keycol = ?", ["Go away"]
         )
+
+    @defer.inlineCallbacks
+    def test_upsert(self) -> Generator["defer.Deferred[object]", object, None]:
+        self.mock_txn.rowcount = 1
+
+        result = yield defer.ensureDeferred(
+            self.datastore.db_pool.simple_upsert(
+                table="tablename",
+                keyvalues={"columnname": "oldvalue"},
+                values={"othercol": "newvalue"},
+            )
+        )
+
+        self.mock_txn.execute.assert_called_with(
+            "INSERT INTO tablename (columnname, othercol) VALUES (?, ?) ON CONFLICT (columnname)  DO UPDATE SET othercol=EXCLUDED.othercol",
+            ["oldvalue", "newvalue"],
+        )
+        self.assertTrue(result)
+
+    @defer.inlineCallbacks
+    def test_upsert_with_insert(
+        self,
+    ) -> Generator["defer.Deferred[object]", object, None]:
+        self.mock_txn.rowcount = 1
+
+        result = yield defer.ensureDeferred(
+            self.datastore.db_pool.simple_upsert(
+                table="tablename",
+                keyvalues={"columnname": "oldvalue"},
+                values={"othercol": "newvalue"},
+                insertion_values={"thirdcol": "insertionval"},
+            )
+        )
+
+        self.mock_txn.execute.assert_called_with(
+            "INSERT INTO tablename (columnname, thirdcol, othercol) VALUES (?, ?, ?) ON CONFLICT (columnname)  DO UPDATE SET othercol=EXCLUDED.othercol",
+            ["oldvalue", "insertionval", "newvalue"],
+        )
+        self.assertTrue(result)
+
+    @defer.inlineCallbacks
+    def test_upsert_with_where(
+        self,
+    ) -> Generator["defer.Deferred[object]", object, None]:
+        self.mock_txn.rowcount = 1
+
+        result = yield defer.ensureDeferred(
+            self.datastore.db_pool.simple_upsert(
+                table="tablename",
+                keyvalues={"columnname": "oldvalue"},
+                values={"othercol": "newvalue"},
+                where_clause="thirdcol IS NULL",
+            )
+        )
+
+        self.mock_txn.execute.assert_called_with(
+            "INSERT INTO tablename (columnname, othercol) VALUES (?, ?) ON CONFLICT (columnname) WHERE thirdcol IS NULL DO UPDATE SET othercol=EXCLUDED.othercol",
+            ["oldvalue", "newvalue"],
+        )
+        self.assertTrue(result)
