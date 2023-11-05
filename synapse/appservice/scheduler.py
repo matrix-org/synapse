@@ -57,6 +57,7 @@ from typing import (
     Iterable,
     List,
     Optional,
+    Sequence,
     Set,
     Tuple,
 )
@@ -72,7 +73,7 @@ from synapse.events import EventBase
 from synapse.logging.context import run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.databases.main import DataStore
-from synapse.types import DeviceListUpdates, JsonDict
+from synapse.types import DeviceListUpdates, JsonMapping
 from synapse.util import Clock
 
 if TYPE_CHECKING:
@@ -120,8 +121,8 @@ class ApplicationServiceScheduler:
         self,
         appservice: ApplicationService,
         events: Optional[Collection[EventBase]] = None,
-        ephemeral: Optional[Collection[JsonDict]] = None,
-        to_device_messages: Optional[Collection[JsonDict]] = None,
+        ephemeral: Optional[Collection[JsonMapping]] = None,
+        to_device_messages: Optional[Collection[JsonMapping]] = None,
         device_list_summary: Optional[DeviceListUpdates] = None,
     ) -> None:
         """
@@ -179,9 +180,9 @@ class _ServiceQueuer:
         # dict of {service_id: [events]}
         self.queued_events: Dict[str, List[EventBase]] = {}
         # dict of {service_id: [events]}
-        self.queued_ephemeral: Dict[str, List[JsonDict]] = {}
+        self.queued_ephemeral: Dict[str, List[JsonMapping]] = {}
         # dict of {service_id: [to_device_message_json]}
-        self.queued_to_device_messages: Dict[str, List[JsonDict]] = {}
+        self.queued_to_device_messages: Dict[str, List[JsonMapping]] = {}
         # dict of {service_id: [device_list_summary]}
         self.queued_device_list_summaries: Dict[str, List[DeviceListUpdates]] = {}
 
@@ -199,9 +200,7 @@ class _ServiceQueuer:
         if service.id in self.requests_in_flight:
             return
 
-        run_as_background_process(
-            "as-sender-%s" % (service.id,), self._send_request, service
-        )
+        run_as_background_process("as-sender", self._send_request, service)
 
     async def _send_request(self, service: ApplicationService) -> None:
         # sanity-check: we shouldn't get here if this service already has a sender
@@ -294,8 +293,8 @@ class _ServiceQueuer:
         self,
         service: ApplicationService,
         events: Iterable[EventBase],
-        ephemerals: Iterable[JsonDict],
-        to_device_messages: Iterable[JsonDict],
+        ephemerals: Iterable[JsonMapping],
+        to_device_messages: Iterable[JsonMapping],
     ) -> Tuple[TransactionOneTimeKeysCount, TransactionUnusedFallbackKeys]:
         """
         Given a list of the events, ephemeral messages and to-device messages,
@@ -364,9 +363,9 @@ class _TransactionController:
     async def send(
         self,
         service: ApplicationService,
-        events: List[EventBase],
-        ephemeral: Optional[List[JsonDict]] = None,
-        to_device_messages: Optional[List[JsonDict]] = None,
+        events: Sequence[EventBase],
+        ephemeral: Optional[List[JsonMapping]] = None,
+        to_device_messages: Optional[List[JsonMapping]] = None,
         one_time_keys_count: Optional[TransactionOneTimeKeysCount] = None,
         unused_fallback_keys: Optional[TransactionUnusedFallbackKeys] = None,
         device_list_summary: Optional[DeviceListUpdates] = None,
@@ -477,14 +476,11 @@ class _Recoverer:
         self.backoff_counter = 1
 
     def recover(self) -> None:
-        def _retry() -> None:
-            run_as_background_process(
-                "as-recoverer-%s" % (self.service.id,), self.retry
-            )
-
         delay = 2**self.backoff_counter
         logger.info("Scheduling retries on %s in %fs", self.service.id, delay)
-        self.clock.call_later(delay, _retry)
+        self.clock.call_later(
+            delay, run_as_background_process, "as-recoverer", self.retry
+        )
 
     def _backoff(self) -> None:
         # cap the backoff to be around 8.5min => (2^9) = 512 secs

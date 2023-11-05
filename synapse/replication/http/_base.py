@@ -25,6 +25,7 @@ from twisted.internet.error import ConnectError, DNSLookupError
 from twisted.web.server import Request
 
 from synapse.api.errors import HttpResponseException, SynapseError
+from synapse.config.workers import MAIN_PROCESS_INSTANCE_NAME
 from synapse.http import RequestTimedOutError
 from synapse.http.server import HttpServer
 from synapse.http.servlet import parse_json_object_from_request
@@ -194,13 +195,8 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
         the `instance_map` config).
         """
         clock = hs.get_clock()
-        client = hs.get_simple_http_client()
+        client = hs.get_replication_client()
         local_instance_name = hs.get_instance_name()
-
-        # The value of these option should match the replication listener settings
-        master_host = hs.config.worker.worker_replication_host
-        master_port = hs.config.worker.worker_replication_http_port
-        master_tls = hs.config.worker.worker_replication_http_tls
 
         instance_map = hs.config.worker.instance_map
 
@@ -213,7 +209,9 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
             )
 
         @trace_with_opname("outgoing_replication_request")
-        async def send_request(*, instance_name: str = "master", **kwargs: Any) -> Any:
+        async def send_request(
+            *, instance_name: str = MAIN_PROCESS_INSTANCE_NAME, **kwargs: Any
+        ) -> Any:
             # We have to pull these out here to avoid circular dependencies...
             streams = hs.get_replication_command_handler().get_streams_to_replicate()
             replication = hs.get_replication_data_handler()
@@ -221,15 +219,7 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
             with outgoing_gauge.track_inprogress():
                 if instance_name == local_instance_name:
                     raise Exception("Trying to send HTTP request to self")
-                if instance_name == "master":
-                    host = master_host
-                    port = master_port
-                    tls = master_tls
-                elif instance_name in instance_map:
-                    host = instance_map[instance_name].host
-                    port = instance_map[instance_name].port
-                    tls = instance_map[instance_name].tls
-                else:
+                if instance_name not in instance_map:
                     raise Exception(
                         "Instance %r not in 'instance_map' config" % (instance_name,)
                     )
@@ -248,7 +238,7 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
 
                     data[_STREAM_POSITION_KEY] = {
                         "streams": {
-                            stream.NAME: stream.current_token(local_instance_name)
+                            stream.NAME: stream.minimal_local_current_token()
                             for stream in streams
                         },
                         "instance_name": local_instance_name,
@@ -277,13 +267,11 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
                         "Unknown METHOD on %s replication endpoint" % (cls.NAME,)
                     )
 
-                # Here the protocol is hard coded to be http by default or https in case the replication
-                # port is set to have tls true.
-                scheme = "https" if tls else "http"
-                uri = "%s://%s:%s/_synapse/replication/%s/%s" % (
-                    scheme,
-                    host,
-                    port,
+                # Hard code a special scheme to show this only used for replication. The
+                # instance_name will be passed into the ReplicationEndpointFactory to
+                # determine connection details from the instance_map.
+                uri = "synapse-replication://%s/_synapse/replication/%s/%s" % (
+                    instance_name,
                     cls.NAME,
                     "/".join(url_args),
                 )
@@ -345,7 +333,7 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
                 _outgoing_request_counter.labels(cls.NAME, 200).inc()
 
                 # Wait on any streams that the remote may have written to.
-                for stream_name, position in result.get(
+                for stream_name, position in result.pop(
                     _STREAM_POSITION_KEY, {}
                 ).items():
                     await replication.wait_for_stream_position(
@@ -426,6 +414,8 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
             code, response = await self.response_cache.wrap(
                 txn_id, self._handle_request, request, content, **kwargs
             )
+            # Take a copy so we don't mutate things in the cache.
+            response = dict(response)
         else:
             # The `@cancellable` decorator may be applied to `_handle_request`. But we
             # told `HttpServer.register_paths` that our handler is `_check_auth_and_handle`,
@@ -443,7 +433,7 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
 
         if self.WAIT_FOR_STREAMS:
             response[_STREAM_POSITION_KEY] = {
-                stream.NAME: stream.current_token(self._instance_name)
+                stream.NAME: stream.minimal_local_current_token()
                 for stream in self._streams
             }
 

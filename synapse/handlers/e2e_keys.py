@@ -13,9 +13,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import logging
-from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Mapping, Optional, Tuple
+from typing import TYPE_CHECKING, Dict, Iterable, List, Mapping, Optional, Tuple
 
 import attr
 from canonicaljson import encode_canonical_json
@@ -32,6 +31,7 @@ from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.logging.opentracing import log_kv, set_tag, tag_args, trace
 from synapse.types import (
     JsonDict,
+    JsonMapping,
     UserID,
     get_domain_from_id,
     get_verify_key_from_cross_signing_key,
@@ -53,6 +53,7 @@ class E2eKeysHandler:
         self.store = hs.get_datastores().main
         self.federation = hs.get_federation_client()
         self.device_handler = hs.get_device_handler()
+        self._appservice_handler = hs.get_application_service_handler()
         self.is_mine = hs.is_mine
         self.clock = hs.get_clock()
 
@@ -86,6 +87,13 @@ class E2eKeysHandler:
         self._query_devices_linearizer = Linearizer(
             name="query_devices",
             max_count=10,
+        )
+
+        self._query_appservices_for_otks = (
+            hs.config.experimental.msc3983_appservice_otk_claims
+        )
+        self._query_appservices_for_keys = (
+            hs.config.experimental.msc3984_appservice_key_query
         )
 
     @trace
@@ -159,19 +167,22 @@ class E2eKeysHandler:
             # A map of destination -> user ID -> device IDs.
             remote_queries_not_in_cache: Dict[str, Dict[str, Iterable[str]]] = {}
             if remote_queries:
-                query_list: List[Tuple[str, Optional[str]]] = []
+                user_ids = set()
+                user_and_device_ids: List[Tuple[str, str]] = []
                 for user_id, device_ids in remote_queries.items():
                     if device_ids:
-                        query_list.extend(
+                        user_and_device_ids.extend(
                             (user_id, device_id) for device_id in device_ids
                         )
                     else:
-                        query_list.append((user_id, None))
+                        user_ids.add(user_id)
 
                 (
                     user_ids_not_in_cache,
                     remote_results,
-                ) = await self.store.get_user_devices_from_cache(query_list)
+                ) = await self.store.get_user_devices_from_cache(
+                    user_ids, user_and_device_ids
+                )
 
                 # Check that the homeserver still shares a room with all cached users.
                 # Note that this check may be slightly racy when a remote user leaves a
@@ -262,11 +273,7 @@ class E2eKeysHandler:
                 delay_cancellation=True,
             )
 
-            ret = {"device_keys": results, "failures": failures}
-
-            ret.update(cross_signing_keys)
-
-            return ret
+            return {"device_keys": results, "failures": failures, **cross_signing_keys}
 
     @trace
     async def _query_devices_for_destination(
@@ -398,7 +405,7 @@ class E2eKeysHandler:
     @cancellable
     async def get_cross_signing_keys_from_cache(
         self, query: Iterable[str], from_user_id: Optional[str]
-    ) -> Dict[str, Dict[str, dict]]:
+    ) -> Dict[str, Dict[str, JsonMapping]]:
         """Get cross-signing keys for users from the database
 
         Args:
@@ -490,6 +497,19 @@ class E2eKeysHandler:
             local_query, include_displaynames
         )
 
+        # Check if the application services have any additional results.
+        if self._query_appservices_for_keys:
+            # Query the appservices for any keys.
+            appservice_results = await self._appservice_handler.query_keys(query)
+
+            # Merge results, overriding with what the appservice returned.
+            for user_id, devices in appservice_results.get("device_keys", {}).items():
+                # Copy the appservice device info over the homeserver device info, but
+                # don't completely overwrite it.
+                results.setdefault(user_id, {}).update(devices)
+
+            # TODO Handle cross-signing keys.
+
         # Build the result structure
         for user_id, device_keys in results.items():
             for device_id, device_info in device_keys.items():
@@ -522,35 +542,152 @@ class E2eKeysHandler:
         device_keys_query: Dict[str, Optional[List[str]]] = query_body.get(
             "device_keys", {}
         )
+        if any(
+            not self.is_mine(UserID.from_string(user_id))
+            for user_id in device_keys_query
+        ):
+            raise SynapseError(400, "User is not hosted on this homeserver")
+
         res = await self.query_local_devices(
             device_keys_query,
             include_displaynames=(
                 self.config.federation.allow_device_name_lookup_over_federation
             ),
         )
-        ret = {"device_keys": res}
 
         # add in the cross-signing keys
         cross_signing_keys = await self.get_cross_signing_keys_from_cache(
             device_keys_query, None
         )
 
-        ret.update(cross_signing_keys)
+        return {"device_keys": res, **cross_signing_keys}
 
-        return ret
+    async def claim_local_one_time_keys(
+        self,
+        local_query: List[Tuple[str, str, str, int]],
+        always_include_fallback_keys: bool,
+    ) -> Iterable[Dict[str, Dict[str, Dict[str, JsonDict]]]]:
+        """Claim one time keys for local users.
+
+        1. Attempt to claim OTKs from the database.
+        2. Ask application services if they provide OTKs.
+        3. Attempt to fetch fallback keys from the database.
+
+        Args:
+            local_query: An iterable of tuples of (user ID, device ID, algorithm).
+            always_include_fallback_keys: True to always include fallback keys.
+
+        Returns:
+            An iterable of maps of user ID -> a map device ID -> a map of key ID -> JSON bytes.
+        """
+
+        # Cap the number of OTKs that can be claimed at once to avoid abuse.
+        local_query = [
+            (user_id, device_id, algorithm, min(count, 5))
+            for user_id, device_id, algorithm, count in local_query
+        ]
+
+        otk_results, not_found = await self.store.claim_e2e_one_time_keys(local_query)
+
+        # If the application services have not provided any keys via the C-S
+        # API, query it directly for one-time keys.
+        if self._query_appservices_for_otks:
+            # TODO Should this query for fallback keys of uploaded OTKs if
+            #      always_include_fallback_keys is True? The MSC is ambiguous.
+            (
+                appservice_results,
+                not_found,
+            ) = await self._appservice_handler.claim_e2e_one_time_keys(not_found)
+        else:
+            appservice_results = {}
+
+        # Calculate which user ID / device ID / algorithm tuples to get fallback
+        # keys for. This can be either only missing results *or* all results
+        # (which don't already have a fallback key).
+        if always_include_fallback_keys:
+            # Build the fallback query as any part of the original query where
+            # the appservice didn't respond with a fallback key.
+            fallback_query = []
+
+            # Iterate each item in the original query and search the results
+            # from the appservice for that user ID / device ID. If it is found,
+            # check if any of the keys match the requested algorithm & are a
+            # fallback key.
+            for user_id, device_id, algorithm, _count in local_query:
+                # Check if the appservice responded for this query.
+                as_result = appservice_results.get(user_id, {}).get(device_id, {})
+                found_otk = False
+                for key_id, key_json in as_result.items():
+                    if key_id.startswith(f"{algorithm}:"):
+                        # A OTK or fallback key was found for this query.
+                        found_otk = True
+                        # A fallback key was found for this query, no need to
+                        # query further.
+                        if key_json.get("fallback", False):
+                            break
+
+                else:
+                    # No fallback key was found from appservices, query for it.
+                    # Only mark the fallback key as used if no OTK was found
+                    # (from either the database or appservices).
+                    mark_as_used = not found_otk and not any(
+                        key_id.startswith(f"{algorithm}:")
+                        for key_id in otk_results.get(user_id, {})
+                        .get(device_id, {})
+                        .keys()
+                    )
+                    # Note that it doesn't make sense to request more than 1 fallback key
+                    # per (user_id, device_id, algorithm).
+                    fallback_query.append((user_id, device_id, algorithm, mark_as_used))
+
+        else:
+            # All fallback keys get marked as used.
+            fallback_query = [
+                # Note that it doesn't make sense to request more than 1 fallback key
+                # per (user_id, device_id, algorithm).
+                (user_id, device_id, algorithm, True)
+                for user_id, device_id, algorithm, count in not_found
+            ]
+
+        # For each user that does not have a one-time keys available, see if
+        # there is a fallback key.
+        fallback_results = await self.store.claim_e2e_fallback_keys(fallback_query)
+
+        # Return the results in order, each item from the input query should
+        # only appear once in the combined list.
+        return (otk_results, appservice_results, fallback_results)
 
     @trace
     async def claim_one_time_keys(
-        self, query: Dict[str, Dict[str, Dict[str, str]]], timeout: Optional[int]
+        self,
+        query: Dict[str, Dict[str, Dict[str, int]]],
+        user: UserID,
+        timeout: Optional[int],
+        always_include_fallback_keys: bool,
     ) -> JsonDict:
-        local_query: List[Tuple[str, str, str]] = []
-        remote_queries: Dict[str, Dict[str, Dict[str, str]]] = {}
+        """
+        Args:
+            query: A chain of maps from (user_id, device_id, algorithm) to the requested
+                number of keys to claim.
+            user: The user who is claiming these keys.
+            timeout: How long to wait for any federation key claim requests before
+                giving up.
+            always_include_fallback_keys: always include a fallback key for local users'
+                devices, even if we managed to claim a one-time-key.
 
-        for user_id, one_time_keys in query.get("one_time_keys", {}).items():
+        Returns: a heterogeneous dict with two keys:
+            one_time_keys: chain of maps user ID -> device ID -> key ID -> key.
+            failures: map from remote destination to a JsonDict describing the error.
+        """
+        local_query: List[Tuple[str, str, str, int]] = []
+        remote_queries: Dict[str, Dict[str, Dict[str, Dict[str, int]]]] = {}
+
+        for user_id, one_time_keys in query.items():
             # we use UserID.from_string to catch invalid user ids
             if self.is_mine(UserID.from_string(user_id)):
-                for device_id, algorithm in one_time_keys.items():
-                    local_query.append((user_id, device_id, algorithm))
+                for device_id, algorithms in one_time_keys.items():
+                    for algorithm, count in algorithms.items():
+                        local_query.append((user_id, device_id, algorithm, count))
             else:
                 domain = get_domain_from_id(user_id)
                 remote_queries.setdefault(domain, {})[user_id] = one_time_keys
@@ -558,17 +695,22 @@ class E2eKeysHandler:
         set_tag("local_key_query", str(local_query))
         set_tag("remote_key_query", str(remote_queries))
 
-        results = await self.store.claim_e2e_one_time_keys(local_query)
+        results = await self.claim_local_one_time_keys(
+            local_query, always_include_fallback_keys
+        )
 
         # A map of user ID -> device ID -> key ID -> key.
         json_result: Dict[str, Dict[str, Dict[str, JsonDict]]] = {}
+        for result in results:
+            for user_id, device_keys in result.items():
+                for device_id, keys in device_keys.items():
+                    for key_id, key in keys.items():
+                        json_result.setdefault(user_id, {}).setdefault(
+                            device_id, {}
+                        ).update({key_id: key})
+
+        # Remote failures.
         failures: Dict[str, JsonDict] = {}
-        for user_id, device_keys in results.items():
-            for device_id, keys in device_keys.items():
-                for key_id, json_str in keys.items():
-                    json_result.setdefault(user_id, {})[device_id] = {
-                        key_id: json_decoder.decode(json_str)
-                    }
 
         @trace
         async def claim_client_keys(destination: str) -> None:
@@ -576,7 +718,7 @@ class E2eKeysHandler:
             device_keys = remote_queries[destination]
             try:
                 remote_result = await self.federation.claim_client_keys(
-                    destination, {"one_time_keys": device_keys}, timeout=timeout
+                    user, destination, device_keys, timeout=timeout
                 )
                 for user_id, keys in remote_result["one_time_keys"].items():
                     if user_id in device_keys:
@@ -617,6 +759,16 @@ class E2eKeysHandler:
     async def upload_keys_for_user(
         self, user_id: str, device_id: str, keys: JsonDict
     ) -> JsonDict:
+        """
+        Args:
+            user_id: user whose keys are being uploaded.
+            device_id: device whose keys are being uploaded.
+            keys: the body of a /keys/upload request.
+
+        Returns a dictionary with one field:
+            "one_time_keys": A mapping from algorithm to number of keys for that
+                algorithm, including those previously persisted.
+        """
         # This can only be called from the main process.
         assert isinstance(self.device_handler, DeviceHandler)
 
@@ -999,7 +1151,7 @@ class E2eKeysHandler:
         user_id: str,
         master_key_id: str,
         signed_master_key: JsonDict,
-        stored_master_key: JsonDict,
+        stored_master_key: JsonMapping,
         devices: Dict[str, Dict[str, JsonDict]],
     ) -> List["SignatureListItem"]:
         """Check signatures of a user's master key made by their devices.
@@ -1150,7 +1302,7 @@ class E2eKeysHandler:
 
     async def _get_e2e_cross_signing_verify_key(
         self, user_id: str, key_type: str, from_user_id: Optional[str] = None
-    ) -> Tuple[JsonDict, str, VerifyKey]:
+    ) -> Tuple[JsonMapping, str, VerifyKey]:
         """Fetch locally or remotely query for a cross-signing public key.
 
         First, attempt to fetch the cross-signing public key from storage.
@@ -1205,7 +1357,7 @@ class E2eKeysHandler:
         self,
         user: UserID,
         desired_key_type: str,
-    ) -> Optional[Tuple[Dict[str, Any], str, VerifyKey]]:
+    ) -> Optional[Tuple[JsonMapping, str, VerifyKey]]:
         """Queries cross-signing keys for a remote user and saves them to the database
 
         Only the key specified by `key_type` will be returned, while all retrieved keys
@@ -1298,6 +1450,20 @@ class E2eKeysHandler:
 
         return desired_key_data
 
+    async def is_cross_signing_set_up_for_user(self, user_id: str) -> bool:
+        """Checks if the user has cross-signing set up
+
+        Args:
+            user_id: The user to check
+
+        Returns:
+            True if the user has cross-signing set up, False otherwise
+        """
+        existing_master_key = await self.store.get_e2e_cross_signing_key(
+            user_id, "master"
+        )
+        return existing_master_key is not None
+
 
 def _check_cross_signing_key(
     key: JsonDict, user_id: str, key_type: str, signing_key: Optional[VerifyKey] = None
@@ -1332,7 +1498,7 @@ def _check_device_signature(
     user_id: str,
     verify_key: VerifyKey,
     signed_device: JsonDict,
-    stored_device: JsonDict,
+    stored_device: JsonMapping,
 ) -> None:
     """Check that a signature on a device or cross-signing key is correct and
     matches the copy of the device/key that we have stored.  Throws an

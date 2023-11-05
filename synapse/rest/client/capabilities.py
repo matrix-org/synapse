@@ -33,6 +33,7 @@ class CapabilitiesRestServlet(RestServlet):
     """End point to expose the capabilities of the server."""
 
     PATTERNS = client_patterns("/capabilities$")
+    CATEGORY = "Client API requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -63,6 +64,9 @@ class CapabilitiesRestServlet(RestServlet):
                 },
                 "m.3pid_changes": {
                     "enabled": self.config.registration.enable_3pid_changes
+                },
+                "m.get_login_token": {
+                    "enabled": self.config.auth.login_via_existing_enabled,
                 },
             }
         }

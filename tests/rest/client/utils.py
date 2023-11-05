@@ -36,7 +36,7 @@ from urllib.parse import urlencode
 import attr
 from typing_extensions import Literal
 
-from twisted.web.resource import Resource
+from twisted.test.proto_helpers import MemoryReactorClock
 from twisted.web.server import Site
 
 from synapse.api.constants import Membership
@@ -44,7 +44,7 @@ from synapse.api.errors import Codes
 from synapse.server import HomeServer
 from synapse.types import JsonDict
 
-from tests.server import FakeChannel, FakeSite, make_request
+from tests.server import FakeChannel, make_request
 from tests.test_utils.html_parsers import TestHtmlParser
 from tests.test_utils.oidc import FakeAuthorizationGrant, FakeOidcServer
 
@@ -67,6 +67,7 @@ class RestHelper:
     """
 
     hs: HomeServer
+    reactor: MemoryReactorClock
     site: Site
     auth_user_id: Optional[str]
 
@@ -142,7 +143,7 @@ class RestHelper:
             path = path + "?access_token=%s" % tok
 
         channel = make_request(
-            self.hs.get_reactor(),
+            self.reactor,
             self.site,
             "POST",
             path,
@@ -216,7 +217,7 @@ class RestHelper:
             data["reason"] = reason
 
         channel = make_request(
-            self.hs.get_reactor(),
+            self.reactor,
             self.site,
             "POST",
             path,
@@ -313,7 +314,7 @@ class RestHelper:
         data.update(extra_data or {})
 
         channel = make_request(
-            self.hs.get_reactor(),
+            self.reactor,
             self.site,
             "PUT",
             path,
@@ -394,7 +395,7 @@ class RestHelper:
             path = path + "?access_token=%s" % tok
 
         channel = make_request(
-            self.hs.get_reactor(),
+            self.reactor,
             self.site,
             "PUT",
             path,
@@ -433,7 +434,7 @@ class RestHelper:
             path = path + f"?access_token={tok}"
 
         channel = make_request(
-            self.hs.get_reactor(),
+            self.reactor,
             self.site,
             "GET",
             path,
@@ -488,7 +489,7 @@ class RestHelper:
         if body is not None:
             content = json.dumps(body).encode("utf8")
 
-        channel = make_request(self.hs.get_reactor(), self.site, method, path, content)
+        channel = make_request(self.reactor, self.site, method, path, content)
 
         assert channel.code == expect_code, "Expected: %d, got: %d, resp: %r" % (
             expect_code,
@@ -556,7 +557,6 @@ class RestHelper:
 
     def upload_media(
         self,
-        resource: Resource,
         image_data: bytes,
         tok: str,
         filename: str = "test.png",
@@ -573,8 +573,8 @@ class RestHelper:
         image_length = len(image_data)
         path = "/_matrix/media/r0/upload?filename=%s" % (filename,)
         channel = make_request(
-            self.hs.get_reactor(),
-            FakeSite(resource, self.hs.get_reactor()),
+            self.reactor,
+            self.site,
             "POST",
             path,
             content=image_data,
@@ -603,7 +603,7 @@ class RestHelper:
             expect_code: The return code to expect from attempting the whoami request
         """
         channel = make_request(
-            self.hs.get_reactor(),
+            self.reactor,
             self.site,
             "GET",
             "account/whoami",
@@ -642,7 +642,7 @@ class RestHelper:
     ) -> Tuple[JsonDict, FakeAuthorizationGrant]:
         """Log in (as a new user) via OIDC
 
-        Returns the result of the final token login.
+        Returns the result of the final token login and the fake authorization grant.
 
         Requires that "oidc_config" in the homeserver config be set appropriately
         (TEST_OIDC_CONFIG is a suitable example) - and by implication, needs a
@@ -672,10 +672,28 @@ class RestHelper:
         assert m, channel.text_body
         login_token = m.group(1)
 
-        # finally, submit the matrix login token to the login API, which gives us our
-        # matrix access token and device id.
+        return self.login_via_token(login_token, expected_status), grant
+
+    def login_via_token(
+        self,
+        login_token: str,
+        expected_status: int = 200,
+    ) -> JsonDict:
+        """Submit the matrix login token to the login API, which gives us our
+        matrix access token and device id.Log in (as a new user) via OIDC
+
+        Returns the result of the token login.
+
+        Requires that "oidc_config" in the homeserver config be set appropriately
+        (TEST_OIDC_CONFIG is a suitable example) - and by implication, needs a
+        "public_base_url".
+
+        Also requires the login servlet and the OIDC callback resource to be mounted at
+        the normal places.
+        """
+
         channel = make_request(
-            self.hs.get_reactor(),
+            self.reactor,
             self.site,
             "POST",
             "/login",
@@ -684,7 +702,7 @@ class RestHelper:
         assert (
             channel.code == expected_status
         ), f"unexpected status in response: {channel.code}"
-        return channel.json_body, grant
+        return channel.json_body
 
     def auth_via_oidc(
         self,
@@ -805,7 +823,7 @@ class RestHelper:
         with fake_serer.patch_homeserver(hs=self.hs):
             # now hit the callback URI with the right params and a made-up code
             channel = make_request(
-                self.hs.get_reactor(),
+                self.reactor,
                 self.site,
                 "GET",
                 callback_uri,
@@ -849,7 +867,7 @@ class RestHelper:
         # is the easiest way of figuring out what the Host header ought to be set to
         # to keep Synapse happy.
         channel = make_request(
-            self.hs.get_reactor(),
+            self.reactor,
             self.site,
             "GET",
             uri,
@@ -867,7 +885,7 @@ class RestHelper:
         location = get_location(channel)
         parts = urllib.parse.urlsplit(location)
         channel = make_request(
-            self.hs.get_reactor(),
+            self.reactor,
             self.site,
             "GET",
             urllib.parse.urlunsplit(("", "") + parts[2:]),
@@ -900,9 +918,7 @@ class RestHelper:
             + urllib.parse.urlencode({"session": ui_auth_session_id})
         )
         # hit the redirect url (which will issue a cookie and state)
-        channel = make_request(
-            self.hs.get_reactor(), self.site, "GET", sso_redirect_endpoint
-        )
+        channel = make_request(self.reactor, self.site, "GET", sso_redirect_endpoint)
         # that should serve a confirmation page
         assert channel.code == HTTPStatus.OK, channel.text_body
         channel.extract_cookies(cookies)

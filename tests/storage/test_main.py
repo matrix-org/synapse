@@ -20,7 +20,7 @@ from tests import unittest
 
 class DataStoreTestCase(unittest.HomeserverTestCase):
     def setUp(self) -> None:
-        super(DataStoreTestCase, self).setUp()
+        super().setUp()
 
         self.store = self.hs.get_datastores().main
 
@@ -29,9 +29,9 @@ class DataStoreTestCase(unittest.HomeserverTestCase):
 
     def test_get_users_paginate(self) -> None:
         self.get_success(self.store.register_user(self.user.to_string(), "pass"))
-        self.get_success(self.store.create_profile(self.user.localpart))
+        self.get_success(self.store.create_profile(self.user))
         self.get_success(
-            self.store.set_profile_displayname(self.user.localpart, self.displayname)
+            self.store.set_profile_displayname(self.user, self.displayname)
         )
 
         users, total = self.get_success(
@@ -39,11 +39,11 @@ class DataStoreTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(1, total)
-        self.assertEqual(self.displayname, users.pop()["displayname"])
+        self.assertEqual(self.displayname, users.pop().displayname)
 
         users, total = self.get_success(
             self.store.get_users_paginate(0, 10, name="BC", guests=False)
         )
 
         self.assertEqual(1, total)
-        self.assertEqual(self.displayname, users.pop()["displayname"])
+        self.assertEqual(self.displayname, users.pop().displayname)

@@ -27,7 +27,7 @@ from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.tcp.commands import PositionCommand
 from synapse.replication.tcp.protocol import ServerReplicationStreamProtocol
 from synapse.replication.tcp.streams import EventsStream
-from synapse.replication.tcp.streams._base import StreamRow, Token
+from synapse.replication.tcp.streams._base import CachesStream, StreamRow, Token
 from synapse.util.metrics import Measure
 
 if TYPE_CHECKING:
@@ -191,7 +191,12 @@ class ReplicationStreamer:
 
                         if updates:
                             logger.info(
-                                "Streaming: %s -> %s", stream.NAME, updates[-1][0]
+                                "Streaming: %s -> %s (limited: %s, updates: %s, max token: %s)",
+                                stream.NAME,
+                                updates[-1][0],
+                                limited,
+                                len(updates),
+                                current_token,
                             )
                             stream_updates_counter.labels(stream.NAME).inc(len(updates))
 
@@ -199,6 +204,23 @@ class ReplicationStreamer:
                             # The token has advanced but there is no data to
                             # send, so we send a `POSITION` to inform other
                             # workers of the updated position.
+                            #
+                            # There are two reasons for this: 1) this instance
+                            # requested a stream ID but didn't use it, or 2)
+                            # this instance advanced its own stream position due
+                            # to receiving notifications about other instances
+                            # advancing their stream position.
+
+                            # We skip sending `POSITION` for the `caches` stream
+                            # for the second case as a) it generates a lot of
+                            # traffic as every worker would echo each write, and
+                            # b) nothing cares if a given worker's caches stream
+                            # position lags.
+                            if stream.NAME == CachesStream.NAME:
+                                # If there haven't been any writes since the
+                                # `last_token` then we're in the second case.
+                                if stream.minimal_local_current_token() <= last_token:
+                                    continue
 
                             # Note: `last_token` may not *actually* be the
                             # last token we sent out in a RDATA or POSITION.
@@ -237,6 +259,24 @@ class ReplicationStreamer:
                                 )
                             except Exception:
                                 logger.exception("Failed to replicate")
+
+                        # The last token we send may not match the current
+                        # token, in which case we want to send out a `POSITION`
+                        # to tell other workers the actual current position.
+                        if updates[-1][0] < current_token:
+                            logger.info(
+                                "Sending position: %s -> %s",
+                                stream.NAME,
+                                current_token,
+                            )
+                            self.command_handler.send_command(
+                                PositionCommand(
+                                    stream.NAME,
+                                    self._instance_name,
+                                    updates[-1][0],
+                                    current_token,
+                                )
+                            )
 
             logger.debug("No more pending updates, breaking poke loop")
         finally:

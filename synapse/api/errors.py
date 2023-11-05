@@ -16,6 +16,7 @@
 """Contains exceptions and error codes."""
 
 import logging
+import math
 import typing
 from enum import Enum
 from http import HTTPStatus
@@ -27,7 +28,7 @@ from synapse.util import json_decoder
 
 if typing.TYPE_CHECKING:
     from synapse.config.homeserver import HomeServerConfig
-    from synapse.types import JsonDict
+    from synapse.types import JsonDict, StrCollection
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +81,8 @@ class Codes(str, Enum):
     WEAK_PASSWORD = "M_WEAK_PASSWORD"
     INVALID_SIGNATURE = "M_INVALID_SIGNATURE"
     USER_DEACTIVATED = "M_USER_DEACTIVATED"
+    # USER_LOCKED = "M_USER_LOCKED"
+    USER_LOCKED = "ORG_MATRIX_MSC3939_USER_LOCKED"
 
     # Part of MSC3848
     # https://github.com/matrix-org/matrix-spec-proposals/pull/3848
@@ -108,16 +111,31 @@ class Codes(str, Enum):
 
     USER_AWAITING_APPROVAL = "ORG.MATRIX.MSC3866_USER_AWAITING_APPROVAL"
 
+    AS_PING_URL_NOT_SET = "M_URL_NOT_SET"
+    AS_PING_BAD_STATUS = "M_BAD_STATUS"
+    AS_PING_CONNECTION_TIMEOUT = "M_CONNECTION_TIMEOUT"
+    AS_PING_CONNECTION_FAILED = "M_CONNECTION_FAILED"
+
+    # Attempt to send a second annotation with the same event type & annotation key
+    # MSC2677
+    DUPLICATE_ANNOTATION = "M_DUPLICATE_ANNOTATION"
+
 
 class CodeMessageException(RuntimeError):
-    """An exception with integer code and message string attributes.
+    """An exception with integer code, a message string attributes and optional headers.
 
     Attributes:
         code: HTTP error code
         msg: string describing the error
+        headers: optional response headers to send
     """
 
-    def __init__(self, code: Union[int, HTTPStatus], msg: str):
+    def __init__(
+        self,
+        code: Union[int, HTTPStatus],
+        msg: str,
+        headers: Optional[Dict[str, str]] = None,
+    ):
         super().__init__("%d: %s" % (code, msg))
 
         # Some calls to this method pass instances of http.HTTPStatus for `code`.
@@ -128,6 +146,7 @@ class CodeMessageException(RuntimeError):
         # To eliminate this behaviour, we convert them to their integer equivalents here.
         self.code = int(code)
         self.msg = msg
+        self.headers = headers
 
 
 class RedirectException(CodeMessageException):
@@ -173,6 +192,7 @@ class SynapseError(CodeMessageException):
         msg: str,
         errcode: str = Codes.UNKNOWN,
         additional_fields: Optional[Dict] = None,
+        headers: Optional[Dict[str, str]] = None,
     ):
         """Constructs a synapse error.
 
@@ -181,7 +201,7 @@ class SynapseError(CodeMessageException):
             msg: The human-readable error message.
             errcode: The matrix error code e.g 'M_FORBIDDEN'
         """
-        super().__init__(code, msg)
+        super().__init__(code, msg, headers)
         self.errcode = errcode
         if additional_fields is None:
             self._additional_fields: Dict = {}
@@ -191,6 +211,11 @@ class SynapseError(CodeMessageException):
     def error_dict(self, config: Optional["HomeServerConfig"]) -> "JsonDict":
         return cs_error(self.msg, self.errcode, **self._additional_fields)
 
+    @property
+    def debug_context(self) -> Optional[str]:
+        """Override this to add debugging context that shouldn't be sent to clients."""
+        return None
+
 
 class InvalidAPICallError(SynapseError):
     """You called an existing API endpoint, but fed that endpoint
@@ -198,6 +223,13 @@ class InvalidAPICallError(SynapseError):
 
     def __init__(self, msg: str):
         super().__init__(HTTPStatus.BAD_REQUEST, msg, Codes.BAD_JSON)
+
+
+class InvalidProxyCredentialsError(SynapseError):
+    """Error raised when the proxy credentials are invalid."""
+
+    def __init__(self, msg: str, errcode: str = Codes.UNKNOWN):
+        super().__init__(401, msg, errcode)
 
 
 class ProxiedRequestError(SynapseError):
@@ -324,6 +356,20 @@ class AuthError(SynapseError):
         additional_fields: Optional[dict] = None,
     ):
         super().__init__(code, msg, errcode, additional_fields)
+
+
+class OAuthInsufficientScopeError(SynapseError):
+    """An error raised when the caller does not have sufficient scope to perform the requested action"""
+
+    def __init__(
+        self,
+        required_scopes: List[str],
+    ):
+        headers = {
+            "WWW-Authenticate": 'Bearer error="insufficient_scope", scope="%s"'
+            % (" ".join(required_scopes))
+        }
+        super().__init__(401, "Insufficient scope", Codes.FORBIDDEN, None, headers)
 
 
 class UnstableSpecAuthError(AuthError):
@@ -463,18 +509,30 @@ class InvalidCaptchaError(SynapseError):
 class LimitExceededError(SynapseError):
     """A client has sent too many requests and is being throttled."""
 
+    include_retry_after_header = False
+
     def __init__(
         self,
+        limiter_name: str,
         code: int = 429,
-        msg: str = "Too Many Requests",
         retry_after_ms: Optional[int] = None,
         errcode: str = Codes.LIMIT_EXCEEDED,
     ):
-        super().__init__(code, msg, errcode)
+        headers = (
+            {"Retry-After": str(math.ceil(retry_after_ms / 1000))}
+            if self.include_retry_after_header and retry_after_ms is not None
+            else None
+        )
+        super().__init__(code, "Too Many Requests", errcode, headers=headers)
         self.retry_after_ms = retry_after_ms
+        self.limiter_name = limiter_name
 
     def error_dict(self, config: Optional["HomeServerConfig"]) -> "JsonDict":
         return cs_error(self.msg, self.errcode, retry_after_ms=self.retry_after_ms)
+
+    @property
+    def debug_context(self) -> Optional[str]:
+        return self.limiter_name
 
 
 class RoomKeysVersionError(SynapseError):
@@ -673,17 +731,26 @@ class FederationPullAttemptBackoffError(RuntimeError):
     Attributes:
         event_id: The event_id which we are refusing to pull
         message: A custom error message that gives more context
+        retry_after_ms: The remaining backoff interval, in milliseconds
     """
 
-    def __init__(self, event_ids: List[str], message: Optional[str]):
-        self.event_ids = event_ids
+    def __init__(
+        self, event_ids: "StrCollection", message: Optional[str], retry_after_ms: int
+    ):
+        event_ids = list(event_ids)
 
         if message:
             error_message = message
         else:
-            error_message = f"Not attempting to pull event_ids={self.event_ids} because we already tried to pull them recently (backing off)."
+            error_message = (
+                f"Not attempting to pull event_ids={event_ids} because we already "
+                "tried to pull them recently (backing off)."
+            )
 
         super().__init__(error_message)
+
+        self.event_ids = event_ids
+        self.retry_after_ms = retry_after_ms
 
 
 class HttpResponseException(CodeMessageException):
@@ -751,3 +818,25 @@ class ModuleFailedException(Exception):
     Raised when a module API callback fails, for example because it raised an
     exception.
     """
+
+
+class PartialStateConflictError(SynapseError):
+    """An internal error raised when attempting to persist an event with partial state
+    after the room containing the event has been un-partial stated.
+
+    This error should be handled by recomputing the event context and trying again.
+
+    This error has an HTTP status code so that it can be transported over replication.
+    It should not be exposed to clients.
+    """
+
+    @staticmethod
+    def message() -> str:
+        return "Cannot persist partial state event in un-partial stated room"
+
+    def __init__(self) -> None:
+        super().__init__(
+            HTTPStatus.CONFLICT,
+            msg=PartialStateConflictError.message(),
+            errcode=Codes.UNKNOWN,
+        )

@@ -1,14 +1,4 @@
 {
-  "__inputs": [
-    {
-      "name": "DS_PROMETHEUS",
-      "label": "Prometheus",
-      "description": "",
-      "type": "datasource",
-      "pluginId": "prometheus",
-      "pluginName": "Prometheus"
-    }
-  ],
   "__elements": {},
   "__requires": [
     {
@@ -47,7 +37,7 @@
       {
         "builtIn": 1,
         "datasource": {
-          "uid": "$datasource"
+          "uid": "${DS_PROMETHEUS}"
         },
         "enable": false,
         "hide": true,
@@ -56,6 +46,17 @@
         "name": "Annotations & Alerts",
         "showIn": 0,
         "type": "dashboard"
+      },
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${DS_PROMETHEUS}"
+        },
+        "enable": true,
+        "expr": "changes(process_start_time_seconds{instance=\"$instance\",job=~\"synapse\"}[$bucket_size]) * on (instance, job) group_left(version) synapse_build_info{instance=\"$instance\",job=\"synapse\"}",
+        "iconColor": "purple",
+        "name": "deploys",
+        "titleFormat": "Deployed {{version}}"
       }
     ]
   },
@@ -82,7 +83,7 @@
       "collapsed": false,
       "datasource": {
         "type": "prometheus",
-        "uid": "000000001"
+        "uid": "${DS_PROMETHEUS}"
       },
       "gridPos": {
         "h": 1,
@@ -96,7 +97,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "000000001"
+            "uid": "${DS_PROMETHEUS}"
           },
           "refId": "A"
         }
@@ -118,7 +119,7 @@
       },
       "dataFormat": "tsbuckets",
       "datasource": {
-        "uid": "$datasource"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -192,7 +193,7 @@
       "targets": [
         {
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "expr": "sum(rate(synapse_http_server_response_time_seconds_bucket{servlet='RoomSendEventRestServlet',instance=\"$instance\",code=~\"2..\"}[$bucket_size])) by (le)",
           "format": "heatmap",
@@ -224,7 +225,7 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": {
-        "uid": "$datasource"
+        "uid": "${DS_PROMETHEUS}"
       },
       "description": "",
       "fieldConfig": {
@@ -322,7 +323,7 @@
       "targets": [
         {
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "expr": "histogram_quantile(0.99, sum(rate(synapse_http_server_response_time_seconds_bucket{servlet='RoomSendEventRestServlet',index=~\"$index\",instance=\"$instance\",code=~\"2..\"}[$bucket_size])) by (le))",
           "format": "time_series",
@@ -332,7 +333,7 @@
         },
         {
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "expr": "histogram_quantile(0.9, sum(rate(synapse_http_server_response_time_seconds_bucket{servlet='RoomSendEventRestServlet',index=~\"$index\",instance=\"$instance\",code=~\"2..\"}[$bucket_size])) by (le))",
           "format": "time_series",
@@ -343,7 +344,7 @@
         },
         {
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "expr": "histogram_quantile(0.75, sum(rate(synapse_http_server_response_time_seconds_bucket{servlet='RoomSendEventRestServlet',index=~\"$index\",instance=\"$instance\",code=~\"2..\"}[$bucket_size])) by (le))",
           "format": "time_series",
@@ -353,7 +354,7 @@
         },
         {
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "expr": "histogram_quantile(0.5, sum(rate(synapse_http_server_response_time_seconds_bucket{servlet='RoomSendEventRestServlet',index=~\"$index\",instance=\"$instance\",code=~\"2..\"}[$bucket_size])) by (le))",
           "format": "time_series",
@@ -363,7 +364,7 @@
         },
         {
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "expr": "histogram_quantile(0.25, sum(rate(synapse_http_server_response_time_seconds_bucket{servlet='RoomSendEventRestServlet',index=~\"$index\",instance=\"$instance\",code=~\"2..\"}[$bucket_size])) by (le))",
           "legendFormat": "25%",
@@ -371,7 +372,7 @@
         },
         {
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "expr": "histogram_quantile(0.05, sum(rate(synapse_http_server_response_time_seconds_bucket{servlet='RoomSendEventRestServlet',index=~\"$index\",instance=\"$instance\",code=~\"2..\"}[$bucket_size])) by (le))",
           "legendFormat": "5%",
@@ -379,7 +380,7 @@
         },
         {
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "expr": "sum(rate(synapse_http_server_response_time_seconds_sum{servlet='RoomSendEventRestServlet',index=~\"$index\",instance=\"$instance\",code=~\"2..\"}[$bucket_size])) / sum(rate(synapse_http_server_response_time_seconds_count{servlet='RoomSendEventRestServlet',index=~\"$index\",instance=\"$instance\",code=~\"2..\"}[$bucket_size]))",
           "legendFormat": "Average",
@@ -387,7 +388,7 @@
         },
         {
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "expr": "sum(rate(synapse_storage_events_persisted_events_total{instance=\"$instance\"}[$bucket_size]))",
           "hide": false,
@@ -457,7 +458,7 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": {
-        "uid": "$datasource"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -504,7 +505,7 @@
       "targets": [
         {
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "expr": "rate(process_cpu_seconds_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
           "format": "time_series",
@@ -564,7 +565,7 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": {
-        "uid": "$datasource"
+        "uid": "${DS_PROMETHEUS}"
       },
       "editable": true,
       "error": false,
@@ -614,7 +615,7 @@
       "targets": [
         {
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "expr": "process_resident_memory_bytes{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}",
           "format": "time_series",
@@ -627,7 +628,7 @@
         },
         {
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "expr": "sum(process_resident_memory_bytes{instance=\"$instance\",job=~\"$job\",index=~\"$index\"})",
           "hide": true,
@@ -671,12 +672,101 @@
       }
     },
     {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "axisSoftMax": 1,
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 10,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 19
+      },
+      "id": 245,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "synapse_build_info{instance=\"$instance\", job=\"synapse\"} - 1",
+          "legendFormat": "version {{version}}",
+          "range": true,
+          "refId": "deployed_synapse_versions"
+        }
+      ],
+      "title": "Deployed Synapse versions over time",
+      "type": "timeseries"
+    },
+    {
       "aliasColors": {},
       "bars": false,
       "dashLength": 10,
       "dashes": false,
       "datasource": {
-        "uid": "$datasource"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -731,7 +821,7 @@
       "targets": [
         {
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "expr": "process_open_fds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}",
           "format": "time_series",
@@ -744,7 +834,7 @@
         },
         {
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "expr": "process_max_fds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}",
           "format": "time_series",
@@ -793,7 +883,7 @@
       "collapsed": true,
       "datasource": {
         "type": "prometheus",
-        "uid": "$datasource"
+        "uid": "${DS_PROMETHEUS}"
       },
       "gridPos": {
         "h": 1,
@@ -809,7 +899,8 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
-            "uid": "$datasource"
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
           },
           "editable": true,
           "error": false,
@@ -872,19 +963,21 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
+              "editorMode": "code",
               "expr": "rate(process_cpu_system_seconds_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "{{job}}-{{index}} system ",
               "metric": "",
+              "range": true,
               "refId": "B",
               "step": 20
             },
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "rate(process_cpu_user_seconds_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
@@ -1114,7 +1207,7 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editable": true,
           "error": false,
@@ -1164,7 +1257,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "process_resident_memory_bytes{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}",
               "format": "time_series",
@@ -1177,7 +1270,7 @@
             },
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "sum(process_resident_memory_bytes{instance=\"$instance\",job=~\"$job\",index=~\"$index\"})",
               "interval": "",
@@ -1223,7 +1316,7 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -1276,7 +1369,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "scrape_duration_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}",
               "format": "time_series",
@@ -1328,7 +1421,8 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
-            "uid": "$datasource"
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -1368,20 +1462,42 @@
           "pointradius": 5,
           "points": false,
           "renderer": "flot",
-          "seriesOverrides": [],
+          "seriesOverrides": [
+            {
+              "$$hashKey": "object:116",
+              "alias": "/^version .*/",
+              "lines": true,
+              "linewidth": 6,
+              "points": false
+            }
+          ],
           "spaceLength": 10,
           "stack": false,
           "steppedLine": false,
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
+              "editorMode": "code",
               "expr": "min_over_time(up{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "{{job}}-{{index}}",
+              "range": true,
               "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "expr": "synapse_build_info{instance=\"$instance\", job=\"synapse\"} - 1",
+              "hide": false,
+              "legendFormat": "version {{version}}",
+              "range": true,
+              "refId": "deployed_synapse_versions"
             }
           ],
           "thresholds": [],
@@ -1420,7 +1536,7 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -1466,7 +1582,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "rate(synapse_http_server_response_ru_utime_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])+rate(synapse_http_server_response_ru_stime_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
@@ -1478,7 +1594,7 @@
             },
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "rate(synapse_background_process_ru_utime_seconds_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])+rate(synapse_background_process_ru_stime_seconds_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
@@ -1538,7 +1654,7 @@
           "dashes": false,
           "datasource": {
             "type": "prometheus",
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -1584,7 +1700,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "code",
               "expr": "rate(synapse_http_client_requests_total{job=~\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size])",
@@ -1594,7 +1710,7 @@
             },
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "code",
               "expr": "rate(synapse_http_matrixfederationclient_requests_total{job=~\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size])",
@@ -1731,7 +1847,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "refId": "A"
         }
@@ -1743,7 +1859,7 @@
       "collapsed": true,
       "datasource": {
         "type": "prometheus",
-        "uid": "$datasource"
+        "uid": "${DS_PROMETHEUS}"
       },
       "gridPos": {
         "h": 1,
@@ -1767,7 +1883,7 @@
           },
           "dataFormat": "tsbuckets",
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -1788,7 +1904,7 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 56
+            "y": 28
           },
           "heatmap": {},
           "hideZeroBuckets": false,
@@ -1841,7 +1957,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "sum(rate(synapse_http_server_response_time_seconds_bucket{servlet='RoomSendEventRestServlet',instance=\"$instance\"}[$bucket_size])) by (le)",
               "format": "heatmap",
@@ -1872,7 +1988,7 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "description": "",
           "editable": true,
@@ -1890,7 +2006,7 @@
             "h": 9,
             "w": 12,
             "x": 12,
-            "y": 56
+            "y": 28
           },
           "hiddenSeries": false,
           "id": 33,
@@ -1923,7 +2039,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "sum(rate(synapse_storage_events_persisted_events_total{instance=\"$instance\"}[$bucket_size])) without (job,index)",
               "format": "time_series",
@@ -1973,7 +2089,7 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "decimals": 1,
           "fill": 1,
@@ -1982,7 +2098,7 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 65
+            "y": 37
           },
           "hiddenSeries": false,
           "id": 40,
@@ -2014,7 +2130,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "rate(synapse_storage_events_persisted_by_source_type{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
@@ -2061,7 +2177,7 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "decimals": 1,
           "fill": 1,
@@ -2070,7 +2186,7 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 65
+            "y": 37
           },
           "hiddenSeries": false,
           "id": 46,
@@ -2102,7 +2218,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "rate(synapse_storage_events_persisted_by_event_type{job=~\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size])",
               "format": "time_series",
@@ -2152,7 +2268,7 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "decimals": 1,
           "fill": 1,
@@ -2161,7 +2277,7 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 72
+            "y": 44
           },
           "hiddenSeries": false,
           "id": 44,
@@ -2196,7 +2312,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "rate(synapse_storage_events_persisted_by_origin{job=~\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size])",
               "format": "time_series",
@@ -2244,7 +2360,7 @@
           "dashes": false,
           "datasource": {
             "type": "prometheus",
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "decimals": 1,
           "fill": 1,
@@ -2253,7 +2369,7 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 72
+            "y": 44
           },
           "hiddenSeries": false,
           "id": 45,
@@ -2288,7 +2404,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "code",
               "expr": "sum(rate(synapse_storage_events_persisted_events_sep_total{job=~\"$job\",index=~\"$index\", type=\"m.room.member\",instance=\"$instance\", origin_type=\"local\"}[$bucket_size])) by (origin_type, origin_entity)",
@@ -2354,7 +2470,7 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 79
+            "y": 51
           },
           "hiddenSeries": false,
           "id": 118,
@@ -2488,7 +2604,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "description": "CPU and DB time spent on most expensive state resolution in a room, summed over all workers. This is a very rough proxy for \"how fast is state res\", but it doesn't accurately represent the system load (e.g. it completely ignores cheap state resolutions).\n",
           "fieldConfig": {
@@ -2547,7 +2663,7 @@
             "h": 9,
             "w": 12,
             "x": 12,
-            "y": 79
+            "y": 51
           },
           "id": 222,
           "options": {
@@ -2566,7 +2682,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "exemplar": false,
               "expr": "sum(rate(synapse_state_res_db_for_biggest_room_seconds_total{instance=\"$instance\"}[1m]))",
@@ -2580,7 +2696,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "exemplar": false,
               "expr": "sum(rate(synapse_state_res_cpu_for_biggest_room_seconds_total{instance=\"$instance\"}[1m]))",
@@ -2600,7 +2716,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "refId": "A"
         }
@@ -2612,7 +2728,7 @@
       "collapsed": true,
       "datasource": {
         "type": "prometheus",
-        "uid": "$datasource"
+        "uid": "${DS_PROMETHEUS}"
       },
       "gridPos": {
         "h": 1,
@@ -2629,7 +2745,7 @@
           "dashes": false,
           "datasource": {
             "type": "prometheus",
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editable": true,
           "error": false,
@@ -2646,7 +2762,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 57
+            "y": 29
           },
           "hiddenSeries": false,
           "id": 4,
@@ -2682,7 +2798,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "rate(synapse_http_server_requests_received_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
@@ -2751,7 +2867,7 @@
           "dashes": false,
           "datasource": {
             "type": "prometheus",
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editable": true,
           "error": false,
@@ -2768,7 +2884,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 57
+            "y": 29
           },
           "hiddenSeries": false,
           "id": 32,
@@ -2800,7 +2916,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "rate(synapse_http_server_requests_received_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\",method!=\"OPTIONS\"}[$bucket_size]) and topk(10,synapse_http_server_requests_received_total{instance=\"$instance\",job=~\"$job\",method!=\"OPTIONS\"})",
               "format": "time_series",
@@ -2850,7 +2966,7 @@
           "dashes": false,
           "datasource": {
             "type": "prometheus",
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editable": true,
           "error": false,
@@ -2867,7 +2983,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 65
+            "y": 37
           },
           "hiddenSeries": false,
           "id": 139,
@@ -2903,7 +3019,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "rate(synapse_http_server_in_flight_requests_ru_utime_seconds_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])+rate(synapse_http_server_in_flight_requests_ru_stime_seconds_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
@@ -2972,7 +3088,7 @@
           "dashes": false,
           "datasource": {
             "type": "prometheus",
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editable": true,
           "error": false,
@@ -2989,7 +3105,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 65
+            "y": 37
           },
           "hiddenSeries": false,
           "id": 52,
@@ -3025,7 +3141,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "(rate(synapse_http_server_in_flight_requests_ru_utime_seconds_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])+rate(synapse_http_server_in_flight_requests_ru_stime_seconds_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])) / rate(synapse_http_server_requests_received_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
@@ -3094,7 +3210,7 @@
           "dashes": false,
           "datasource": {
             "type": "prometheus",
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editable": true,
           "error": false,
@@ -3111,7 +3227,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 73
+            "y": 45
           },
           "hiddenSeries": false,
           "id": 7,
@@ -3146,7 +3262,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "rate(synapse_http_server_in_flight_requests_db_txn_duration_seconds_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
@@ -3195,7 +3311,7 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editable": true,
           "error": false,
@@ -3212,7 +3328,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 73
+            "y": 45
           },
           "hiddenSeries": false,
           "id": 47,
@@ -3248,7 +3364,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "(sum(rate(synapse_http_server_response_time_seconds_sum{instance=\"$instance\",job=~\"$job\",index=~\"$index\",tag!=\"incremental_sync\"}[$bucket_size])) without (code))/(sum(rate(synapse_http_server_response_time_seconds_count{instance=\"$instance\",job=~\"$job\",index=~\"$index\",tag!=\"incremental_sync\"}[$bucket_size])) without (code))",
               "format": "time_series",
@@ -3296,7 +3412,7 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -3310,7 +3426,7 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 81
+            "y": 53
           },
           "hiddenSeries": false,
           "id": 103,
@@ -3349,7 +3465,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "topk(10,synapse_http_server_in_flight_requests_count{instance=\"$instance\",job=~\"$job\",index=~\"$index\"})",
               "format": "time_series",
@@ -3360,7 +3476,7 @@
             },
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "sum(avg_over_time(synapse_http_server_in_flight_requests_count{job=\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size]))",
               "interval": "",
@@ -3403,7 +3519,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "refId": "A"
         }
@@ -3415,7 +3531,7 @@
       "collapsed": true,
       "datasource": {
         "type": "prometheus",
-        "uid": "$datasource"
+        "uid": "${DS_PROMETHEUS}"
       },
       "gridPos": {
         "h": 1,
@@ -3431,7 +3547,7 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -3445,7 +3561,7 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 5
+            "y": 30
           },
           "hiddenSeries": false,
           "id": 99,
@@ -3467,7 +3583,7 @@
           },
           "paceLength": 10,
           "percentage": false,
-          "pluginVersion": "8.4.3",
+          "pluginVersion": "9.2.2",
           "pointradius": 5,
           "points": false,
           "renderer": "flot",
@@ -3478,7 +3594,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "rate(synapse_background_process_ru_utime_seconds_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])+rate(synapse_background_process_ru_stime_seconds_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
@@ -3524,7 +3640,7 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -3538,7 +3654,7 @@
             "h": 9,
             "w": 12,
             "x": 12,
-            "y": 5
+            "y": 30
           },
           "hiddenSeries": false,
           "id": 101,
@@ -3560,7 +3676,7 @@
           },
           "paceLength": 10,
           "percentage": false,
-          "pluginVersion": "8.4.3",
+          "pluginVersion": "9.2.2",
           "pointradius": 5,
           "points": false,
           "renderer": "flot",
@@ -3571,7 +3687,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "rate(synapse_background_process_db_txn_duration_seconds_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]) +  rate(synapse_background_process_db_sched_duration_seconds_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
@@ -3617,7 +3733,7 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -3631,7 +3747,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 14
+            "y": 39
           },
           "hiddenSeries": false,
           "id": 138,
@@ -3651,7 +3767,7 @@
             "alertThreshold": true
           },
           "percentage": false,
-          "pluginVersion": "8.4.3",
+          "pluginVersion": "9.2.2",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -3662,7 +3778,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "synapse_background_process_in_flight_count{job=~\"$job\",index=~\"$index\",instance=\"$instance\"}",
               "legendFormat": "{{job}}-{{index}} {{name}}",
@@ -3704,7 +3820,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "refId": "A"
         }
@@ -3716,7 +3832,7 @@
       "collapsed": true,
       "datasource": {
         "type": "prometheus",
-        "uid": "$datasource"
+        "uid": "${DS_PROMETHEUS}"
       },
       "gridPos": {
         "h": 1,
@@ -3732,7 +3848,7 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -3746,7 +3862,7 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 59
+            "y": 31
           },
           "hiddenSeries": false,
           "id": 79,
@@ -3779,7 +3895,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "sum(rate(synapse_federation_client_sent_transactions_total{instance=\"$instance\"}[$bucket_size]))",
               "format": "time_series",
@@ -3789,7 +3905,7 @@
             },
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "sum(rate(synapse_util_metrics_block_count_total{block_name=\"_send_new_transaction\",instance=\"$instance\"}[$bucket_size]) - ignoring (block_name) rate(synapse_federation_client_sent_transactions_total{instance=\"$instance\"}[$bucket_size]))",
               "legendFormat": "failed txn rate",
@@ -3832,7 +3948,7 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -3846,7 +3962,7 @@
             "h": 9,
             "w": 12,
             "x": 12,
-            "y": 59
+            "y": 31
           },
           "hiddenSeries": false,
           "id": 83,
@@ -3879,7 +3995,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "sum(rate(synapse_federation_server_received_pdus_total{instance=~\"$instance\"}[$bucket_size]))",
               "format": "time_series",
@@ -3889,7 +4005,7 @@
             },
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "sum(rate(synapse_federation_server_received_edus_total{instance=~\"$instance\"}[$bucket_size]))",
               "format": "time_series",
@@ -3934,7 +4050,8 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
-            "uid": "$datasource"
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -3948,7 +4065,7 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 68
+            "y": 40
           },
           "hiddenSeries": false,
           "id": 109,
@@ -3981,18 +4098,20 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
-              "expr": "sum(rate(synapse_federation_client_sent_pdu_destinations:total_total{instance=\"$instance\"}[$bucket_size]))",
+              "editorMode": "code",
+              "expr": "sum(rate(synapse_federation_client_sent_pdu_destinations_count_total{instance=\"$instance\"}[$bucket_size]))",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
               "legendFormat": "pdus",
+              "range": true,
               "refId": "A"
             },
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "sum(rate(synapse_federation_client_sent_edus_total{instance=\"$instance\"}[$bucket_size]))",
               "format": "time_series",
@@ -4038,7 +4157,7 @@
           "dashes": false,
           "datasource": {
             "type": "prometheus",
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -4052,7 +4171,7 @@
             "h": 9,
             "w": 12,
             "x": 12,
-            "y": 68
+            "y": 40
           },
           "hiddenSeries": false,
           "id": 111,
@@ -4085,7 +4204,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "code",
               "expr": "rate(synapse_federation_client_sent_edus_by_type_total{instance=\"$instance\"}[$bucket_size])",
@@ -4130,13 +4249,257 @@
           }
         },
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "description": "Triangular growth may indicate a problem with federation sending from the remote host --- but it may also be the case that everyone is asleep and no messages are being sent.\n\nSee https://matrix-org.github.io/synapse/latest/usage/configuration/config_documentation.html#federation_metrics_domains",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "axisSoftMax": 60,
+                "axisSoftMin": 0,
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "line"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 60
+                  }
+                ]
+              },
+              "unit": "m"
+            },
+            "overrides": [
+              {
+                "__systemRef": "hideSeriesFrom",
+                "matcher": {
+                  "id": "byNames",
+                  "options": {
+                    "mode": "exclude",
+                    "names": [
+                      "libera.chat "
+                    ],
+                    "prefix": "All except:",
+                    "readOnly": true
+                  }
+                },
+                "properties": [
+                  {
+                    "id": "custom.hideFrom",
+                    "value": {
+                      "legend": false,
+                      "tooltip": false,
+                      "viz": true
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 49
+          },
+          "id": 243,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "exemplar": false,
+              "expr": "(time() - max without (job, index, host) (avg_over_time(synapse_federation_last_received_pdu_time[10m]))) / 60",
+              "instant": false,
+              "legendFormat": "{{server_name}} ",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Age of last PDU received from nominated hosts",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "description": "Triangular growth may indicate a problem with federation senders on the monitored instance---but it may also be the case that everyone is asleep and no messages are being sent.\n\nSee https://matrix-org.github.io/synapse/latest/usage/configuration/config_documentation.html#federation_metrics_domains",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "axisSoftMax": 60,
+                "axisSoftMin": 0,
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "line"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 60
+                  }
+                ]
+              },
+              "unit": "m"
+            },
+            "overrides": [
+              {
+                "__systemRef": "hideSeriesFrom",
+                "matcher": {
+                  "id": "byNames",
+                  "options": {
+                    "mode": "exclude",
+                    "names": [
+                      "libera.chat"
+                    ],
+                    "prefix": "All except:",
+                    "readOnly": true
+                  }
+                },
+                "properties": [
+                  {
+                    "id": "custom.hideFrom",
+                    "value": {
+                      "legend": false,
+                      "tooltip": false,
+                      "viz": true
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 49
+          },
+          "id": 241,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "exemplar": false,
+              "expr": "(time() - max without (job, index, host) (avg_over_time(synapse_federation_last_sent_pdu_time[10m]))) / 60",
+              "instant": false,
+              "legendFormat": "{{server_name}}",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Age of last PDU sent to nominated hosts",
+          "type": "timeseries"
+        },
+        {
           "aliasColors": {},
           "bars": false,
           "dashLength": 10,
           "dashes": false,
           "datasource": {
             "type": "prometheus",
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "description": "The number of events in the in-memory queues ",
           "fieldConfig": {
@@ -4148,10 +4511,10 @@
           "fill": 1,
           "fillGradient": 0,
           "gridPos": {
-            "h": 8,
+            "h": 9,
             "w": 12,
             "x": 0,
-            "y": 77
+            "y": 57
           },
           "hiddenSeries": false,
           "id": 142,
@@ -4183,7 +4546,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "code",
               "expr": "synapse_federation_transaction_queue_pending_pdus{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}",
@@ -4195,7 +4558,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "synapse_federation_transaction_queue_pending_edus{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}",
               "interval": "",
@@ -4244,7 +4607,7 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "description": "Number of events queued up on the master process for processing by the federation sender",
           "fieldConfig": {
@@ -4259,7 +4622,7 @@
             "h": 9,
             "w": 12,
             "x": 12,
-            "y": 77
+            "y": 57
           },
           "hiddenSeries": false,
           "id": 140,
@@ -4292,7 +4655,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "synapse_federation_send_queue_presence_changed_size{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}",
               "format": "time_series",
@@ -4303,7 +4666,7 @@
             },
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "synapse_federation_send_queue_presence_map_size{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}",
               "format": "time_series",
@@ -4315,7 +4678,7 @@
             },
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "synapse_federation_send_queue_presence_destinations_size{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}",
               "format": "time_series",
@@ -4327,7 +4690,7 @@
             },
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "synapse_federation_send_queue_keyed_edu_size{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}",
               "format": "time_series",
@@ -4339,7 +4702,7 @@
             },
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "synapse_federation_send_queue_edus_size{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}",
               "format": "time_series",
@@ -4351,7 +4714,7 @@
             },
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "synapse_federation_send_queue_pos_time_size{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}",
               "format": "time_series",
@@ -4407,7 +4770,7 @@
           },
           "dataFormat": "tsbuckets",
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -4428,7 +4791,7 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 85
+            "y": 66
           },
           "heatmap": {},
           "hideZeroBuckets": false,
@@ -4484,7 +4847,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "sum(rate(synapse_event_processing_lag_by_event_bucket{instance=\"$instance\",name=\"federation_sender\"}[$bucket_size])) by (le)",
               "format": "heatmap",
@@ -4519,7 +4882,7 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -4533,7 +4896,7 @@
             "h": 9,
             "w": 12,
             "x": 12,
-            "y": 86
+            "y": 66
           },
           "hiddenSeries": false,
           "id": 162,
@@ -4608,7 +4971,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "histogram_quantile(0.99, sum(rate(synapse_event_processing_lag_by_event_bucket{name='federation_sender',index=~\"$index\",instance=\"$instance\"}[$bucket_size])) by (le))",
               "format": "time_series",
@@ -4619,7 +4982,7 @@
             },
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "histogram_quantile(0.9, sum(rate(synapse_event_processing_lag_by_event_bucket{name='federation_sender',index=~\"$index\",instance=\"$instance\"}[$bucket_size])) by (le))",
               "format": "time_series",
@@ -4630,7 +4993,7 @@
             },
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "histogram_quantile(0.75, sum(rate(synapse_event_processing_lag_by_event_bucket{name='federation_sender',index=~\"$index\",instance=\"$instance\"}[$bucket_size])) by (le))",
               "format": "time_series",
@@ -4641,7 +5004,7 @@
             },
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "histogram_quantile(0.5, sum(rate(synapse_event_processing_lag_by_event_bucket{name='federation_sender',index=~\"$index\",instance=\"$instance\"}[$bucket_size])) by (le))",
               "format": "time_series",
@@ -4652,7 +5015,7 @@
             },
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "histogram_quantile(0.25, sum(rate(synapse_event_processing_lag_by_event_bucket{name='federation_sender',index=~\"$index\",instance=\"$instance\"}[$bucket_size])) by (le))",
               "interval": "",
@@ -4661,7 +5024,7 @@
             },
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "histogram_quantile(0.05, sum(rate(synapse_event_processing_lag_by_event_bucket{name='federation_sender',index=~\"$index\",instance=\"$instance\"}[$bucket_size])) by (le))",
               "interval": "",
@@ -4670,7 +5033,7 @@
             },
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "sum(rate(synapse_event_processing_lag_by_event_sum{name='federation_sender',index=~\"$index\",instance=\"$instance\"}[$bucket_size])) / sum(rate(synapse_event_processing_lag_by_event_count{name='federation_sender',index=~\"$index\",instance=\"$instance\"}[$bucket_size]))",
               "interval": "",
@@ -4743,13 +5106,28 @@
           },
           "dataFormat": "tsbuckets",
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "scaleDistribution": {
+                  "type": "linear"
+                }
+              }
+            },
+            "overrides": []
           },
           "gridPos": {
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 94
+            "y": 75
           },
           "heatmap": {},
           "hideZeroBuckets": false,
@@ -4759,11 +5137,53 @@
             "show": false
           },
           "links": [],
+          "options": {
+            "calculate": false,
+            "calculation": {},
+            "cellGap": -1,
+            "cellValues": {
+              "decimals": 2
+            },
+            "color": {
+              "exponent": 0.5,
+              "fill": "#b4ff00",
+              "min": 0,
+              "mode": "scheme",
+              "reverse": false,
+              "scale": "exponential",
+              "scheme": "Inferno",
+              "steps": 128
+            },
+            "exemplars": {
+              "color": "rgba(255,0,255,0.7)"
+            },
+            "filterValues": {
+              "le": 1e-9
+            },
+            "legend": {
+              "show": false
+            },
+            "rowsFrame": {
+              "layout": "auto"
+            },
+            "showValue": "never",
+            "tooltip": {
+              "show": true,
+              "yHistogram": true
+            },
+            "yAxis": {
+              "axisPlacement": "left",
+              "decimals": 0,
+              "reverse": false,
+              "unit": "s"
+            }
+          },
+          "pluginVersion": "9.2.2",
           "reverseYBuckets": false,
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "sum(rate(synapse_federation_server_pdu_process_time_bucket{instance=\"$instance\"}[$bucket_size])) by (le)",
               "format": "heatmap",
@@ -4798,7 +5218,8 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
-            "uid": "$datasource"
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
           },
           "editable": true,
           "error": false,
@@ -4815,7 +5236,7 @@
             "h": 9,
             "w": 12,
             "x": 12,
-            "y": 95
+            "y": 75
           },
           "hiddenSeries": false,
           "id": 203,
@@ -4837,7 +5258,7 @@
           },
           "paceLength": 10,
           "percentage": false,
-          "pluginVersion": "9.0.4",
+          "pluginVersion": "9.2.2",
           "pointradius": 5,
           "points": false,
           "renderer": "flot",
@@ -4848,13 +5269,15 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
-              "expr": "synapse_federation_server_oldest_inbound_pdu_in_staging{job=\"$job\",index=~\"$index\",instance=\"$instance\"}",
+              "editorMode": "code",
+              "expr": "synapse_federation_server_oldest_inbound_pdu_in_staging{job=~\"$job\",index=~\"$index\",instance=\"$instance\"}",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
-              "legendFormat": "rss {{index}}",
+              "legendFormat": "{{job}}-{{index}}",
+              "range": true,
               "refId": "A",
               "step": 4
             }
@@ -4899,7 +5322,8 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
-            "uid": "$datasource"
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
           },
           "editable": true,
           "error": false,
@@ -4916,7 +5340,7 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 103
+            "y": 84
           },
           "hiddenSeries": false,
           "id": 202,
@@ -4938,7 +5362,7 @@
           },
           "paceLength": 10,
           "percentage": false,
-          "pluginVersion": "9.0.4",
+          "pluginVersion": "9.2.2",
           "pointradius": 5,
           "points": false,
           "renderer": "flot",
@@ -4949,13 +5373,15 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
-              "expr": "synapse_federation_server_number_inbound_pdu_in_staging{job=\"$job\",index=~\"$index\",instance=\"$instance\"}",
+              "editorMode": "code",
+              "expr": "synapse_federation_server_number_inbound_pdu_in_staging{job=~\"$job\",index=~\"$index\",instance=\"$instance\"}",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
-              "legendFormat": "rss {{index}}",
+              "legendFormat": "{{job}}-{{index}}",
+              "range": true,
               "refId": "A",
               "step": 4
             }
@@ -5001,7 +5427,7 @@
           "dashes": false,
           "datasource": {
             "type": "prometheus",
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fill": 1,
           "fillGradient": 0,
@@ -5009,7 +5435,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 104
+            "y": 84
           },
           "hiddenSeries": false,
           "id": 205,
@@ -5029,7 +5455,7 @@
             "alertThreshold": true
           },
           "percentage": false,
-          "pluginVersion": "9.0.4",
+          "pluginVersion": "9.2.2",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -5041,7 +5467,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "sum(rate(synapse_federation_soft_failed_events_total{instance=\"$instance\"}[$bucket_size]))",
               "interval": "",
@@ -5086,7 +5512,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "refId": "A"
         }
@@ -5115,6 +5541,8 @@
                 "mode": "palette-classic"
               },
               "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
                 "axisLabel": "",
                 "axisPlacement": "auto",
                 "barAlignment": 0,
@@ -5162,7 +5590,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 1
+            "y": 154
           },
           "id": 239,
           "options": {
@@ -5201,6 +5629,8 @@
                 "mode": "palette-classic"
               },
               "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
                 "axisLabel": "",
                 "axisPlacement": "auto",
                 "barAlignment": 0,
@@ -5248,7 +5678,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 1
+            "y": 154
           },
           "id": 235,
           "options": {
@@ -5288,6 +5718,8 @@
                 "mode": "palette-classic"
               },
               "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
                 "axisLabel": "",
                 "axisPlacement": "auto",
                 "barAlignment": 0,
@@ -5335,7 +5767,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 9
+            "y": 162
           },
           "id": 237,
           "options": {
@@ -5376,6 +5808,8 @@
                 "mode": "palette-classic"
               },
               "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
                 "axisLabel": "",
                 "axisPlacement": "auto",
                 "barAlignment": 0,
@@ -5423,7 +5857,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 9
+            "y": 162
           },
           "id": 233,
           "options": {
@@ -5459,7 +5893,7 @@
           "dashes": false,
           "datasource": {
             "type": "prometheus",
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "description": "",
           "fieldConfig": {
@@ -5474,7 +5908,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 17
+            "y": 170
           },
           "hiddenSeries": false,
           "id": 229,
@@ -5497,7 +5931,7 @@
           },
           "paceLength": 10,
           "percentage": false,
-          "pluginVersion": "9.0.4",
+          "pluginVersion": "9.2.2",
           "pointradius": 5,
           "points": false,
           "renderer": "flot",
@@ -5564,7 +5998,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "code",
               "expr": "histogram_quantile(0.9995, sum(rate(synapse_rate_limit_queue_wait_time_seconds_bucket{index=~\"$index\",instance=\"$instance\"}[$bucket_size])) by (le))",
@@ -5577,7 +6011,7 @@
             },
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "code",
               "expr": "histogram_quantile(0.99, sum(rate(synapse_rate_limit_queue_wait_time_seconds_bucket{index=~\"$index\",instance=\"$instance\"}[$bucket_size])) by (le))",
@@ -5589,7 +6023,7 @@
             },
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "histogram_quantile(0.9, sum(rate(synapse_rate_limit_queue_wait_time_seconds_bucket{index=~\"$index\",instance=\"$instance\"}[$bucket_size])) by (le))",
               "format": "time_series",
@@ -5600,7 +6034,7 @@
             },
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "histogram_quantile(0.75, sum(rate(synapse_rate_limit_queue_wait_time_seconds_bucket{index=~\"$index\",instance=\"$instance\"}[$bucket_size])) by (le))",
               "format": "time_series",
@@ -5610,7 +6044,7 @@
             },
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "histogram_quantile(0.5, sum(rate(synapse_rate_limit_queue_wait_time_seconds_bucket{index=~\"$index\",instance=\"$instance\"}[$bucket_size])) by (le))",
               "format": "time_series",
@@ -5620,7 +6054,7 @@
             },
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "histogram_quantile(0.25, sum(rate(synapse_rate_limit_queue_wait_time_seconds_bucket{index=~\"$index\",instance=\"$instance\"}[$bucket_size])) by (le))",
               "legendFormat": "25%",
@@ -5628,7 +6062,7 @@
             },
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "histogram_quantile(0.05, sum(rate(synapse_rate_limit_queue_wait_time_seconds_bucket{index=~\"$index\",instance=\"$instance\"}[$bucket_size])) by (le))",
               "legendFormat": "5%",
@@ -5636,7 +6070,7 @@
             },
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "sum(rate(synapse_rate_limit_queue_wait_time_seconds_sum{index=~\"$index\",instance=\"$instance\"}[$bucket_size])) / sum(rate(synapse_rate_limit_queue_wait_time_seconds_count{index=~\"$index\",instance=\"$instance\"}[$bucket_size]))",
               "legendFormat": "Average",
@@ -5709,6 +6143,8 @@
                 "mode": "palette-classic"
               },
               "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
                 "axisLabel": "",
                 "axisPlacement": "auto",
                 "barAlignment": 0,
@@ -5773,7 +6209,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 17
+            "y": 170
           },
           "id": 231,
           "options": {
@@ -5821,7 +6257,7 @@
       "collapsed": true,
       "datasource": {
         "type": "prometheus",
-        "uid": "$datasource"
+        "uid": "${DS_PROMETHEUS}"
       },
       "gridPos": {
         "h": 1,
@@ -5832,109 +6268,115 @@
       "id": 60,
       "panels": [
         {
-          "aliasColors": {},
-          "bars": false,
-          "dashLength": 10,
-          "dashes": false,
           "datasource": {
-            "uid": "$datasource"
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
-              "links": []
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 10,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "links": [],
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "hertz"
             },
             "overrides": []
           },
-          "fill": 1,
-          "fillGradient": 0,
           "gridPos": {
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 32
+            "y": 155
           },
-          "hiddenSeries": false,
           "id": 51,
-          "legend": {
-            "avg": false,
-            "current": false,
-            "max": false,
-            "min": false,
-            "show": true,
-            "total": false,
-            "values": false
-          },
-          "lines": true,
-          "linewidth": 1,
           "links": [],
-          "nullPointMode": "null",
           "options": {
-            "alertThreshold": true
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "none"
+            }
           },
-          "paceLength": 10,
-          "percentage": false,
-          "pluginVersion": "8.4.3",
-          "pointradius": 5,
-          "points": false,
-          "renderer": "flot",
-          "seriesOverrides": [],
-          "spaceLength": 10,
-          "stack": false,
-          "steppedLine": false,
+          "pluginVersion": "9.2.2",
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
+              "editorMode": "code",
               "expr": "rate(synapse_http_httppusher_http_pushes_processed_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]) and on (instance, job, index) (synapse_http_httppusher_http_pushes_failed_total + synapse_http_httppusher_http_pushes_processed_total) > 0",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 2,
-              "legendFormat": "processed {{job}}",
+              "legendFormat": "processed {{job}}-{{index}}",
+              "range": true,
               "refId": "A",
               "step": 20
             },
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
+              "editorMode": "code",
               "expr": "rate(synapse_http_httppusher_http_pushes_failed_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]) and on (instance, job, index) (synapse_http_httppusher_http_pushes_failed_total + synapse_http_httppusher_http_pushes_processed_total) > 0",
               "format": "time_series",
               "intervalFactor": 2,
-              "legendFormat": "failed {{job}}",
+              "legendFormat": "failed {{job}}-{{index}}",
+              "range": true,
               "refId": "B",
               "step": 20
             }
           ],
-          "thresholds": [],
-          "timeRegions": [],
           "title": "HTTP Push rate",
-          "tooltip": {
-            "shared": true,
-            "sort": 0,
-            "value_type": "individual"
-          },
-          "type": "graph",
-          "xaxis": {
-            "mode": "time",
-            "show": true,
-            "values": []
-          },
-          "yaxes": [
-            {
-              "format": "hertz",
-              "logBase": 1,
-              "show": true
-            },
-            {
-              "format": "short",
-              "logBase": 1,
-              "show": true
-            }
-          ],
-          "yaxis": {
-            "align": false
-          }
+          "type": "timeseries"
         },
         {
           "aliasColors": {},
@@ -5942,7 +6384,7 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "description": "",
           "fieldConfig": {
@@ -5957,7 +6399,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 32
+            "y": 155
           },
           "hiddenSeries": false,
           "id": 134,
@@ -5978,7 +6420,7 @@
             "alertThreshold": true
           },
           "percentage": false,
-          "pluginVersion": "8.4.3",
+          "pluginVersion": "9.2.2",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -5989,7 +6431,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "topk(10,synapse_pushers{job=~\"$job\",index=~\"$index\", instance=\"$instance\"})",
               "legendFormat": "{{kind}} {{app_id}}",
@@ -6031,7 +6473,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "refId": "A"
         }
@@ -6043,7 +6485,7 @@
       "collapsed": true,
       "datasource": {
         "type": "prometheus",
-        "uid": "$datasource"
+        "uid": "${DS_PROMETHEUS}"
       },
       "gridPos": {
         "h": 1,
@@ -6210,7 +6652,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "exemplar": true,
               "expr": "sum(rate(synapse_push_bulk_push_rule_evaluator_push_rules_invalidation_counter_total{job=\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size]))",
@@ -6625,7 +7067,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "000000001"
+            "uid": "${DS_PROMETHEUS}"
           },
           "refId": "A"
         }
@@ -6637,7 +7079,7 @@
       "collapsed": true,
       "datasource": {
         "type": "prometheus",
-        "uid": "000000001"
+        "uid": "${DS_PROMETHEUS}"
       },
       "gridPos": {
         "h": 1,
@@ -6649,7 +7091,7 @@
       "panels": [
         {
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -6727,7 +7169,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "rate(synapse_storage_schedule_time_sum{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])/rate(synapse_storage_schedule_time_count[$bucket_size])",
               "format": "time_series",
@@ -6746,7 +7188,7 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "description": "Shows the time in which the given percentage of database queries were scheduled, over the sampled timespan",
           "fieldConfig": {
@@ -6795,7 +7237,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "histogram_quantile(0.99, rate(synapse_storage_schedule_time_bucket{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]))",
               "format": "time_series",
@@ -6807,7 +7249,7 @@
             },
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "histogram_quantile(0.95, rate(synapse_storage_schedule_time_bucket{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]))",
               "format": "time_series",
@@ -6817,7 +7259,7 @@
             },
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "histogram_quantile(0.90, rate(synapse_storage_schedule_time_bucket{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]))",
               "format": "time_series",
@@ -6827,7 +7269,7 @@
             },
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "rate(synapse_storage_schedule_time_sum{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])/rate(synapse_storage_schedule_time_count{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
@@ -6875,7 +7317,7 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editable": true,
           "error": false,
@@ -6927,7 +7369,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "topk(10, rate(synapse_storage_transaction_time_count_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]))",
               "format": "time_series",
@@ -6975,7 +7417,7 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editable": true,
           "error": false,
@@ -7027,7 +7469,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "rate(synapse_storage_transaction_time_sum_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
@@ -7075,7 +7517,7 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editable": true,
           "error": false,
@@ -7127,7 +7569,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "rate(synapse_storage_transaction_time_sum_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])/rate(synapse_storage_transaction_time_count_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
@@ -7175,7 +7617,7 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -7221,7 +7663,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "histogram_quantile(0.99, sum(rate(synapse_storage_schedule_time_bucket{index=~\"$index\",instance=\"$instance\",job=\"$job\"}[$bucket_size])) by (le))",
               "format": "time_series",
@@ -7231,7 +7673,7 @@
             },
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "histogram_quantile(0.9, sum(rate(synapse_storage_schedule_time_bucket{index=~\"$index\",instance=\"$instance\",job=\"$job\"}[$bucket_size])) by (le))",
               "format": "time_series",
@@ -7241,7 +7683,7 @@
             },
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "histogram_quantile(0.75, sum(rate(synapse_storage_schedule_time_bucket{index=~\"$index\",instance=\"$instance\",job=\"$job\"}[$bucket_size])) by (le))",
               "format": "time_series",
@@ -7251,7 +7693,7 @@
             },
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "histogram_quantile(0.5, sum(rate(synapse_storage_schedule_time_bucket{index=~\"$index\",instance=\"$instance\",job=\"$job\"}[$bucket_size])) by (le))",
               "format": "time_series",
@@ -7299,7 +7741,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "000000001"
+            "uid": "${DS_PROMETHEUS}"
           },
           "refId": "A"
         }
@@ -7311,7 +7753,7 @@
       "collapsed": true,
       "datasource": {
         "type": "prometheus",
-        "uid": "000000001"
+        "uid": "${DS_PROMETHEUS}"
       },
       "gridPos": {
         "h": 1,
@@ -7327,7 +7769,7 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editable": true,
           "error": false,
@@ -7344,7 +7786,7 @@
             "h": 13,
             "w": 12,
             "x": 0,
-            "y": 35
+            "y": 158
           },
           "hiddenSeries": false,
           "id": 12,
@@ -7367,7 +7809,7 @@
           },
           "paceLength": 10,
           "percentage": false,
-          "pluginVersion": "9.0.4",
+          "pluginVersion": "9.2.2",
           "pointradius": 5,
           "points": false,
           "renderer": "flot",
@@ -7378,7 +7820,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "rate(synapse_util_metrics_block_ru_utime_seconds_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\",block_name!=\"wrapped_request_handler\"}[$bucket_size]) + rate(synapse_util_metrics_block_ru_stime_seconds_total[$bucket_size])",
               "format": "time_series",
@@ -7425,7 +7867,7 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editable": true,
           "error": false,
@@ -7442,7 +7884,7 @@
             "h": 13,
             "w": 12,
             "x": 12,
-            "y": 35
+            "y": 158
           },
           "hiddenSeries": false,
           "id": 26,
@@ -7465,7 +7907,7 @@
           },
           "paceLength": 10,
           "percentage": false,
-          "pluginVersion": "9.0.4",
+          "pluginVersion": "9.2.2",
           "pointradius": 5,
           "points": false,
           "renderer": "flot",
@@ -7476,7 +7918,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "(rate(synapse_util_metrics_block_ru_utime_seconds_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]) + rate(synapse_util_metrics_block_ru_stime_seconds_total[$bucket_size])) / rate(synapse_util_metrics_block_count_total[$bucket_size])",
               "format": "time_series",
@@ -7541,7 +7983,7 @@
             "h": 13,
             "w": 12,
             "x": 0,
-            "y": 48
+            "y": 171
           },
           "hiddenSeries": false,
           "id": 13,
@@ -7564,7 +8006,7 @@
           },
           "paceLength": 10,
           "percentage": false,
-          "pluginVersion": "9.0.4",
+          "pluginVersion": "9.2.2",
           "pointradius": 5,
           "points": false,
           "renderer": "flot",
@@ -7627,7 +8069,7 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "description": "The time each database transaction takes to execute, on average, broken down by metrics block.",
           "editable": true,
@@ -7645,7 +8087,7 @@
             "h": 13,
             "w": 12,
             "x": 12,
-            "y": 48
+            "y": 171
           },
           "hiddenSeries": false,
           "id": 27,
@@ -7668,7 +8110,7 @@
           },
           "paceLength": 10,
           "percentage": false,
-          "pluginVersion": "9.0.4",
+          "pluginVersion": "9.2.2",
           "pointradius": 5,
           "points": false,
           "renderer": "flot",
@@ -7679,7 +8121,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "rate(synapse_util_metrics_block_db_txn_duration_seconds_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]) / rate(synapse_util_metrics_block_db_txn_count_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
@@ -7726,7 +8168,7 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editable": true,
           "error": false,
@@ -7743,7 +8185,7 @@
             "h": 13,
             "w": 12,
             "x": 0,
-            "y": 61
+            "y": 184
           },
           "hiddenSeries": false,
           "id": 28,
@@ -7765,7 +8207,7 @@
           },
           "paceLength": 10,
           "percentage": false,
-          "pluginVersion": "9.0.4",
+          "pluginVersion": "9.2.2",
           "pointradius": 5,
           "points": false,
           "renderer": "flot",
@@ -7776,7 +8218,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "rate(synapse_util_metrics_block_db_txn_duration_seconds_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]) / rate(synapse_util_metrics_block_db_txn_count_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
@@ -7823,7 +8265,7 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editable": true,
           "error": false,
@@ -7840,7 +8282,7 @@
             "h": 13,
             "w": 12,
             "x": 12,
-            "y": 61
+            "y": 184
           },
           "hiddenSeries": false,
           "id": 25,
@@ -7862,7 +8304,7 @@
           },
           "paceLength": 10,
           "percentage": false,
-          "pluginVersion": "9.0.4",
+          "pluginVersion": "9.2.2",
           "pointradius": 5,
           "points": false,
           "renderer": "flot",
@@ -7873,7 +8315,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "rate(synapse_util_metrics_block_time_seconds_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]) / rate(synapse_util_metrics_block_count_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
@@ -7922,7 +8364,7 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fill": 1,
           "fillGradient": 0,
@@ -7930,7 +8372,7 @@
             "h": 15,
             "w": 12,
             "x": 0,
-            "y": 74
+            "y": 197
           },
           "hiddenSeries": false,
           "id": 154,
@@ -7951,7 +8393,7 @@
             "alertThreshold": true
           },
           "percentage": false,
-          "pluginVersion": "9.0.4",
+          "pluginVersion": "9.2.2",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -7962,7 +8404,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "rate(synapse_util_metrics_block_count_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "interval": "",
@@ -8005,7 +8447,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "000000001"
+            "uid": "${DS_PROMETHEUS}"
           },
           "refId": "A"
         }
@@ -8017,7 +8459,7 @@
       "collapsed": true,
       "datasource": {
         "type": "prometheus",
-        "uid": "000000001"
+        "uid": "${DS_PROMETHEUS}"
       },
       "gridPos": {
         "h": 1,
@@ -8033,7 +8475,7 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "decimals": 2,
           "editable": true,
@@ -8086,7 +8528,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "rate(synapse_util_caches_cache_hits{job=~\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size])/rate(synapse_util_caches_cache{job=~\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size])",
               "format": "time_series",
@@ -8136,7 +8578,7 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editable": true,
           "error": false,
@@ -8187,7 +8629,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "synapse_util_caches_cache_size{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}",
               "format": "time_series",
@@ -8236,7 +8678,7 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editable": true,
           "error": false,
@@ -8287,7 +8729,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "rate(synapse_util_caches_cache{job=~\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size])",
               "format": "time_series",
@@ -8335,7 +8777,7 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -8387,7 +8829,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "topk(10, rate(synapse_util_caches_cache{job=~\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size]) - rate(synapse_util_caches_cache_hits{job=~\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size]))",
               "format": "time_series",
@@ -8436,7 +8878,7 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -8483,7 +8925,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "rate(synapse_util_caches_cache_evicted_size{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
@@ -8529,7 +8971,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "000000001"
+            "uid": "${DS_PROMETHEUS}"
           },
           "refId": "A"
         }
@@ -8541,7 +8983,7 @@
       "collapsed": true,
       "datasource": {
         "type": "prometheus",
-        "uid": "000000001"
+        "uid": "${DS_PROMETHEUS}"
       },
       "gridPos": {
         "h": 1,
@@ -8557,7 +8999,7 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -8603,7 +9045,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "synapse_util_caches_response_cache_size{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}",
               "interval": "",
@@ -8647,7 +9089,7 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -8693,7 +9135,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "rate(synapse_util_caches_response_cache_hits{instance=\"$instance\", job=~\"$job\", index=~\"$index\"}[$bucket_size])/rate(synapse_util_caches_response_cache{instance=\"$instance\", job=~\"$job\", index=~\"$index\"}[$bucket_size])",
               "interval": "",
@@ -8702,7 +9144,7 @@
             },
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "",
               "interval": "",
@@ -8747,7 +9189,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "000000001"
+            "uid": "${DS_PROMETHEUS}"
           },
           "refId": "A"
         }
@@ -8759,7 +9201,7 @@
       "collapsed": true,
       "datasource": {
         "type": "prometheus",
-        "uid": "000000001"
+        "uid": "${DS_PROMETHEUS}"
       },
       "gridPos": {
         "h": 1,
@@ -8775,7 +9217,7 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -8822,7 +9264,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "rate(python_gc_time_sum{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[10m])",
               "format": "time_series",
@@ -8869,7 +9311,7 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "decimals": 3,
           "editable": true,
@@ -8921,7 +9363,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "rate(python_gc_time_sum{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])/rate(python_gc_time_count[$bucket_size])",
               "format": "time_series",
@@ -8968,7 +9410,7 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "description": "'gen 0' shows the number of objects allocated since the last gen0 GC.\n'gen 1' / 'gen 2' show the number of gen0/gen1 GCs since the last gen1/gen2 GC.",
           "fieldConfig": {
@@ -9023,7 +9465,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "python_gc_counts{job=~\"$job\",index=~\"$index\",instance=\"$instance\"}",
               "format": "time_series",
@@ -9070,7 +9512,7 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -9117,7 +9559,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "rate(python_gc_unreachable_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])/rate(python_gc_time_count{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
@@ -9162,7 +9604,7 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -9209,7 +9651,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "rate(python_gc_time_count{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
@@ -9320,7 +9762,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "000000001"
+            "uid": "${DS_PROMETHEUS}"
           },
           "refId": "A"
         }
@@ -9332,7 +9774,7 @@
       "collapsed": true,
       "datasource": {
         "type": "prometheus",
-        "uid": "000000001"
+        "uid": "${DS_PROMETHEUS}"
       },
       "gridPos": {
         "h": 1,
@@ -9349,7 +9791,7 @@
           "dashes": false,
           "datasource": {
             "type": "prometheus",
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -9363,7 +9805,7 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 40
+            "y": 162
           },
           "hiddenSeries": false,
           "id": 43,
@@ -9385,7 +9827,7 @@
           },
           "paceLength": 10,
           "percentage": false,
-          "pluginVersion": "9.0.4",
+          "pluginVersion": "9.2.2",
           "pointradius": 5,
           "points": false,
           "renderer": "flot",
@@ -9396,7 +9838,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "sum (rate(synapse_replication_tcp_protocol_outbound_commands_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])) without (name, conn_id)",
               "format": "time_series",
@@ -9441,7 +9883,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -9449,6 +9891,8 @@
                 "mode": "palette-classic"
               },
               "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
                 "axisLabel": "",
                 "axisPlacement": "auto",
                 "barAlignment": 0,
@@ -9498,7 +9942,7 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 40
+            "y": 162
           },
           "id": 41,
           "links": [],
@@ -9537,7 +9981,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -9545,6 +9989,8 @@
                 "mode": "palette-classic"
               },
               "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
                 "axisLabel": "",
                 "axisPlacement": "auto",
                 "barAlignment": 0,
@@ -9595,7 +10041,7 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 47
+            "y": 169
           },
           "id": 42,
           "links": [],
@@ -9634,7 +10080,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -9642,6 +10088,8 @@
                 "mode": "palette-classic"
               },
               "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
                 "axisLabel": "",
                 "axisPlacement": "auto",
                 "axisSoftMin": 1,
@@ -9693,7 +10141,7 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 47
+            "y": 169
           },
           "id": 220,
           "links": [],
@@ -9751,7 +10199,7 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 54
+            "y": 176
           },
           "hiddenSeries": false,
           "id": 144,
@@ -9771,7 +10219,7 @@
             "alertThreshold": true
           },
           "percentage": false,
-          "pluginVersion": "9.0.4",
+          "pluginVersion": "9.2.2",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -9830,7 +10278,7 @@
           "dashes": false,
           "datasource": {
             "type": "prometheus",
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -9844,7 +10292,7 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 54
+            "y": 176
           },
           "hiddenSeries": false,
           "id": 115,
@@ -9866,7 +10314,7 @@
           },
           "paceLength": 10,
           "percentage": false,
-          "pluginVersion": "9.0.4",
+          "pluginVersion": "9.2.2",
           "pointradius": 5,
           "points": false,
           "renderer": "flot",
@@ -9877,7 +10325,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "rate(synapse_replication_tcp_protocol_close_reason_total{job=~\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size])",
               "format": "time_series",
@@ -9924,7 +10372,7 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -9938,7 +10386,7 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 61
+            "y": 183
           },
           "hiddenSeries": false,
           "id": 113,
@@ -9960,7 +10408,7 @@
           },
           "paceLength": 10,
           "percentage": false,
-          "pluginVersion": "9.0.4",
+          "pluginVersion": "9.2.2",
           "pointradius": 5,
           "points": false,
           "renderer": "flot",
@@ -9971,7 +10419,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "synapse_replication_tcp_resource_connections_per_stream{job=~\"$job\",index=~\"$index\",instance=\"$instance\"}",
               "format": "time_series",
@@ -9981,7 +10429,7 @@
             },
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "synapse_replication_tcp_resource_total_connections{job=~\"$job\",index=~\"$index\",instance=\"$instance\"}",
               "format": "time_series",
@@ -10026,7 +10474,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "000000001"
+            "uid": "${DS_PROMETHEUS}"
           },
           "refId": "A"
         }
@@ -10038,7 +10486,7 @@
       "collapsed": true,
       "datasource": {
         "type": "prometheus",
-        "uid": "000000001"
+        "uid": "${DS_PROMETHEUS}"
       },
       "gridPos": {
         "h": 1,
@@ -10054,11 +10502,10 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
-              "custom": {},
               "links": []
             },
             "overrides": []
@@ -10069,7 +10516,7 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 41
+            "y": 163
           },
           "hiddenSeries": false,
           "id": 67,
@@ -10091,7 +10538,7 @@
           },
           "paceLength": 10,
           "percentage": false,
-          "pluginVersion": "7.3.7",
+          "pluginVersion": "9.2.2",
           "pointradius": 5,
           "points": false,
           "renderer": "flot",
@@ -10102,7 +10549,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "max(synapse_event_persisted_position{instance=\"$instance\"}) - on() group_right() synapse_event_processing_positions{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}",
               "format": "time_series",
@@ -10150,11 +10597,10 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
-              "custom": {},
               "links": []
             },
             "overrides": []
@@ -10165,7 +10611,7 @@
             "h": 9,
             "w": 12,
             "x": 12,
-            "y": 41
+            "y": 163
           },
           "hiddenSeries": false,
           "id": 71,
@@ -10187,7 +10633,7 @@
           },
           "paceLength": 10,
           "percentage": false,
-          "pluginVersion": "7.3.7",
+          "pluginVersion": "9.2.2",
           "pointradius": 5,
           "points": false,
           "renderer": "flot",
@@ -10198,7 +10644,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "time()*1000-synapse_event_processing_last_ts{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}",
               "format": "time_series",
@@ -10246,11 +10692,10 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
-              "custom": {},
               "links": []
             },
             "overrides": []
@@ -10261,7 +10706,7 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 50
+            "y": 172
           },
           "hiddenSeries": false,
           "id": 121,
@@ -10284,7 +10729,7 @@
           },
           "paceLength": 10,
           "percentage": false,
-          "pluginVersion": "7.3.7",
+          "pluginVersion": "9.2.2",
           "pointradius": 5,
           "points": false,
           "renderer": "flot",
@@ -10295,7 +10740,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "deriv(synapse_event_processing_last_ts{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])/1000 - 1",
               "format": "time_series",
@@ -10342,7 +10787,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "000000001"
+            "uid": "${DS_PROMETHEUS}"
           },
           "refId": "A"
         }
@@ -10354,7 +10799,7 @@
       "collapsed": true,
       "datasource": {
         "type": "prometheus",
-        "uid": "000000001"
+        "uid": "${DS_PROMETHEUS}"
       },
       "gridPos": {
         "h": 1,
@@ -10378,12 +10823,21 @@
           },
           "dataFormat": "tsbuckets",
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "description": "Colour reflects the number of rooms with the given number of forward extremities, or fewer.\n\nThis is only updated once an hour.",
           "fieldConfig": {
             "defaults": {
-              "custom": {}
+              "custom": {
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "scaleDistribution": {
+                  "type": "linear"
+                }
+              }
             },
             "overrides": []
           },
@@ -10401,11 +10855,51 @@
             "show": true
           },
           "links": [],
+          "options": {
+            "calculate": false,
+            "calculation": {},
+            "cellGap": 1,
+            "cellValues": {},
+            "color": {
+              "exponent": 0.5,
+              "fill": "#B877D9",
+              "min": 0,
+              "mode": "opacity",
+              "reverse": false,
+              "scale": "exponential",
+              "scheme": "Oranges",
+              "steps": 128
+            },
+            "exemplars": {
+              "color": "rgba(255,0,255,0.7)"
+            },
+            "filterValues": {
+              "le": 1e-9
+            },
+            "legend": {
+              "show": true
+            },
+            "rowsFrame": {
+              "layout": "auto"
+            },
+            "showValue": "never",
+            "tooltip": {
+              "show": true,
+              "yHistogram": true
+            },
+            "yAxis": {
+              "axisPlacement": "left",
+              "decimals": 0,
+              "reverse": false,
+              "unit": "short"
+            }
+          },
+          "pluginVersion": "9.2.2",
           "reverseYBuckets": false,
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "synapse_forward_extremities_bucket{instance=\"$instance\"} and on (index, instance, job) (synapse_storage_events_persisted_events_total > 0)",
               "format": "heatmap",
@@ -10437,12 +10931,11 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "description": "Number of rooms with the given number of forward extremities or fewer.\n\nThis is only updated once an hour.",
           "fieldConfig": {
             "defaults": {
-              "custom": {},
               "links": []
             },
             "overrides": []
@@ -10471,8 +10964,11 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "connected",
+          "options": {
+            "alertThreshold": true
+          },
           "percentage": false,
-          "pluginVersion": "7.1.3",
+          "pluginVersion": "9.2.2",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -10483,7 +10979,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "synapse_forward_extremities_bucket{instance=\"$instance\"} > 0",
               "format": "heatmap",
@@ -10538,12 +11034,21 @@
           },
           "dataFormat": "tsbuckets",
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "description": "Colour reflects the number of events persisted to rooms with the given number of forward extremities, or fewer.",
           "fieldConfig": {
             "defaults": {
-              "custom": {}
+              "custom": {
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "scaleDistribution": {
+                  "type": "linear"
+                }
+              }
             },
             "overrides": []
           },
@@ -10561,11 +11066,51 @@
             "show": true
           },
           "links": [],
+          "options": {
+            "calculate": false,
+            "calculation": {},
+            "cellGap": 1,
+            "cellValues": {},
+            "color": {
+              "exponent": 0.5,
+              "fill": "#5794F2",
+              "min": 0,
+              "mode": "opacity",
+              "reverse": false,
+              "scale": "exponential",
+              "scheme": "Oranges",
+              "steps": 128
+            },
+            "exemplars": {
+              "color": "rgba(255,0,255,0.7)"
+            },
+            "filterValues": {
+              "le": 1e-9
+            },
+            "legend": {
+              "show": true
+            },
+            "rowsFrame": {
+              "layout": "auto"
+            },
+            "showValue": "never",
+            "tooltip": {
+              "show": true,
+              "yHistogram": true
+            },
+            "yAxis": {
+              "axisPlacement": "left",
+              "decimals": 0,
+              "reverse": false,
+              "unit": "short"
+            }
+          },
+          "pluginVersion": "9.2.2",
           "reverseYBuckets": false,
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "rate(synapse_storage_events_forward_extremities_persisted_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events_total > 0)",
               "format": "heatmap",
@@ -10597,12 +11142,11 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "description": "For a given percentage P, the number X where P% of events were persisted to rooms with X forward extremities or fewer.",
           "fieldConfig": {
             "defaults": {
-              "custom": {},
               "links": []
             },
             "overrides": []
@@ -10630,8 +11174,11 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
+          "options": {
+            "alertThreshold": true
+          },
           "percentage": false,
-          "pluginVersion": "7.1.3",
+          "pluginVersion": "9.2.2",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -10642,7 +11189,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "histogram_quantile(0.5, rate(synapse_storage_events_forward_extremities_persisted_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events_total > 0))",
               "format": "time_series",
@@ -10652,7 +11199,7 @@
             },
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "histogram_quantile(0.75, rate(synapse_storage_events_forward_extremities_persisted_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events_total > 0))",
               "format": "time_series",
@@ -10662,7 +11209,7 @@
             },
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "histogram_quantile(0.90, rate(synapse_storage_events_forward_extremities_persisted_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events_total > 0))",
               "format": "time_series",
@@ -10672,7 +11219,7 @@
             },
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "histogram_quantile(0.99, rate(synapse_storage_events_forward_extremities_persisted_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events_total > 0))",
               "format": "time_series",
@@ -10727,12 +11274,21 @@
           },
           "dataFormat": "tsbuckets",
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "description": "Colour reflects the number of events persisted to rooms with the given number of stale forward extremities, or fewer.\n\nStale forward extremities are those that were in the previous set of extremities as well as the new.",
           "fieldConfig": {
             "defaults": {
-              "custom": {}
+              "custom": {
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "scaleDistribution": {
+                  "type": "linear"
+                }
+              }
             },
             "overrides": []
           },
@@ -10750,11 +11306,51 @@
             "show": true
           },
           "links": [],
+          "options": {
+            "calculate": false,
+            "calculation": {},
+            "cellGap": 1,
+            "cellValues": {},
+            "color": {
+              "exponent": 0.5,
+              "fill": "#FF9830",
+              "min": 0,
+              "mode": "opacity",
+              "reverse": false,
+              "scale": "exponential",
+              "scheme": "Oranges",
+              "steps": 128
+            },
+            "exemplars": {
+              "color": "rgba(255,0,255,0.7)"
+            },
+            "filterValues": {
+              "le": 1e-9
+            },
+            "legend": {
+              "show": true
+            },
+            "rowsFrame": {
+              "layout": "auto"
+            },
+            "showValue": "never",
+            "tooltip": {
+              "show": true,
+              "yHistogram": true
+            },
+            "yAxis": {
+              "axisPlacement": "left",
+              "decimals": 0,
+              "reverse": false,
+              "unit": "short"
+            }
+          },
+          "pluginVersion": "9.2.2",
           "reverseYBuckets": false,
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "rate(synapse_storage_events_stale_forward_extremities_persisted_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events_total > 0)",
               "format": "heatmap",
@@ -10786,12 +11382,11 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "description": "For  given percentage P, the number X where P% of events were persisted to rooms with X stale forward extremities or fewer.\n\nStale forward extremities are those that were in the previous set of extremities as well as the new.",
           "fieldConfig": {
             "defaults": {
-              "custom": {},
               "links": []
             },
             "overrides": []
@@ -10819,8 +11414,11 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
+          "options": {
+            "alertThreshold": true
+          },
           "percentage": false,
-          "pluginVersion": "7.1.3",
+          "pluginVersion": "9.2.2",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -10831,7 +11429,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "histogram_quantile(0.5, rate(synapse_storage_events_stale_forward_extremities_persisted_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events_total > 0))",
               "format": "time_series",
@@ -10841,7 +11439,7 @@
             },
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "histogram_quantile(0.75, rate(synapse_storage_events_stale_forward_extremities_persisted_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events_total > 0))",
               "format": "time_series",
@@ -10851,7 +11449,7 @@
             },
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "histogram_quantile(0.90, rate(synapse_storage_events_stale_forward_extremities_persisted_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events_total > 0))",
               "format": "time_series",
@@ -10861,7 +11459,7 @@
             },
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "histogram_quantile(0.99, rate(synapse_storage_events_stale_forward_extremities_persisted_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events_total > 0))",
               "format": "time_series",
@@ -10916,12 +11514,21 @@
           },
           "dataFormat": "tsbuckets",
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "description": "Colour reflects the number of state resolution operations performed over the given number of state groups, or fewer.",
           "fieldConfig": {
             "defaults": {
-              "custom": {}
+              "custom": {
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "scaleDistribution": {
+                  "type": "linear"
+                }
+              }
             },
             "overrides": []
           },
@@ -10939,11 +11546,51 @@
             "show": true
           },
           "links": [],
+          "options": {
+            "calculate": false,
+            "calculation": {},
+            "cellGap": 1,
+            "cellValues": {},
+            "color": {
+              "exponent": 0.5,
+              "fill": "#73BF69",
+              "min": 0,
+              "mode": "opacity",
+              "reverse": false,
+              "scale": "exponential",
+              "scheme": "Oranges",
+              "steps": 128
+            },
+            "exemplars": {
+              "color": "rgba(255,0,255,0.7)"
+            },
+            "filterValues": {
+              "le": 1e-9
+            },
+            "legend": {
+              "show": true
+            },
+            "rowsFrame": {
+              "layout": "auto"
+            },
+            "showValue": "never",
+            "tooltip": {
+              "show": true,
+              "yHistogram": true
+            },
+            "yAxis": {
+              "axisPlacement": "left",
+              "decimals": 0,
+              "reverse": false,
+              "unit": "short"
+            }
+          },
+          "pluginVersion": "9.2.2",
           "reverseYBuckets": false,
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "rate(synapse_state_number_state_groups_in_resolution_bucket{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "heatmap",
@@ -10976,12 +11623,12 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
-            "uid": "$datasource"
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
           },
           "description": "For a given percentage P, the number X where P% of state resolution operations took place over X state groups or fewer.",
           "fieldConfig": {
             "defaults": {
-              "custom": {},
               "links": []
             },
             "overrides": []
@@ -11010,8 +11657,11 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
+          "options": {
+            "alertThreshold": true
+          },
           "percentage": false,
-          "pluginVersion": "7.1.3",
+          "pluginVersion": "9.2.2",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -11022,18 +11672,20 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
+              "editorMode": "code",
               "expr": "histogram_quantile(0.5, rate(synapse_state_number_state_groups_in_resolution_bucket{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]))",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
               "legendFormat": "50%",
+              "range": true,
               "refId": "A"
             },
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "histogram_quantile(0.75, rate(synapse_state_number_state_groups_in_resolution_bucket{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]))",
               "format": "time_series",
@@ -11044,7 +11696,7 @@
             },
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "histogram_quantile(0.90, rate(synapse_state_number_state_groups_in_resolution_bucket{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]))",
               "format": "time_series",
@@ -11055,7 +11707,7 @@
             },
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "histogram_quantile(0.99, rate(synapse_state_number_state_groups_in_resolution_bucket{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]))",
               "format": "time_series",
@@ -11103,15 +11755,9 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "description": "When we do a state res while persisting events we try and see if we can prune any stale extremities.",
-          "fieldConfig": {
-            "defaults": {
-              "custom": {}
-            },
-            "overrides": []
-          },
           "fill": 1,
           "fillGradient": 0,
           "gridPos": {
@@ -11134,8 +11780,11 @@
           "lines": true,
           "linewidth": 1,
           "nullPointMode": "null",
+          "options": {
+            "alertThreshold": true
+          },
           "percentage": false,
-          "pluginVersion": "7.1.3",
+          "pluginVersion": "9.2.2",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -11146,7 +11795,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "sum(rate(synapse_storage_events_state_resolutions_during_persistence_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]))",
               "interval": "",
@@ -11155,7 +11804,7 @@
             },
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "sum(rate(synapse_storage_events_potential_times_prune_extremities_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]))",
               "interval": "",
@@ -11164,7 +11813,7 @@
             },
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "sum(rate(synapse_storage_events_times_pruned_extremities_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]))",
               "interval": "",
@@ -11207,7 +11856,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "000000001"
+            "uid": "${DS_PROMETHEUS}"
           },
           "refId": "A"
         }
@@ -11219,7 +11868,7 @@
       "collapsed": true,
       "datasource": {
         "type": "prometheus",
-        "uid": "000000001"
+        "uid": "${DS_PROMETHEUS}"
       },
       "gridPos": {
         "h": 1,
@@ -11236,7 +11885,7 @@
           "dashes": false,
           "datasource": {
             "type": "prometheus",
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -11290,7 +11939,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "code",
               "expr": "max(synapse_admin_mau_max{instance=\"$instance\"})",
@@ -11304,7 +11953,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "code",
               "expr": "max(synapse_admin_mau_current{instance=\"$instance\"})",
@@ -11353,7 +12002,7 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fill": 1,
           "fillGradient": 0,
@@ -11392,7 +12041,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "synapse_admin_mau_current_mau_by_service{instance=\"$instance\"}",
               "interval": "",
@@ -11435,7 +12084,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "000000001"
+            "uid": "${DS_PROMETHEUS}"
           },
           "refId": "A"
         }
@@ -11447,7 +12096,7 @@
       "collapsed": true,
       "datasource": {
         "type": "prometheus",
-        "uid": "000000001"
+        "uid": "${DS_PROMETHEUS}"
       },
       "gridPos": {
         "h": 1,
@@ -11464,7 +12113,7 @@
           "dashes": false,
           "datasource": {
             "type": "prometheus",
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -11510,7 +12159,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "code",
               "expr": "rate(synapse_notifier_users_woken_by_stream_total{job=\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size])",
@@ -11563,7 +12212,7 @@
           "dashes": false,
           "datasource": {
             "type": "prometheus",
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -11609,7 +12258,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "code",
               "expr": "rate(synapse_handler_presence_get_updates_total{job=~\"$job\",instance=\"$instance\"}[$bucket_size])",
@@ -11660,7 +12309,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "000000001"
+            "uid": "${DS_PROMETHEUS}"
           },
           "refId": "A"
         }
@@ -11672,7 +12321,7 @@
       "collapsed": true,
       "datasource": {
         "type": "prometheus",
-        "uid": "000000001"
+        "uid": "${DS_PROMETHEUS}"
       },
       "gridPos": {
         "h": 1,
@@ -11689,7 +12338,7 @@
           "dashes": false,
           "datasource": {
             "type": "prometheus",
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fill": 1,
           "fillGradient": 0,
@@ -11728,7 +12377,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "code",
               "expr": "rate(synapse_appservice_api_sent_events_total{instance=\"$instance\"}[$bucket_size])",
@@ -11777,7 +12426,7 @@
           "dashes": false,
           "datasource": {
             "type": "prometheus",
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fill": 1,
           "fillGradient": 0,
@@ -11816,7 +12465,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "code",
               "expr": "rate(synapse_appservice_api_sent_transactions_total{instance=\"$instance\"}[$bucket_size])",
@@ -11863,7 +12512,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "000000001"
+            "uid": "${DS_PROMETHEUS}"
           },
           "refId": "A"
         }
@@ -11875,7 +12524,7 @@
       "collapsed": true,
       "datasource": {
         "type": "prometheus",
-        "uid": "000000001"
+        "uid": "${DS_PROMETHEUS}"
       },
       "gridPos": {
         "h": 1,
@@ -11891,7 +12540,7 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fill": 1,
           "fillGradient": 0,
@@ -11930,7 +12579,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "rate(synapse_handler_presence_notified_presence_total{job=\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size])",
               "interval": "",
@@ -11939,7 +12588,7 @@
             },
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "rate(synapse_handler_presence_federation_presence_out_total{job=\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size])",
               "interval": "",
@@ -11948,7 +12597,7 @@
             },
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "rate(synapse_handler_presence_presence_updates_total{job=\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size])",
               "interval": "",
@@ -11957,7 +12606,7 @@
             },
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "rate(synapse_handler_presence_federation_presence_total{job=\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size])",
               "interval": "",
@@ -11966,7 +12615,7 @@
             },
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "rate(synapse_handler_presence_bump_active_time_total{job=\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size])",
               "interval": "",
@@ -12011,7 +12660,7 @@
           "dashes": false,
           "datasource": {
             "type": "prometheus",
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fill": 1,
           "fillGradient": 0,
@@ -12050,7 +12699,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "code",
               "expr": "rate(synapse_handler_presence_state_transition_total{job=\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size])",
@@ -12099,7 +12748,7 @@
           "dashes": false,
           "datasource": {
             "type": "prometheus",
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fill": 1,
           "fillGradient": 0,
@@ -12138,7 +12787,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "code",
               "expr": "rate(synapse_handler_presence_notify_reason_total{job=\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size])",
@@ -12185,7 +12834,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "000000001"
+            "uid": "${DS_PROMETHEUS}"
           },
           "refId": "A"
         }
@@ -12197,7 +12846,7 @@
       "collapsed": true,
       "datasource": {
         "type": "prometheus",
-        "uid": "000000001"
+        "uid": "${DS_PROMETHEUS}"
       },
       "gridPos": {
         "h": 1,
@@ -12210,7 +12859,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -12218,6 +12867,8 @@
                 "mode": "palette-classic"
               },
               "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
                 "axisLabel": "",
                 "axisPlacement": "auto",
                 "barAlignment": 0,
@@ -12266,7 +12917,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 46
+            "y": 47
           },
           "id": 191,
           "options": {
@@ -12285,7 +12936,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "code",
               "expr": "rate(synapse_external_cache_set{job=~\"$job\", instance=\"$instance\", index=~\"$index\"}[$bucket_size])",
@@ -12305,7 +12956,7 @@
           "dashes": false,
           "datasource": {
             "type": "prometheus",
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "description": "",
           "fill": 1,
@@ -12314,7 +12965,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 46
+            "y": 47
           },
           "hiddenSeries": false,
           "id": 193,
@@ -12334,7 +12985,7 @@
             "alertThreshold": true
           },
           "percentage": false,
-          "pluginVersion": "9.0.4",
+          "pluginVersion": "9.2.2",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -12345,7 +12996,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "code",
               "expr": "sum without (hit) (rate(synapse_external_cache_get{job=~\"$job\", instance=\"$instance\", index=~\"$index\"}[$bucket_size]))",
@@ -12402,13 +13053,28 @@
           "dataFormat": "tsbuckets",
           "datasource": {
             "type": "prometheus",
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "scaleDistribution": {
+                  "type": "linear"
+                }
+              }
+            },
+            "overrides": []
           },
           "gridPos": {
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 54
+            "y": 55
           },
           "heatmap": {},
           "hideZeroBuckets": false,
@@ -12418,11 +13084,53 @@
             "show": false
           },
           "links": [],
+          "options": {
+            "calculate": false,
+            "calculation": {},
+            "cellGap": -1,
+            "cellValues": {
+              "decimals": 2
+            },
+            "color": {
+              "exponent": 0.5,
+              "fill": "#b4ff00",
+              "min": 0,
+              "mode": "scheme",
+              "reverse": false,
+              "scale": "exponential",
+              "scheme": "Inferno",
+              "steps": 128
+            },
+            "exemplars": {
+              "color": "rgba(255,0,255,0.7)"
+            },
+            "filterValues": {
+              "le": 1e-9
+            },
+            "legend": {
+              "show": false
+            },
+            "rowsFrame": {
+              "layout": "auto"
+            },
+            "showValue": "never",
+            "tooltip": {
+              "show": true,
+              "yHistogram": true
+            },
+            "yAxis": {
+              "axisPlacement": "left",
+              "decimals": 0,
+              "reverse": false,
+              "unit": "s"
+            }
+          },
+          "pluginVersion": "9.2.2",
           "reverseYBuckets": false,
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "expr": "sum(rate(synapse_external_cache_response_time_seconds_bucket{index=~\"$index\",instance=\"$instance\",job=~\"$job\"}[$bucket_size])) by (le)",
               "format": "heatmap",
@@ -12454,7 +13162,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "$datasource"
+            "uid": "${DS_PROMETHEUS}"
           },
           "description": "",
           "fieldConfig": {
@@ -12463,6 +13171,8 @@
                 "mode": "palette-classic"
               },
               "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
                 "axisLabel": "",
                 "axisPlacement": "auto",
                 "barAlignment": 0,
@@ -12507,7 +13217,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 54
+            "y": 55
           },
           "id": 223,
           "options": {
@@ -12526,7 +13236,7 @@
           "targets": [
             {
               "datasource": {
-                "uid": "$datasource"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "code",
               "expr": "rate(synapse_external_cache_get{job=~\"$job\", instance=\"$instance\", index=~\"$index\", hit=\"False\"}[$bucket_size])",
@@ -12544,7 +13254,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "000000001"
+            "uid": "${DS_PROMETHEUS}"
           },
           "refId": "A"
         }
@@ -12570,7 +13280,8 @@
         "hide": 0,
         "includeAll": false,
         "multi": false,
-        "name": "datasource",
+        "name": "DS_PROMETHEUS",
+        "label": "Datasource",
         "options": [],
         "query": "prometheus",
         "queryValue": "",
@@ -12641,7 +13352,7 @@
       {
         "current": {},
         "datasource": {
-          "uid": "$datasource"
+          "uid": "${DS_PROMETHEUS}"
         },
         "definition": "",
         "hide": 0,
@@ -12667,7 +13378,7 @@
         "allValue": "",
         "current": {},
         "datasource": {
-          "uid": "$datasource"
+          "uid": "${DS_PROMETHEUS}"
         },
         "definition": "",
         "hide": 0,
@@ -12697,7 +13408,7 @@
         "allValue": ".*",
         "current": {},
         "datasource": {
-          "uid": "$datasource"
+          "uid": "${DS_PROMETHEUS}"
         },
         "definition": "",
         "hide": 0,
@@ -12757,6 +13468,6 @@
   "timezone": "",
   "title": "Synapse",
   "uid": "000000012",
-  "version": 150,
+  "version": 160,
   "weekStart": ""
 }

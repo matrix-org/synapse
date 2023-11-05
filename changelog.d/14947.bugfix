@@ -1,1 +1,0 @@
-Fix a long-standing bug where sending messages on servers with presence enabled would spam "Re-starting finished log context" log lines.

@@ -412,3 +412,70 @@ class PushRuleAttributesTestCase(HomeserverTestCase):
         )
         self.assertEqual(channel.code, 404)
         self.assertEqual(channel.json_body["errcode"], Codes.NOT_FOUND)
+
+    def test_contains_user_name(self) -> None:
+        """
+        Tests that `contains_user_name` rule is present and have proper value in `pattern`.
+        """
+        username = "bob"
+        self.register_user(username, "pass")
+        token = self.login(username, "pass")
+
+        channel = self.make_request(
+            "GET",
+            "/pushrules/global/content/.m.rule.contains_user_name",
+            access_token=token,
+        )
+
+        self.assertEqual(channel.code, 200)
+
+        self.assertEqual(
+            {
+                "rule_id": ".m.rule.contains_user_name",
+                "default": True,
+                "enabled": True,
+                "pattern": username,
+                "actions": [
+                    "notify",
+                    {"set_tweak": "highlight"},
+                    {"set_tweak": "sound", "value": "default"},
+                ],
+            },
+            channel.json_body,
+        )
+
+    def test_is_user_mention(self) -> None:
+        """
+        Tests that `is_user_mention` rule is present and have proper value in `value`.
+        """
+        user = self.register_user("bob", "pass")
+        token = self.login("bob", "pass")
+
+        channel = self.make_request(
+            "GET",
+            "/pushrules/global/override/.m.rule.is_user_mention",
+            access_token=token,
+        )
+
+        self.assertEqual(channel.code, 200)
+
+        self.assertEqual(
+            {
+                "rule_id": ".m.rule.is_user_mention",
+                "default": True,
+                "enabled": True,
+                "conditions": [
+                    {
+                        "kind": "event_property_contains",
+                        "key": "content.m\\.mentions.user_ids",
+                        "value": user,
+                    }
+                ],
+                "actions": [
+                    "notify",
+                    {"set_tweak": "highlight"},
+                    {"set_tweak": "sound", "value": "default"},
+                ],
+            },
+            channel.json_body,
+        )

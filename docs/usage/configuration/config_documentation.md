@@ -25,8 +25,10 @@ messages from the database after 5 minutes, rather than 5 months.
 
 In addition, configuration options referring to size use the following suffixes:
 
-* `M` = MiB, or 1,048,576 bytes
 * `K` = KiB, or 1024 bytes
+* `M` = MiB, or 1,048,576 bytes
+* `G` = GiB, or 1,073,741,824 bytes
+* `T` = TiB, or 1,099,511,627,776 bytes
 
 For example, setting `max_avatar_size: 10M` means that Synapse will not accept files larger than 10,485,760 bytes
 for a user avatar.
@@ -228,6 +230,13 @@ Example configuration:
 presence:
   enabled: false
 ```
+
+`enabled` can also be set to a special value of "untracked" which ignores updates
+received via clients and federation, while still accepting updates from the
+[module API](../../modules/index.md).
+
+*The "untracked" option was added in Synapse 1.96.0.*
+
 ---
 ### `require_auth_for_profile_requests`
 
@@ -462,6 +471,20 @@ See the docs [request log format](../administration/request_log.md).
 * `additional_resources`: Only valid for an 'http' listener. A map of
    additional endpoints which should be loaded via dynamic modules.
 
+Unix socket support (_Added in Synapse 1.89.0_):
+* `path`: A path and filename for a Unix socket. Make sure it is located in a
+  directory with read and write permissions, and that it already exists (the directory
+  will not be created). Defaults to `None`.
+  * **Note**: The use of both `path` and `port` options for the same `listener` is not
+    compatible.
+  * The `x_forwarded` option defaults to true  when using Unix sockets and can be omitted.
+  * Other options that would not make sense to use with a UNIX socket, such as 
+    `bind_addresses` and `tls` will be ignored and can be removed.
+* `mode`: The file permissions to set on the UNIX socket. Defaults to `666`
+* **Note:** Must be set as `type: http` (does not support `metrics` and `manhole`). 
+  Also make sure that `metrics` is not included in `resources` -> `names`
+
+
 Valid resource names are:
 
 * `client`: the client-server API (/_matrix/client), and the synapse admin API (/_synapse/admin). Also implies `media` and `static`.
@@ -474,7 +497,7 @@ Valid resource names are:
 
 * `media`: the media API (/_matrix/media).
 
-* `metrics`: the metrics interface. See [here](../../metrics-howto.md).
+* `metrics`: the metrics interface. See [here](../../metrics-howto.md). (Not compatible with Unix sockets)
 
 * `openid`: OpenID authentication. See [here](../../openid.md).
 
@@ -505,7 +528,7 @@ listeners:
 Example configuration #2:
 ```yaml
 listeners:
-  # Unsecure HTTP listener: for when matrix traffic passes through a reverse proxy
+  # Insecure HTTP listener: for when matrix traffic passes through a reverse proxy
   # that unwraps TLS.
   #
   # If you plan to use a reverse proxy, please see
@@ -533,6 +556,22 @@ listeners:
     bind_addresses: ['::1', '127.0.0.1']
     type: manhole
 ```
+Example configuration #3:
+```yaml
+listeners:
+  # Unix socket listener: Ideal for Synapse deployments behind a reverse proxy, offering
+  # lightweight interprocess communication without TCP/IP overhead, avoid port
+  # conflicts, and providing enhanced security through system file permissions.
+  #
+  # Note that x_forwarded will default to true, when using a UNIX socket. Please see
+  # https://matrix-org.github.io/synapse/latest/reverse_proxy.html.
+  #
+  - path: /var/run/synapse/main_public.sock
+    type: http
+    resources:
+      - names: [client, federation]
+```
+
 ---
 ### `manhole_settings`
 
@@ -576,6 +615,10 @@ An optional duration. If set, Synapse will run a daily background task to log ou
 delete any device that hasn't been accessed for more than the specified amount of time.
 
 Defaults to no duration, which means devices are never pruned.
+
+**Note:** This task will always run on the main process, regardless of the value of
+`run_background_tasks_on`. This is due to workers currently not having the ability to
+delete devices.
 
 Example configuration:
 ```yaml
@@ -900,6 +943,17 @@ Example configuration:
 redaction_retention_period: 28d
 ```
 ---
+### `forgotten_room_retention_period`
+
+How long to keep locally forgotten rooms before purging them from the DB.
+
+Defaults to `null`, meaning it's disabled.
+
+Example configuration:
+```yaml
+forgotten_room_retention_period: 28d
+```
+---
 ### `user_ips_max_age`
 
 How long to track users' last seen time and IPs in the database.
@@ -979,11 +1033,8 @@ which are older than the room's maximum retention period. Synapse will also
 filter events received over federation so that events that should have been
 purged are ignored and not stored again.
 
-The message retention policies feature is disabled by default. Please be advised
-that enabling this feature carries some risk. There are known bugs with the implementation
-which can cause database corruption. Setting retention to delete older history
-is less risky than deleting newer history but in general caution is advised when enabling this
-experimental feature. You can read more about this feature [here](../../message_retention_policies.md).
+The message retention policies feature is disabled by default. You can read more
+about this feature [here](../../message_retention_policies.md).
 
 This setting has the following sub-options:
 * `default_policy`: Default retention policy. If set, Synapse will apply it to rooms that lack the
@@ -1086,14 +1137,14 @@ federation_verify_certificates: false
 
 The minimum TLS version that will be used for outbound federation requests.
 
-Defaults to `1`. Configurable to `1`, `1.1`, `1.2`, or `1.3`. Note
-that setting this value higher than `1.2` will prevent federation to most
-of the public Matrix network: only configure it to `1.3` if you have an
+Defaults to `"1"`. Configurable to `"1"`, `"1.1"`, `"1.2"`, or `"1.3"`. Note
+that setting this value higher than `"1.2"` will prevent federation to most
+of the public Matrix network: only configure it to `"1.3"` if you have an
 entirely private federation setup and you can ensure TLS 1.3 support.
 
 Example configuration:
 ```yaml
-federation_client_minimum_tls_version: 1.2
+federation_client_minimum_tls_version: "1.2"
 ```
 ---
 ### `federation_certificate_verification_whitelist`
@@ -1105,7 +1156,7 @@ This setting should only be used in very specific cases, such as
 federation over Tor hidden services and similar. For private networks
 of homeservers, you likely want to use a private CA instead.
 
-Only effective if `federation_verify_certicates` is `true`.
+Only effective if `federation_verify_certificates` is `true`.
 
 Example configuration:
 ```yaml
@@ -1145,6 +1196,11 @@ N.B. we recommend also firewalling your federation listener to limit
 inbound federation traffic as early as possible, rather than relying
 purely on this application-layer restriction.  If not specified, the
 default is to whitelist everything.
+
+Note: this does not stop a server from joining rooms that servers not on the
+whitelist are in. As such, this option is really only useful to establish a
+"private federation", where a group of servers all whitelist each other and have
+the same whitelist.
 
 Example configuration:
 ```yaml
@@ -1190,6 +1246,43 @@ on this homeserver.
 Example configuration:
 ```yaml
 allow_device_name_lookup_over_federation: true
+```
+---
+### `federation`
+
+The federation section defines some sub-options related to federation.
+
+The following options are related to configuring timeout and retry logic for one request,
+independently of the others.
+Short retry algorithm is used when something or someone will wait for the request to have an
+answer, while long retry is used for requests that happen in the background,
+like sending a federation transaction.
+
+* `client_timeout`: timeout for the federation requests. Default to 60s.
+* `max_short_retry_delay`: maximum delay to be used for the short retry algo. Default to 2s.
+* `max_long_retry_delay`: maximum delay to be used for the short retry algo. Default to 60s.
+* `max_short_retries`: maximum number of retries for the short retry algo. Default to 3 attempts.
+* `max_long_retries`: maximum number of retries for the long retry algo. Default to 10 attempts.
+
+The following options control the retry logic when communicating with a specific homeserver destination.
+Unlike the previous configuration options, these values apply across all requests
+for a given destination and the state of the backoff is stored in the database.
+
+* `destination_min_retry_interval`: the initial backoff, after the first request fails. Defaults to 10m.
+* `destination_retry_multiplier`: how much we multiply the backoff by after each subsequent fail. Defaults to 2.
+* `destination_max_retry_interval`: a cap on the backoff. Defaults to a week.
+
+Example configuration:
+```yaml
+federation:
+  client_timeout: 180s
+  max_short_retry_delay: 7s
+  max_long_retry_delay: 100s
+  max_short_retries: 5
+  max_long_retries: 20
+  destination_min_retry_interval: 30s
+  destination_retry_multiplier: 5
+  destination_max_retry_interval: 12h
 ```
 ---
 ## Caching
@@ -1518,11 +1611,11 @@ rc_registration_token_validity:
 
 This option specifies several limits for login:
 * `address` ratelimits login requests based on the client's IP
-      address. Defaults to `per_second: 0.17`, `burst_count: 3`.
+      address. Defaults to `per_second: 0.003`, `burst_count: 5`.
 
 * `account` ratelimits login requests based on the account the
-  client is attempting to log into. Defaults to `per_second: 0.17`,
-  `burst_count: 3`.
+  client is attempting to log into. Defaults to `per_second: 0.003`,
+  `burst_count: 5`.
 
 * `failed_attempts` ratelimits login requests based on the account the
   client is attempting to log into, based on the amount of failed login
@@ -1762,6 +1855,30 @@ Maximum number of pixels that will be thumbnailed. Defaults to 32M.
 Example configuration:
 ```yaml
 max_image_pixels: 35M
+```
+---
+### `prevent_media_downloads_from`
+
+A list of domains to never download media from. Media from these
+domains that is already downloaded will not be deleted, but will be
+inaccessible to users. This option does not affect admin APIs trying
+to download/operate on media.
+
+This will not prevent the listed domains from accessing media themselves.
+It simply prevents users on this server from downloading media originating
+from the listed servers.
+
+This will have no effect on media originating from the local server.
+This only affects media downloaded from other Matrix servers, to
+block domains from URL previews see [`url_preview_url_blacklist`](#url_preview_url_blacklist).
+
+Defaults to an empty list (nothing blocked).
+
+Example configuration:
+```yaml
+prevent_media_downloads_from:
+  - evil.example.org
+  - evil2.example.org
 ```
 ---
 ### `dynamic_thumbnails`
@@ -2227,12 +2344,12 @@ allows the shared secret to be specified in an external file.
 
 The file should be a plain text file, containing only the shared secret.
 
-If this file does not exist, Synapse will create a new signing
-key on startup and store it in this file.
+If this file does not exist, Synapse will create a new shared
+secret on startup and store it in this file.
 
 Example configuration:
 ```yaml
-registration_shared_secret_file: /path/to/secrets/file
+registration_shared_secret_path: /path/to/secrets/file
 ```
 
 _Added in Synapse 1.67.0._
@@ -2542,7 +2659,50 @@ Example configuration:
 ```yaml
 nonrefreshable_access_token_lifetime: 24h
 ```
+---
+### `ui_auth`
 
+The amount of time to allow a user-interactive authentication session to be active.
+
+This defaults to 0, meaning the user is queried for their credentials
+before every action, but this can be overridden to allow a single
+validation to be re-used.  This weakens the protections afforded by
+the user-interactive authentication process, by allowing for multiple
+(and potentially different) operations to use the same validation session.
+
+This is ignored for potentially "dangerous" operations (including
+deactivating an account, modifying an account password, adding a 3PID,
+and minting additional login tokens).
+
+Use the `session_timeout` sub-option here to change the time allowed for credential validation.
+
+Example configuration:
+```yaml
+ui_auth:
+    session_timeout: "15s"
+```
+---
+### `login_via_existing_session`
+
+Matrix supports the ability of an existing session to mint a login token for
+another client.
+
+Synapse disables this by default as it has security ramifications -- a malicious
+client could use the mechanism to spawn more than one session.
+
+The duration of time the generated token is valid for can be configured with the
+`token_timeout` sub-option.
+
+User-interactive authentication is required when this is enabled unless the
+`require_ui_auth` sub-option is set to `False`.
+
+Example configuration:
+```yaml
+login_via_existing_session:
+    enabled: true
+    require_ui_auth: false
+    token_timeout: "5m"
+```
 ---
 ## Metrics
 Config options related to metrics.
@@ -2711,6 +2871,20 @@ Example configuration:
 track_appservice_user_ips: true
 ```
 ---
+### `use_appservice_legacy_authorization`
+
+Whether to send the application service access tokens via the `access_token` query parameter
+per older versions of the Matrix specification. Defaults to false. Set to true to enable sending
+access tokens via a query parameter.
+
+**Enabling this option is considered insecure and is not recommended. **
+
+Example configuration:
+```yaml
+use_appservice_legacy_authorization: true 
+```
+
+---
 ### `macaroon_secret_key`
 
 A secret which is used to sign
@@ -2791,7 +2965,7 @@ Normally, the connection to the key server is validated via TLS certificates.
 Additional security can be provided by configuring a `verify key`, which
 will make synapse check that the response is signed by that key.
 
-This setting supercedes an older setting named `perspectives`. The old format
+This setting supersedes an older setting named `perspectives`. The old format
 is still supported for backwards-compatibility, but it is deprecated.
 
 `trusted_key_servers` defaults to matrix.org, but using it will generate a
@@ -2873,6 +3047,16 @@ enable SAML login. You can either put your entire pysaml config inline using the
 option, or you can specify a path to a psyaml config file with the sub-option `config_path`.
 This setting has the following sub-options:
 
+* `idp_name`: A user-facing name for this identity provider, which is used to
+   offer the user a choice of login mechanisms.
+* `idp_icon`: An optional icon for this identity provider, which is presented
+   by clients and Synapse's own IdP picker page. If given, must be an
+   MXC URI of the format `mxc://<server-name>/<media-id>`. (An easy way to
+   obtain such an MXC URI is to upload an image to an (unencrypted) room
+   and then copy the "url" from the source of the event.)
+* `idp_brand`: An optional brand for this identity provider, allowing clients
+   to style the login flow according to the identity provider in question.
+   See the [spec](https://spec.matrix.org/latest/) for possible options here.
 * `sp_config`: the configuration for the pysaml2 Service Provider. See pysaml2 docs for format of config.
    Default values will be used for the `entityid` and `service` settings,
    so it is not normally necessary to specify them unless you need to
@@ -3024,7 +3208,7 @@ Options for each entry include:
 
 * `idp_icon`: An optional icon for this identity provider, which is presented
    by clients and Synapse's own IdP picker page. If given, must be an
-   MXC URI of the format mxc://<server-name>/<media-id>. (An easy way to
+   MXC URI of the format `mxc://<server-name>/<media-id>`. (An easy way to
    obtain such an MXC URI is to upload an image to an (unencrypted) room
    and then copy the "url" from the source of the event.)
 
@@ -3042,6 +3226,14 @@ Options for each entry include:
 
 * `client_secret`: oauth2 client secret to use. May be omitted if
   `client_secret_jwt_key` is given, or if `client_auth_method` is 'none'.
+  Must be omitted if `client_secret_path` is specified.
+
+* `client_secret_path`: path to the oauth2 client secret to use. With that
+   it's not necessary to leak secrets into the config file itself.
+   Mutually exclusive with `client_secret`. Can be omitted if
+   `client_secret_jwt_key` is specified.
+
+   *Added in Synapse 1.91.0.*
 
 * `client_secret_jwt_key`: Alternative to client_secret: details of a key used
    to create a JSON Web Token to be used as an OAuth2 client secret. If
@@ -3099,6 +3291,11 @@ Options for each entry include:
 * `allow_existing_users`: set to true to allow a user logging in via OIDC to
    match a pre-existing account instead of failing. This could be used if
    switching from password logins to OIDC. Defaults to false.
+
+* `enable_registration`: set to 'false' to disable automatic registration of new
+   users. This allows the OIDC SSO flow to be limited to sign in only, rather than
+   automatically registering users that have a valid SSO login but do not have
+   a pre-registered account. Defaults to true.
 
 * `user_mapping_provider`: Configuration for how attributes returned from a OIDC
    provider are mapped onto a matrix user. This setting has the following
@@ -3216,6 +3413,7 @@ oidc_providers:
     userinfo_endpoint: "https://accounts.example.com/userinfo"
     jwks_uri: "https://accounts.example.com/.well-known/jwks.json"
     skip_verification: true
+    enable_registration: true
     user_mapping_provider:
       config:
         subject_claim: "id"
@@ -3233,7 +3431,18 @@ Enable Central Authentication Service (CAS) for registration and login.
 Has the following sub-options:
 * `enabled`: Set this to true to enable authorization against a CAS server.
    Defaults to false.
+* `idp_name`: A user-facing name for this identity provider, which is used to
+   offer the user a choice of login mechanisms.
+* `idp_icon`: An optional icon for this identity provider, which is presented
+   by clients and Synapse's own IdP picker page. If given, must be an
+   MXC URI of the format `mxc://<server-name>/<media-id>`. (An easy way to
+   obtain such an MXC URI is to upload an image to an (unencrypted) room
+   and then copy the "url" from the source of the event.)
+* `idp_brand`: An optional brand for this identity provider, allowing clients
+   to style the login flow according to the identity provider in question.
+   See the [spec](https://spec.matrix.org/latest/) for possible options here.
 * `server_url`: The URL of the CAS authorization endpoint.
+* `protocol_version`: The CAS protocol version, defaults to none (version 3 is required if you want to use "required_attributes").
 * `displayname_attribute`: The attribute of the CAS response to use as the display name.
    If no name is given here, no displayname will be set.
 * `required_attributes`:  It is possible to configure Synapse to only allow logins if CAS attributes
@@ -3241,16 +3450,24 @@ Has the following sub-options:
    and the values must match the given value. Alternately if the given value
    is `None` then any value is allowed (the attribute just must exist).
    All of the listed attributes must match for the login to be permitted.
+* `enable_registration`: set to 'false' to disable automatic registration of new
+   users. This allows the CAS SSO flow to be limited to sign in only, rather than
+   automatically registering users that have a valid SSO login but do not have
+   a pre-registered account. Defaults to true.
+
+   *Added in Synapse 1.93.0.*
 
 Example configuration:
 ```yaml
 cas_config:
   enabled: true
   server_url: "https://cas-server.com"
+  protocol_version: 3
   displayname_attribute: name
   required_attributes:
     userGroup: "staff"
     department: None
+  enable_registration: true
 ```
 ---
 ### `sso`
@@ -3381,28 +3598,6 @@ password_config:
       require_uppercase: true
 ```
 ---
-### `ui_auth`
-
-The amount of time to allow a user-interactive authentication session to be active.
-
-This defaults to 0, meaning the user is queried for their credentials
-before every action, but this can be overridden to allow a single
-validation to be re-used.  This weakens the protections afforded by
-the user-interactive authentication process, by allowing for multiple
-(and potentially different) operations to use the same validation session.
-
-This is ignored for potentially "dangerous" operations (including
-deactivating an account, modifying an account password, and
-adding a 3PID).
-
-Use the `session_timeout` sub-option here to change the time allowed for credential validation.
-
-Example configuration:
-```yaml
-ui_auth:
-    session_timeout: "15s"
-```
----
 ## Push
 Configuration settings related to push notifications
 
@@ -3432,6 +3627,9 @@ This option has a number of sub-options. They are as follows:
    user has unread messages in. Defaults to true, meaning push clients will see the number of
    rooms with unread messages in them. Set to false to instead send the number
    of unread messages.
+* `jitter_delay`: Delays push notifications by a random amount up to the given
+  duration. Useful for mitigating timing attacks. Optional, defaults to no
+  delay. _Added in Synapse 1.84.0._
 
 Example configuration:
 ```yaml
@@ -3439,6 +3637,7 @@ push:
   enabled: true
   include_content: false
   group_unread_count_by_room: false
+  jitter_delay: "10s"
 ```
 ---
 ## Rooms
@@ -3491,6 +3690,7 @@ This option has the following sub-options:
 * `prefer_local_users`: Defines whether to prefer local users in search query results.
    If set to true, local users are more likely to appear above remote users when searching the
    user directory. Defaults to false.
+* `show_locked_users`: Defines whether to show locked users in search query results. Defaults to false.
 
 Example configuration:
 ```yaml
@@ -3498,6 +3698,7 @@ user_directory:
     enabled: false
     search_all_users: true
     prefer_local_users: true
+    show_locked_users: true
 ```
 ---
 ### `user_consent`
@@ -3603,62 +3804,160 @@ enable_room_list_search: false
 ---
 ### `alias_creation_rules`
 
-The `alias_creation_rules` option controls who is allowed to create aliases
-on this server.
+The `alias_creation_rules` option allows server admins to prevent unwanted
+alias creation on this server.
 
-The format of this option is a list of rules that contain globs that
-match against user_id, room_id and the new alias (fully qualified with
-server name). The action in the first rule that matches is taken,
-which can currently either be "allow" or "deny".
+This setting is an optional list of 0 or more rules. By default, no list is
+provided, meaning that all alias creations are permitted.
 
-Missing user_id/room_id/alias fields default to "*".
+Otherwise, requests to create aliases are matched against each rule in order.
+The first rule that matches decides if the request is allowed or denied. If no 
+rule matches, the request is denied. In particular, this means that configuring
+an empty list of rules will deny every alias creation request.
 
-If no rules match the request is denied. An empty list means no one
-can create aliases.
+Each rule is a YAML object containing four fields, each of which is an optional string:
 
-Options for the rules include:
-* `user_id`: Matches against the creator of the alias. Defaults to "*".
-* `alias`: Matches against the alias being created. Defaults to "*".
-* `room_id`: Matches against the room ID the alias is being pointed at. Defaults to "*"
-* `action`: Whether to "allow" or "deny" the request if the rule matches. Defaults to allow.
+* `user_id`: a glob pattern that matches against the creator of the alias.
+* `alias`: a glob pattern that matches against the alias being created.
+* `room_id`: a glob pattern that matches against the room ID the alias is being pointed at.
+* `action`: either `allow` or `deny`. What to do with the request if the rule matches. Defaults to `allow`.
+
+Each of the glob patterns is optional, defaulting to `*` ("match anything").
+Note that the patterns match against fully qualified IDs, e.g. against 
+`@alice:example.com`, `#room:example.com` and `!abcdefghijk:example.com` instead
+of `alice`, `room` and `abcedgghijk`.
 
 Example configuration:
+
 ```yaml
+# No rule list specified. All alias creations are allowed.
+# This is the default behaviour.
 alias_creation_rules:
-  - user_id: "bad_user"
-    alias: "spammy_alias"
-    room_id: "*"
-    action: deny
 ```
+
+```yaml
+# A list of one rule which allows everything.
+# This has the same effect as the previous example.
+alias_creation_rules:
+  - "action": "allow"
+```
+
+```yaml
+# An empty list of rules. All alias creations are denied.
+alias_creation_rules: []
+```
+
+```yaml
+# A list of one rule which denies everything.
+# This has the same effect as the previous example.
+alias_creation_rules:
+  - "action": "deny"
+```
+
+```yaml
+# Prevent a specific user from creating aliases.
+# Allow other users to create any alias
+alias_creation_rules:
+  - user_id: "@bad_user:example.com"
+    action: deny
+    
+  - action: allow
+```
+
+```yaml
+# Prevent aliases being created which point to a specific room.
+alias_creation_rules:
+  - room_id: "!forbiddenRoom:example.com"
+    action: deny
+
+  - action: allow
+```
+
 ---
 ### `room_list_publication_rules`
 
-The `room_list_publication_rules` option controls who can publish and
-which rooms can be published in the public room list.
+The `room_list_publication_rules` option allows server admins to prevent
+unwanted entries from being published in the public room list.
 
 The format of this option is the same as that for
-`alias_creation_rules`.
+[`alias_creation_rules`](#alias_creation_rules): an optional list of 0 or more
+rules. By default, no list is provided, meaning that all rooms may be
+published to the room list.
 
-If the room has one or more aliases associated with it, only one of
-the aliases needs to match the alias rule. If there are no aliases
-then only rules with `alias: *` match.
+Otherwise, requests to publish a room are matched against each rule in order.
+The first rule that matches decides if the request is allowed or denied. If no
+rule matches, the request is denied. In particular, this means that configuring
+an empty list of rules will deny every alias creation request.
 
-If no rules match the request is denied. An empty list means no one
-can publish rooms.
+Each rule is a YAML object containing four fields, each of which is an optional string:
 
-Options for the rules include:
-* `user_id`: Matches against the creator of the alias. Defaults to "*".
-* `alias`: Matches against any current local or canonical aliases associated with the room. Defaults to "*".
-* `room_id`: Matches against the room ID being published. Defaults to "*".
-* `action`: Whether to "allow" or "deny" the request if the rule matches. Defaults to allow.
+* `user_id`: a glob pattern that matches against the user publishing the room.
+* `alias`: a glob pattern that matches against one of published room's aliases.
+  - If the room has no aliases, the alias match fails unless `alias` is unspecified or `*`.
+  - If the room has exactly one alias, the alias match succeeds if the `alias` pattern matches that alias.
+  - If the room has two or more aliases, the alias match succeeds if the pattern matches at least one of the aliases.
+* `room_id`: a glob pattern that matches against the room ID of the room being published.
+* `action`: either `allow` or `deny`. What to do with the request if the rule matches. Defaults to `allow`.
+
+Each of the glob patterns is optional, defaulting to `*` ("match anything").
+Note that the patterns match against fully qualified IDs, e.g. against
+`@alice:example.com`, `#room:example.com` and `!abcdefghijk:example.com` instead
+of `alice`, `room` and `abcedgghijk`.
+
 
 Example configuration:
+
 ```yaml
+# No rule list specified. Anyone may publish any room to the public list.
+# This is the default behaviour.
 room_list_publication_rules:
-  - user_id: "*"
-    alias: "*"
-    room_id: "*"
-    action: allow
+```
+
+```yaml
+# A list of one rule which allows everything.
+# This has the same effect as the previous example.
+room_list_publication_rules:
+  - "action": "allow"
+```
+
+```yaml
+# An empty list of rules. No-one may publish to the room list.
+room_list_publication_rules: []
+```
+
+```yaml
+# A list of one rule which denies everything.
+# This has the same effect as the previous example.
+room_list_publication_rules:
+  - "action": "deny"
+```
+
+```yaml
+# Prevent a specific user from publishing rooms.
+# Allow other users to publish anything.
+room_list_publication_rules:
+  - user_id: "@bad_user:example.com"
+    action: deny
+    
+  - action: allow
+```
+
+```yaml
+# Prevent publication of a specific room.
+room_list_publication_rules:
+  - room_id: "!forbiddenRoom:example.com"
+    action: deny
+
+  - action: allow
+```
+
+```yaml
+# Prevent publication of rooms with at least one alias containing the word "potato".
+room_list_publication_rules:
+  - alias: "#*potato*:example.com"
+    action: deny
+
+  - action: allow
 ```
 
 ---
@@ -3684,6 +3983,29 @@ default_power_level_content_override:
    private_chat: { "events": { "com.example.foo" : 0 } }
    trusted_private_chat: null
    public_chat: null
+```
+---
+### `forget_rooms_on_leave`
+
+Set to true to automatically forget rooms for users when they leave them, either
+normally or via a kick or ban. Defaults to false.
+
+Example configuration:
+```yaml
+forget_rooms_on_leave: false
+```
+---
+### `exclude_rooms_from_sync`
+A list of rooms to exclude from sync responses. This is useful for server
+administrators wishing to group users into a room without these users being able
+to see it from their client.
+
+By default, no room is excluded.
+
+Example configuration:
+```yaml
+exclude_rooms_from_sync:
+    - !foo:example.com
 ```
 
 ---
@@ -3835,19 +4157,33 @@ federation_sender_instances:
 ---
 ### `instance_map`
 
-When using workers this should be a map from [`worker_name`](#worker_name) to the
-HTTP replication listener of the worker, if configured.
-Each worker declared under [`stream_writers`](../../workers.md#stream-writers) needs
-a HTTP replication listener, and that listener should be included in the `instance_map`.
-(The main process also needs an HTTP replication listener, but it should not be
-listed in the `instance_map`.)
+When using workers this should be a map from [`worker_name`](#worker_name) to the HTTP
+replication listener of the worker, if configured, and to the main process. Each worker
+declared under [`stream_writers`](../../workers.md#stream-writers) and
+[`outbound_federation_restricted_to`](#outbound_federation_restricted_to) needs a HTTP
+replication listener, and that listener should be included in the `instance_map`. The
+main process also needs an entry on the `instance_map`, and it should be listed under
+`main` **if even one other worker exists**. Ensure the port matches with what is
+declared inside the `listener` block for a `replication` listener.
+
 
 Example configuration:
 ```yaml
 instance_map:
+  main:
+    host: localhost
+    port: 8030
   worker1:
     host: localhost
     port: 8034
+```
+Example configuration(#2, for UNIX sockets):
+```yaml
+instance_map:
+  main:
+    path: /var/run/synapse/main_replication.sock
+  worker1:
+    path: /var/run/synapse/worker1_replication.sock
 ```
 ---
 ### `stream_writers`
@@ -3865,6 +4201,24 @@ stream_writers:
   events: worker1
   typing: worker1
 ```
+---
+### `outbound_federation_restricted_to`
+
+When using workers, you can restrict outbound federation traffic to only go through a
+specific subset of workers. Any worker specified here must also be in the
+[`instance_map`](#instance_map).
+[`worker_replication_secret`](#worker_replication_secret) must also be configured to
+authorize inter-worker communication.
+
+```yaml
+outbound_federation_restricted_to:
+  - federation_sender1
+  - federation_sender2
+```
+
+Also see the [worker
+documentation](../../workers.md#restrict-outbound-federation-traffic-to-a-specific-set-of-workers)
+for more info.
 ---
 ### `run_background_tasks_on`
 
@@ -3926,7 +4280,21 @@ This setting has the following sub-options:
 * `enabled`: whether to use Redis support. Defaults to false.
 * `host` and `port`: Optional host and port to use to connect to redis. Defaults to
    localhost and 6379
+* `path`: The full path to a local Unix socket file. **If this is used, `host` and
+ `port` are ignored.** Defaults to `/tmp/redis.sock'
 * `password`: Optional password if configured on the Redis instance.
+* `dbid`: Optional redis dbid if needs to connect to specific redis logical db.
+* `use_tls`: Whether to use tls connection. Defaults to false.
+* `certificate_file`: Optional path to the certificate file
+* `private_key_file`: Optional path to the private key file
+* `ca_file`: Optional path to the CA certificate file. Use this one or:
+* `ca_path`: Optional path to the folder containing the CA certificate file
+
+  _Added in Synapse 1.78.0._
+
+  _Changed in Synapse 1.84.0: Added use\_tls, certificate\_file, private\_key\_file, ca\_file and ca\_path attributes_
+
+  _Changed in Synapse 1.85.0: Added path option to use a local Unix socket_
 
 Example configuration:
 ```yaml
@@ -3935,6 +4303,11 @@ redis:
   host: localhost
   port: 6379
   password: <secret_password>
+  dbid: <dbid>
+  #use_tls: True
+  #certificate_file: <path_to_the_certificate_file>
+  #private_key_file: <path_to_the_private_key_file>
+  #ca_file: <path_to_the_ca_certificate_file>
 ```
 ---
 ## Individual worker configuration
@@ -3971,57 +4344,15 @@ Example configuration:
 worker_name: generic_worker1
 ```
 ---
-### `worker_replication_host`
-
-The HTTP replication endpoint that it should talk to on the main Synapse process.
-The main Synapse process defines this with a `replication` resource in
-[`listeners` option](#listeners).
-
-Example configuration:
-```yaml
-worker_replication_host: 127.0.0.1
-```
----
-### `worker_replication_http_port`
-
-The HTTP replication port that it should talk to on the main Synapse process.
-The main Synapse process defines this with a `replication` resource in
-[`listeners` option](#listeners).
-
-Example configuration:
-```yaml
-worker_replication_http_port: 9093
-```
----
-### `worker_replication_http_tls`
-
-Whether TLS should be used for talking to the HTTP replication port on the main
-Synapse process.
-The main Synapse process defines this with the `tls` option on its [listener](#listeners) that
-has the `replication` resource enabled.
-
-**Please note:** by default, it is not safe to expose replication ports to the
-public Internet, even with TLS enabled.
-See [`worker_replication_secret`](#worker_replication_secret).
-
-Defaults to `false`.
-
-*Added in Synapse 1.72.0.*
-
-Example configuration:
-```yaml
-worker_replication_http_tls: true
-```
----
 ### `worker_listeners`
 
 A worker can handle HTTP requests. To do so, a `worker_listeners` option
 must be declared, in the same way as the [`listeners` option](#listeners)
 in the shared config.
 
-Workers declared in [`stream_writers`](#stream_writers) will need to include a
-`replication` listener here, in order to accept internal HTTP requests from
-other workers.
+Workers declared in [`stream_writers`](#stream_writers) and [`instance_map`](#instance_map)
+ will need to include a `replication` listener here, in order to accept internal HTTP 
+requests from other workers.
 
 Example configuration:
 ```yaml
@@ -4030,6 +4361,18 @@ worker_listeners:
     port: 8083
     resources:
       - names: [client, federation]
+```
+Example configuration(#2, using UNIX sockets with a `replication` listener):
+```yaml
+worker_listeners:
+  - type: http
+    path: /var/run/synapse/worker_public.sock
+    resources:
+      - names: [client, federation]
+  - type: http
+    path: /var/run/synapse/worker_replication.sock
+    resources:
+      - names: [replication]
 ```
 ---
 ### `worker_manhole`

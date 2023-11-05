@@ -34,6 +34,7 @@ logger = logging.getLogger(__name__)
 
 class VersionsRestServlet(RestServlet):
     PATTERNS = [re.compile("^/_matrix/client/versions$")]
+    CATEGORY = "Client API requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -78,6 +79,7 @@ class VersionsRestServlet(RestServlet):
                     "v1.3",
                     "v1.4",
                     "v1.5",
+                    "v1.6",
                 ],
                 # as per MSC1497:
                 "unstable_features": {
@@ -89,7 +91,7 @@ class VersionsRestServlet(RestServlet):
                     # Implements additional endpoints as described in MSC2432
                     "org.matrix.msc2432": True,
                     # Implements additional endpoints as described in MSC2666
-                    "uk.half-shot.msc2666.mutual_rooms": True,
+                    "uk.half-shot.msc2666.query_mutual_rooms": True,
                     # Whether new rooms will be set to encrypted or not (based on presets).
                     "io.element.e2ee_forced.public": self.e2ee_forced_public,
                     "io.element.e2ee_forced.private": self.e2ee_forced_private,
@@ -100,8 +102,6 @@ class VersionsRestServlet(RestServlet):
                     "org.matrix.msc2285.stable": True,  # TODO: Remove when MSC2285 becomes a part of the spec
                     # Supports filtering of /publicRooms by room type as per MSC3827
                     "org.matrix.msc3827.stable": True,
-                    # Adds support for importing historical messages as per MSC2716
-                    "org.matrix.msc2716": self.config.experimental.msc2716_enabled,
                     # Adds support for thread relations, per MSC3440.
                     "org.matrix.msc3440.stable": True,  # TODO: remove when "v1.3" is added above
                     # Support for thread read receipts & notification counts.
@@ -109,8 +109,10 @@ class VersionsRestServlet(RestServlet):
                     "org.matrix.msc3773": self.config.experimental.msc3773_enabled,
                     # Allows moderators to fetch redacted event content as described in MSC2815
                     "fi.mau.msc2815": self.config.experimental.msc2815_enabled,
-                    # Adds support for login token requests as per MSC3882
-                    "org.matrix.msc3882": self.config.experimental.msc3882_enabled,
+                    # Adds a ping endpoint for appservices to check HS->AS connection
+                    "fi.mau.msc2659.stable": True,  # TODO: remove when "v1.7" is added above
+                    # TODO: this is no longer needed once unstable MSC3882 does not need to be supported:
+                    "org.matrix.msc3882": self.config.auth.login_via_existing_enabled,
                     # Adds support for remotely enabling/disabling pushers, as per MSC3881
                     "org.matrix.msc3881": self.config.experimental.msc3881_enabled,
                     # Adds support for filtering /messages by event relation.
@@ -120,6 +122,10 @@ class VersionsRestServlet(RestServlet):
                     is not None,
                     # Adds support for relation-based redactions as per MSC3912.
                     "org.matrix.msc3912": self.config.experimental.msc3912_enabled,
+                    # Whether recursively provide relations is supported.
+                    "org.matrix.msc3981": self.config.experimental.msc3981_recurse_relations,
+                    # Adds support for deleting account data.
+                    "org.matrix.msc3391": self.config.experimental.msc3391_enabled,
                 },
             },
         )

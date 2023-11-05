@@ -1,1 +1,0 @@
-Fix a bug when using the `send_local_online_presence_to` module API.

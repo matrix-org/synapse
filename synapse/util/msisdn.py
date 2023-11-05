@@ -22,12 +22,16 @@ def phone_number_to_msisdn(country: str, number: str) -> str:
     Takes an ISO-3166-1 2 letter country code and phone number and
     returns an msisdn representing the canonical version of that
     phone number.
+
+    As an example, if `country` is "GB" and `number` is "7470674927", this
+    function will return "447470674927".
+
     Args:
         country: ISO-3166-1 2 letter country code
         number: Phone number in a national or international format
 
     Returns:
-        The canonical form of the phone number, as an msisdn
+        The canonical form of the phone number, as an msisdn.
     Raises:
         SynapseError if the number could not be parsed.
     """

@@ -1239,6 +1239,7 @@ class OidcProvider:
             grandfather_existing_users,
             extra_attributes,
             auth_provider_session_id=sid,
+            registration_enabled=self._config.enable_registration,
         )
 
     def _remote_id_from_userinfo(self, userinfo: UserInfo) -> str:
@@ -1353,7 +1354,7 @@ class OidcProvider:
         finish_request(request)
 
 
-class LogoutToken(JWTClaims):
+class LogoutToken(JWTClaims):  # type: ignore[misc]
     """
     Holds and verify claims of a logout token, as per
     https://openid.net/specs/openid-connect-backchannel-1_0.html#LogoutToken

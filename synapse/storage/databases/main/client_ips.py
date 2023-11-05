@@ -15,6 +15,7 @@
 import logging
 from typing import TYPE_CHECKING, Dict, List, Mapping, Optional, Tuple, Union, cast
 
+import attr
 from typing_extensions import TypedDict
 
 from synapse.metrics.background_process_metrics import wrap_as_background_process
@@ -42,7 +43,8 @@ logger = logging.getLogger(__name__)
 LAST_SEEN_GRANULARITY = 120 * 1000
 
 
-class DeviceLastConnectionInfo(TypedDict):
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class DeviceLastConnectionInfo:
     """Metadata for the last connection seen for a user and device combination"""
 
     # These types must match the columns in the `devices` table
@@ -499,8 +501,7 @@ class ClientIpWorkerStore(ClientIpBackgroundUpdateStore, MonthlyActiveUsersWorke
             device_id: If None fetches all devices for the user
 
         Returns:
-            A dictionary mapping a tuple of (user_id, device_id) to dicts, with
-            keys giving the column names from the devices table.
+            A dictionary mapping a tuple of (user_id, device_id) to DeviceLastConnectionInfo.
         """
 
         keyvalues = {"user_id": user_id}
@@ -508,7 +509,7 @@ class ClientIpWorkerStore(ClientIpBackgroundUpdateStore, MonthlyActiveUsersWorke
             keyvalues["device_id"] = device_id
 
         res = cast(
-            List[DeviceLastConnectionInfo],
+            List[Tuple[str, Optional[str], Optional[str], str, Optional[int]]],
             await self.db_pool.simple_select_list(
                 table="devices",
                 keyvalues=keyvalues,
@@ -516,7 +517,16 @@ class ClientIpWorkerStore(ClientIpBackgroundUpdateStore, MonthlyActiveUsersWorke
             ),
         )
 
-        return {(d["user_id"], d["device_id"]): d for d in res}
+        return {
+            (user_id, device_id): DeviceLastConnectionInfo(
+                user_id=user_id,
+                device_id=device_id,
+                ip=ip,
+                user_agent=user_agent,
+                last_seen=last_seen,
+            )
+            for user_id, ip, user_agent, device_id, last_seen in res
+        }
 
     async def _get_user_ip_and_agents_from_database(
         self, user: UserID, since_ts: int = 0
@@ -579,6 +589,11 @@ class ClientIpWorkerStore(ClientIpBackgroundUpdateStore, MonthlyActiveUsersWorke
         device_id: Optional[str],
         now: Optional[int] = None,
     ) -> None:
+        # The sync proxy continuously triggers /sync even if the user is not
+        # present so should be excluded from user_ips entries.
+        if user_agent == "sync-v3-proxy-":
+            return
+
         if not now:
             now = int(self._clock.time_msec())
         key = (user_id, access_token, ip)
@@ -678,8 +693,7 @@ class ClientIpWorkerStore(ClientIpBackgroundUpdateStore, MonthlyActiveUsersWorke
             device_id: If None fetches all devices for the user
 
         Returns:
-            A dictionary mapping a tuple of (user_id, device_id) to dicts, with
-            keys giving the column names from the devices table.
+            A dictionary mapping a tuple of (user_id, device_id) to DeviceLastConnectionInfo.
         """
         ret = await self._get_last_client_ip_by_device_from_database(user_id, device_id)
 
@@ -700,13 +714,13 @@ class ClientIpWorkerStore(ClientIpBackgroundUpdateStore, MonthlyActiveUsersWorke
                     continue
 
                 if not device_id or did == device_id:
-                    ret[(user_id, did)] = {
-                        "user_id": user_id,
-                        "ip": ip,
-                        "user_agent": user_agent,
-                        "device_id": did,
-                        "last_seen": last_seen,
-                    }
+                    ret[(user_id, did)] = DeviceLastConnectionInfo(
+                        user_id=user_id,
+                        ip=ip,
+                        user_agent=user_agent,
+                        device_id=did,
+                        last_seen=last_seen,
+                    )
         return ret
 
     async def get_user_ip_and_agents(
@@ -759,3 +773,14 @@ class ClientIpWorkerStore(ClientIpBackgroundUpdateStore, MonthlyActiveUsersWorke
                     }
 
         return list(results.values())
+
+    async def get_last_seen_for_user_id(self, user_id: str) -> Optional[int]:
+        """Get the last seen timestamp for a user, if we have it."""
+
+        return await self.db_pool.simple_select_one_onecol(
+            table="user_ips",
+            keyvalues={"user_id": user_id},
+            retcol="MAX(last_seen)",
+            allow_none=True,
+            desc="get_last_seen_for_user_id",
+        )

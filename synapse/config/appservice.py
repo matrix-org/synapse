@@ -33,17 +33,30 @@ class AppServiceConfig(Config):
 
     def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         self.app_service_config_files = config.get("app_service_config_files", [])
+        if not isinstance(self.app_service_config_files, list) or not all(
+            isinstance(x, str) for x in self.app_service_config_files
+        ):
+            raise ConfigError(
+                "Expected '%s' to be a list of AS config files:"
+                % (self.app_service_config_files),
+                ("app_service_config_files",),
+            )
+
         self.track_appservice_user_ips = config.get("track_appservice_user_ips", False)
+        self.use_appservice_legacy_authorization = config.get(
+            "use_appservice_legacy_authorization", False
+        )
+        if self.use_appservice_legacy_authorization:
+            logger.warning(
+                "The use of appservice legacy authorization via query params is deprecated"
+                " and should be considered insecure."
+            )
 
 
 def load_appservices(
     hostname: str, config_files: List[str]
 ) -> List[ApplicationService]:
     """Returns a list of Application Services from the config files."""
-    if not isinstance(config_files, list):
-        # type-ignore: this function gets arbitrary json value; we do use this path.
-        logger.warning("Expected %s to be a list of AS config files.", config_files)  # type: ignore[unreachable]
-        return []
 
     # Dicts of value -> filename
     seen_as_tokens: Dict[str, str] = {}

@@ -5,22 +5,45 @@ on:
     - cron: 0 8 * * *
 
   workflow_dispatch:
+    # NB: inputs are only present when this workflow is dispatched manually.
+    # (The default below is the default field value in the form to trigger
+    # a manual dispatch). Otherwise the inputs will evaluate to null.
+    inputs:
+      twisted_ref:
+        description: Commit, branch or tag to checkout from upstream Twisted.
+        required: false
+        default: 'trunk'
+        type: string
+
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  check_repo:
+    # Prevent this workflow from running on any fork of Synapse other than matrix-org/synapse, as it is
+    # only useful to the Synapse core team.
+    # All other workflow steps depend on this one, thus if 'should_run_workflow' is not 'true', the rest
+    # of the workflow will be skipped as well.
+    if: github.repository == 'matrix-org/synapse'
+    runs-on: ubuntu-latest
+    outputs:
+      should_run_workflow: ${{ steps.check_condition.outputs.should_run_workflow }}
+    steps:
+      - id: check_condition
+        run: echo "should_run_workflow=${{ github.repository == 'matrix-org/synapse' }}" >> "$GITHUB_OUTPUT"
+
   mypy:
+    needs: check_repo
+    if: needs.check_repo.outputs.should_run_workflow == 'true'
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@9cd00a88a73addc8617065438eff914dd08d0955
-        with:
-          toolchain: stable
+        uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
       - uses: matrix-org/setup-python-poetry@v1
@@ -29,23 +52,23 @@ jobs:
           extras: "all"
       - run: |
           poetry remove twisted
-          poetry add --extras tls git+https://github.com/twisted/twisted.git#trunk
+          poetry add --extras tls git+https://github.com/twisted/twisted.git#${{ inputs.twisted_ref || 'trunk' }}
           poetry install --no-interaction --extras "all test"
-      - name: Remove warn_unused_ignores from mypy config
-        run: sed '/warn_unused_ignores = True/d' -i mypy.ini
+      - name: Remove unhelpful options from mypy config
+        run: sed -e '/warn_unused_ignores = True/d' -e '/warn_redundant_casts = True/d' -i mypy.ini
       - run: poetry run mypy
 
   trial:
+    needs: check_repo
+    if: needs.check_repo.outputs.should_run_workflow == 'true'
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - run: sudo apt-get -qq install xmlsec1
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@9cd00a88a73addc8617065438eff914dd08d0955
-        with:
-          toolchain: stable
+        uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
       - uses: matrix-org/setup-python-poetry@v1
@@ -72,19 +95,23 @@ jobs:
           || true
 
   sytest:
+    needs: check_repo
+    if: needs.check_repo.outputs.should_run_workflow == 'true'
     runs-on: ubuntu-latest
     container:
-      image: matrixdotorg/sytest-synapse:buster
+      # We're using ubuntu:focal because it uses Python 3.8 which is our minimum supported Python version.
+      # This job is a canary to warn us about unreleased twisted changes that would cause problems for us if
+      # they were to be released immediately. For simplicity's sake (and to save CI runners) we use the oldest
+      # version, assuming that any incompatibilities on newer versions would also be present on the oldest.
+      image: matrixdotorg/sytest-synapse:focal
       volumes:
         - ${{ github.workspace }}:/src
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@9cd00a88a73addc8617065438eff914dd08d0955
-        with:
-          toolchain: stable
+        uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
       - name: Patch dependencies
@@ -118,7 +145,8 @@ jobs:
             /logs/**/*.log*
 
   complement:
-    if: "${{ !failure() && !cancelled() }}"
+    needs: check_repo
+    if: "!failure() && !cancelled() && needs.check_repo.outputs.should_run_workflow == 'true'"
     runs-on: ubuntu-latest
 
     strategy:
@@ -135,13 +163,18 @@ jobs:
             database: Postgres
 
     steps:
-      - name: Run actions/checkout@v3 for synapse
-        uses: actions/checkout@v3
+      - name: Run actions/checkout@v4 for synapse
+        uses: actions/checkout@v4
         with:
           path: synapse
 
       - name: Prepare Complement's Prerequisites
         run: synapse/.ci/scripts/setup_complement_prerequisites.sh
+
+      - uses: actions/setup-go@v4
+        with:
+          cache-dependency-path: complement/go.sum
+          go-version-file: complement/go.mod
 
       # This step is specific to the 'Twisted trunk' test run:
       - name: Patch dependencies
@@ -163,7 +196,7 @@ jobs:
 
   # open an issue if the build fails, so we know about it.
   open-issue:
-    if: failure()
+    if: failure() && needs.check_repo.outputs.should_run_workflow == 'true'
     needs:
       - mypy
       - trial
@@ -173,7 +206,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: JasonEtco/create-an-issue@e27dddc79c92bc6e4562f268fffa5ed752639abd # v2.9.1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

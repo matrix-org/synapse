@@ -84,7 +84,7 @@ class UpgradeRoomTest(unittest.HomeserverTestCase):
                 self.room_id, EventTypes.Tombstone, ""
             )
         )
-        self.assertIsNotNone(tombstone_event)
+        assert tombstone_event is not None
         self.assertEqual(new_room_id, tombstone_event.content["replacement_room"])
 
         # Check that the new room exists.

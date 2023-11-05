@@ -13,16 +13,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, Iterable, Mapping, Optional, Tuple, cast
+from typing import TYPE_CHECKING, Dict, Iterable, List, Mapping, Optional, Tuple, cast
 
 from typing_extensions import Literal, TypedDict
 
 from synapse.api.errors import StoreError
 from synapse.logging.opentracing import log_kv, trace
 from synapse.storage._base import SQLBaseStore, db_to_json
-from synapse.storage.database import LoggingTransaction
+from synapse.storage.database import (
+    DatabasePool,
+    LoggingDatabaseConnection,
+    LoggingTransaction,
+)
 from synapse.types import JsonDict, JsonSerializable, StreamKeyType
 from synapse.util import json_encoder
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 
 class RoomKey(TypedDict):
@@ -37,7 +44,89 @@ class RoomKey(TypedDict):
     session_data: JsonSerializable
 
 
-class EndToEndRoomKeyStore(SQLBaseStore):
+class EndToEndRoomKeyBackgroundStore(SQLBaseStore):
+    def __init__(
+        self,
+        database: DatabasePool,
+        db_conn: LoggingDatabaseConnection,
+        hs: "HomeServer",
+    ):
+        super().__init__(database, db_conn, hs)
+
+        self.db_pool.updates.register_background_index_update(
+            update_name="e2e_room_keys_index_room_id",
+            index_name="e2e_room_keys_room_id",
+            table="e2e_room_keys",
+            columns=("room_id",),
+        )
+
+        self.db_pool.updates.register_background_update_handler(
+            "delete_e2e_backup_keys_for_deactivated_users",
+            self._delete_e2e_backup_keys_for_deactivated_users,
+        )
+
+    def _delete_keys_txn(self, txn: LoggingTransaction, user_id: str) -> None:
+        self.db_pool.simple_delete_txn(
+            txn,
+            table="e2e_room_keys",
+            keyvalues={"user_id": user_id},
+        )
+
+        self.db_pool.simple_delete_txn(
+            txn,
+            table="e2e_room_keys_versions",
+            keyvalues={"user_id": user_id},
+        )
+
+    async def _delete_e2e_backup_keys_for_deactivated_users(
+        self, progress: JsonDict, batch_size: int
+    ) -> int:
+        """
+        Retroactively purges account data for users that have already been deactivated.
+        Gets run as a background update caused by a schema delta.
+        """
+
+        last_user: str = progress.get("last_user", "")
+
+        def _delete_backup_keys_for_deactivated_users_txn(
+            txn: LoggingTransaction,
+        ) -> int:
+            sql = """
+                SELECT name FROM users
+                WHERE deactivated = ? and name > ?
+                ORDER BY name ASC
+                LIMIT ?
+            """
+
+            txn.execute(sql, (1, last_user, batch_size))
+            users = [row[0] for row in txn]
+
+            for user in users:
+                self._delete_keys_txn(txn, user)
+
+            if users:
+                self.db_pool.updates._background_update_progress_txn(
+                    txn,
+                    "delete_e2e_backup_keys_for_deactivated_users",
+                    {"last_user": users[-1]},
+                )
+
+            return len(users)
+
+        number_deleted = await self.db_pool.runInteraction(
+            "_delete_backup_keys_for_deactivated_users",
+            _delete_backup_keys_for_deactivated_users_txn,
+        )
+
+        if number_deleted < batch_size:
+            await self.db_pool.updates._end_background_update(
+                "delete_e2e_backup_keys_for_deactivated_users"
+            )
+
+        return number_deleted
+
+
+class EndToEndRoomKeyStore(EndToEndRoomKeyBackgroundStore):
     """The store for end to end room key backups.
 
     See https://spec.matrix.org/v1.1/client-server-api/#server-side-key-backups
@@ -108,7 +197,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             raise StoreError(404, "No backup with that version exists")
 
         values = []
-        for (room_id, session_id, room_key) in room_keys:
+        for room_id, session_id, room_key in room_keys:
             values.append(
                 (
                     user_id,
@@ -126,7 +215,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
                     "message": "Set room key",
                     "room_id": room_id,
                     "session_id": session_id,
-                    StreamKeyType.ROOM: room_key,
+                    StreamKeyType.ROOM.value: room_key,
                 }
             )
 
@@ -185,32 +274,41 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             if session_id:
                 keyvalues["session_id"] = session_id
 
-        rows = await self.db_pool.simple_select_list(
-            table="e2e_room_keys",
-            keyvalues=keyvalues,
-            retcols=(
-                "user_id",
-                "room_id",
-                "session_id",
-                "first_message_index",
-                "forwarded_count",
-                "is_verified",
-                "session_data",
+        rows = cast(
+            List[Tuple[str, str, int, int, int, str]],
+            await self.db_pool.simple_select_list(
+                table="e2e_room_keys",
+                keyvalues=keyvalues,
+                retcols=(
+                    "room_id",
+                    "session_id",
+                    "first_message_index",
+                    "forwarded_count",
+                    "is_verified",
+                    "session_data",
+                ),
+                desc="get_e2e_room_keys",
             ),
-            desc="get_e2e_room_keys",
         )
 
         sessions: Dict[
             Literal["rooms"], Dict[str, Dict[Literal["sessions"], Dict[str, RoomKey]]]
         ] = {"rooms": {}}
-        for row in rows:
-            room_entry = sessions["rooms"].setdefault(row["room_id"], {"sessions": {}})
-            room_entry["sessions"][row["session_id"]] = {
-                "first_message_index": row["first_message_index"],
-                "forwarded_count": row["forwarded_count"],
+        for (
+            room_id,
+            session_id,
+            first_message_index,
+            forwarded_count,
+            is_verified,
+            session_data,
+        ) in rows:
+            room_entry = sessions["rooms"].setdefault(room_id, {"sessions": {}})
+            room_entry["sessions"][session_id] = {
+                "first_message_index": first_message_index,
+                "forwarded_count": forwarded_count,
                 # is_verified must be returned to the client as a boolean
-                "is_verified": bool(row["is_verified"]),
-                "session_data": db_to_json(row["session_data"]),
+                "is_verified": bool(is_verified),
+                "session_data": db_to_json(session_data),
             }
 
         return sessions
@@ -549,4 +647,30 @@ class EndToEndRoomKeyStore(SQLBaseStore):
 
         await self.db_pool.runInteraction(
             "delete_e2e_room_keys_version", _delete_e2e_room_keys_version_txn
+        )
+
+    async def bulk_delete_backup_keys_and_versions_for_user(self, user_id: str) -> None:
+        """
+        Bulk deletes all backup room keys and versions for a given user.
+
+        Args:
+            user_id: the user whose backup keys and versions we're deleting
+        """
+
+        def _delete_all_e2e_room_keys_and_versions_txn(txn: LoggingTransaction) -> None:
+            self.db_pool.simple_delete_txn(
+                txn,
+                table="e2e_room_keys",
+                keyvalues={"user_id": user_id},
+            )
+
+            self.db_pool.simple_delete_txn(
+                txn,
+                table="e2e_room_keys_versions",
+                keyvalues={"user_id": user_id},
+            )
+
+        await self.db_pool.runInteraction(
+            "delete_all_e2e_room_keys_and_versions",
+            _delete_all_e2e_room_keys_and_versions_txn,
         )

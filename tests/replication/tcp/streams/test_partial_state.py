@@ -23,7 +23,7 @@ class PartialStateStreamsTestCase(BaseMultiWorkerStreamTestCase):
     hijack_auth = True
     user_id = "@bob:test"
 
-    def setUp(self):
+    def setUp(self) -> None:
         super().setUp()
         self.store = self.hs.get_datastores().main
 
@@ -37,7 +37,7 @@ class PartialStateStreamsTestCase(BaseMultiWorkerStreamTestCase):
         room_id = self.helper.create_room_as("@bob:test")
         # Mark the room as partial-stated.
         self.get_success(
-            self.store.store_partial_state_room(room_id, ["serv1", "serv2"], 0, "serv1")
+            self.store.store_partial_state_room(room_id, {"serv1", "serv2"}, 0, "serv1")
         )
 
         worker = self.make_worker_hs("synapse.app.generic_worker")

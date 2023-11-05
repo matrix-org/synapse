@@ -25,7 +25,7 @@ try:
 except ImportError:
 
     class PostgresEngine(BaseDatabaseEngine):  # type: ignore[no-redef]
-        def __new__(cls, *args: object, **kwargs: object) -> NoReturn:  # type: ignore[misc]
+        def __new__(cls, *args: object, **kwargs: object) -> NoReturn:
             raise RuntimeError(
                 f"Cannot create {cls.__name__} -- psycopg2 module is not installed"
             )
@@ -36,7 +36,7 @@ try:
 except ImportError:
 
     class Sqlite3Engine(BaseDatabaseEngine):  # type: ignore[no-redef]
-        def __new__(cls, *args: object, **kwargs: object) -> NoReturn:  # type: ignore[misc]
+        def __new__(cls, *args: object, **kwargs: object) -> NoReturn:
             raise RuntimeError(
                 f"Cannot create {cls.__name__} -- sqlite3 module is not installed"
             )

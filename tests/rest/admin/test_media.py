@@ -13,36 +13,42 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os
+from typing import Dict
 
 from parameterized import parameterized
 
 from twisted.test.proto_helpers import MemoryReactor
+from twisted.web.resource import Resource
 
 import synapse.rest.admin
 from synapse.api.errors import Codes
+from synapse.media.filepath import MediaFilePaths
 from synapse.rest.client import login, profile, room
-from synapse.rest.media.v1.filepath import MediaFilePaths
 from synapse.server import HomeServer
 from synapse.util import Clock
 
 from tests import unittest
-from tests.server import FakeSite, make_request
 from tests.test_utils import SMALL_PNG
 
 VALID_TIMESTAMP = 1609459200000  # 2021-01-01 in milliseconds
 INVALID_TIMESTAMP_IN_S = 1893456000  # 2030-01-01 in seconds
 
 
-class DeleteMediaByIDTestCase(unittest.HomeserverTestCase):
-
+class _AdminMediaTests(unittest.HomeserverTestCase):
     servlets = [
         synapse.rest.admin.register_servlets,
         synapse.rest.admin.register_servlets_for_media_repo,
         login.register_servlets,
     ]
 
+    def create_resource_dict(self) -> Dict[str, Resource]:
+        resources = super().create_resource_dict()
+        resources["/_matrix/media"] = self.hs.get_media_repository_resource()
+        return resources
+
+
+class DeleteMediaByIDTestCase(_AdminMediaTests):
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
-        self.media_repo = hs.get_media_repository_resource()
         self.server_name = hs.hostname
 
         self.admin_user = self.register_user("admin", "pass", admin=True)
@@ -118,12 +124,8 @@ class DeleteMediaByIDTestCase(unittest.HomeserverTestCase):
         Tests that delete a media is successfully
         """
 
-        download_resource = self.media_repo.children[b"download"]
-        upload_resource = self.media_repo.children[b"upload"]
-
         # Upload some media into the room
         response = self.helper.upload_media(
-            upload_resource,
             SMALL_PNG,
             tok=self.admin_user_tok,
             expect_code=200,
@@ -135,11 +137,9 @@ class DeleteMediaByIDTestCase(unittest.HomeserverTestCase):
         self.assertEqual(server_name, self.server_name)
 
         # Attempt to access media
-        channel = make_request(
-            self.reactor,
-            FakeSite(download_resource, self.reactor),
+        channel = self.make_request(
             "GET",
-            server_and_media_id,
+            f"/_matrix/media/v3/download/{server_and_media_id}",
             shorthand=False,
             access_token=self.admin_user_tok,
         )
@@ -174,11 +174,9 @@ class DeleteMediaByIDTestCase(unittest.HomeserverTestCase):
         )
 
         # Attempt to access media
-        channel = make_request(
-            self.reactor,
-            FakeSite(download_resource, self.reactor),
+        channel = self.make_request(
             "GET",
-            server_and_media_id,
+            f"/_matrix/media/v3/download/{server_and_media_id}",
             shorthand=False,
             access_token=self.admin_user_tok,
         )
@@ -195,8 +193,7 @@ class DeleteMediaByIDTestCase(unittest.HomeserverTestCase):
         self.assertFalse(os.path.exists(local_path))
 
 
-class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
-
+class DeleteMediaByDateSizeTestCase(_AdminMediaTests):
     servlets = [
         synapse.rest.admin.register_servlets,
         synapse.rest.admin.register_servlets_for_media_repo,
@@ -213,7 +210,8 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
         self.admin_user_tok = self.login("admin", "pass")
 
         self.filepaths = MediaFilePaths(hs.config.media.media_store_path)
-        self.url = "/_synapse/admin/v1/media/%s/delete" % self.server_name
+        self.url = "/_synapse/admin/v1/media/delete"
+        self.legacy_url = "/_synapse/admin/v1/media/%s/delete" % self.server_name
 
         # Move clock up to somewhat realistic time
         self.reactor.advance(1000000000)
@@ -332,11 +330,13 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
             channel.json_body["error"],
         )
 
-    def test_delete_media_never_accessed(self) -> None:
+    @parameterized.expand([(True,), (False,)])
+    def test_delete_media_never_accessed(self, use_legacy_url: bool) -> None:
         """
         Tests that media deleted if it is older than `before_ts` and never accessed
         `last_access_ts` is `NULL` and `created_ts` < `before_ts`
         """
+        url = self.legacy_url if use_legacy_url else self.url
 
         # upload and do not access
         server_and_media_id = self._create_media()
@@ -351,7 +351,7 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
         now_ms = self.clock.time_msec()
         channel = self.make_request(
             "POST",
-            self.url + "?before_ts=" + str(now_ms),
+            url + "?before_ts=" + str(now_ms),
             access_token=self.admin_user_tok,
         )
         self.assertEqual(200, channel.code, msg=channel.json_body)
@@ -528,11 +528,8 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
         """
         Create a media and return media_id and server_and_media_id
         """
-        upload_resource = self.media_repo.children[b"upload"]
-
         # Upload some media into the room
         response = self.helper.upload_media(
-            upload_resource,
             SMALL_PNG,
             tok=self.admin_user_tok,
             expect_code=200,
@@ -552,16 +549,12 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
         """
         Try to access a media and check the result
         """
-        download_resource = self.media_repo.children[b"download"]
-
         media_id = server_and_media_id.split("/")[1]
         local_path = self.filepaths.local_media_filepath(media_id)
 
-        channel = make_request(
-            self.reactor,
-            FakeSite(download_resource, self.reactor),
+        channel = self.make_request(
             "GET",
-            server_and_media_id,
+            f"/_matrix/media/v3/download/{server_and_media_id}",
             shorthand=False,
             access_token=self.admin_user_tok,
         )
@@ -590,28 +583,16 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
             self.assertFalse(os.path.exists(local_path))
 
 
-class QuarantineMediaByIDTestCase(unittest.HomeserverTestCase):
-
-    servlets = [
-        synapse.rest.admin.register_servlets,
-        synapse.rest.admin.register_servlets_for_media_repo,
-        login.register_servlets,
-    ]
-
+class QuarantineMediaByIDTestCase(_AdminMediaTests):
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
-        media_repo = hs.get_media_repository_resource()
         self.store = hs.get_datastores().main
         self.server_name = hs.hostname
 
         self.admin_user = self.register_user("admin", "pass", admin=True)
         self.admin_user_tok = self.login("admin", "pass")
 
-        # Create media
-        upload_resource = media_repo.children[b"upload"]
-
         # Upload some media into the room
         response = self.helper.upload_media(
-            upload_resource,
             SMALL_PNG,
             tok=self.admin_user_tok,
             expect_code=200,
@@ -720,27 +701,16 @@ class QuarantineMediaByIDTestCase(unittest.HomeserverTestCase):
         self.assertFalse(media_info["quarantined_by"])
 
 
-class ProtectMediaByIDTestCase(unittest.HomeserverTestCase):
-
-    servlets = [
-        synapse.rest.admin.register_servlets,
-        synapse.rest.admin.register_servlets_for_media_repo,
-        login.register_servlets,
-    ]
-
+class ProtectMediaByIDTestCase(_AdminMediaTests):
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
-        media_repo = hs.get_media_repository_resource()
+        hs.get_media_repository_resource()
         self.store = hs.get_datastores().main
 
         self.admin_user = self.register_user("admin", "pass", admin=True)
         self.admin_user_tok = self.login("admin", "pass")
 
-        # Create media
-        upload_resource = media_repo.children[b"upload"]
-
         # Upload some media into the room
         response = self.helper.upload_media(
-            upload_resource,
             SMALL_PNG,
             tok=self.admin_user_tok,
             expect_code=200,
@@ -817,8 +787,7 @@ class ProtectMediaByIDTestCase(unittest.HomeserverTestCase):
         self.assertFalse(media_info["safe_from_quarantine"])
 
 
-class PurgeMediaCacheTestCase(unittest.HomeserverTestCase):
-
+class PurgeMediaCacheTestCase(_AdminMediaTests):
     servlets = [
         synapse.rest.admin.register_servlets,
         synapse.rest.admin.register_servlets_for_media_repo,

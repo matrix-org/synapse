@@ -16,6 +16,7 @@ import itertools
 import logging
 from typing import TYPE_CHECKING, Set
 
+from synapse.logging.context import nested_logging_context
 from synapse.storage.databases import Databases
 
 if TYPE_CHECKING:
@@ -33,8 +34,9 @@ class PurgeEventsStorageController:
     async def purge_room(self, room_id: str) -> None:
         """Deletes all record of a room"""
 
-        state_groups_to_delete = await self.stores.main.purge_room(room_id)
-        await self.stores.state.purge_room_state(room_id, state_groups_to_delete)
+        with nested_logging_context(room_id):
+            state_groups_to_delete = await self.stores.main.purge_room(room_id)
+            await self.stores.state.purge_room_state(room_id, state_groups_to_delete)
 
     async def purge_history(
         self, room_id: str, token: str, delete_local_events: bool
@@ -51,15 +53,17 @@ class PurgeEventsStorageController:
                 (instead of just marking them as outliers and deleting their
                 state groups).
         """
-        state_groups = await self.stores.main.purge_history(
-            room_id, token, delete_local_events
-        )
+        with nested_logging_context(room_id):
+            state_groups = await self.stores.main.purge_history(
+                room_id, token, delete_local_events
+            )
 
-        logger.info("[purge] finding state groups that can be deleted")
+            logger.info("[purge] finding state groups that can be deleted")
+            sg_to_delete = await self._find_unreferenced_groups(state_groups)
 
-        sg_to_delete = await self._find_unreferenced_groups(state_groups)
-
-        await self.stores.state.purge_unreferenced_state_groups(room_id, sg_to_delete)
+            await self.stores.state.purge_unreferenced_state_groups(
+                room_id, sg_to_delete
+            )
 
     async def _find_unreferenced_groups(self, state_groups: Set[int]) -> Set[int]:
         """Used when purging history to figure out which state groups can be

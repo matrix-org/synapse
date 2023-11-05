@@ -14,14 +14,14 @@
 import collections.abc
 from typing import Any
 
-from frozendict import frozendict
+from immutabledict import immutabledict
 
 
 def freeze(o: Any) -> Any:
     if isinstance(o, dict):
-        return frozendict({k: freeze(v) for k, v in o.items()})
+        return immutabledict({k: freeze(v) for k, v in o.items()})
 
-    if isinstance(o, frozendict):
+    if isinstance(o, immutabledict):
         return o
 
     if isinstance(o, (bytes, str)):

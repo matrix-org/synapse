@@ -13,9 +13,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import functools
 import gc
 import hashlib
 import hmac
+import json
 import logging
 import secrets
 import time
@@ -28,6 +30,7 @@ from typing import (
     Generic,
     Iterable,
     List,
+    Mapping,
     NoReturn,
     Optional,
     Tuple,
@@ -45,7 +48,7 @@ from typing_extensions import Concatenate, ParamSpec, Protocol
 from twisted.internet.defer import Deferred, ensureDeferred
 from twisted.python.failure import Failure
 from twisted.python.threadpool import ThreadPool
-from twisted.test.proto_helpers import MemoryReactor
+from twisted.test.proto_helpers import MemoryReactor, MemoryReactorClock
 from twisted.trial import unittest
 from twisted.web.resource import Resource
 from twisted.web.server import Request
@@ -53,11 +56,12 @@ from twisted.web.server import Request
 from synapse import events
 from synapse.api.constants import EventTypes
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion
+from synapse.config._base import Config, RootConfig
 from synapse.config.homeserver import HomeServerConfig
 from synapse.config.server import DEFAULT_ROOM_VERSION
 from synapse.crypto.event_signing import add_hashes_and_signatures
 from synapse.federation.transport.server import TransportLayerServer
-from synapse.http.server import JsonResource
+from synapse.http.server import JsonResource, OptionsResource
 from synapse.http.site import SynapseRequest, SynapseSite
 from synapse.logging.context import (
     SENTINEL_CONTEXT,
@@ -82,7 +86,7 @@ from tests.server import (
 )
 from tests.test_utils import event_injection, setup_awaitable_errors
 from tests.test_utils.logging_setup import setup_logging
-from tests.utils import default_config, setupdb
+from tests.utils import checked_cast, default_config, setupdb
 
 setupdb()
 setup_logging()
@@ -124,6 +128,53 @@ def around(target: TV) -> Callable[[Callable[Concatenate[S, P], R]], None]:
     return _around
 
 
+_TConfig = TypeVar("_TConfig", Config, RootConfig)
+
+
+def deepcopy_config(config: _TConfig) -> _TConfig:
+    new_config: _TConfig
+
+    if isinstance(config, RootConfig):
+        new_config = config.__class__(config.config_files)  # type: ignore[arg-type]
+    else:
+        new_config = config.__class__(config.root)
+
+    for attr_name in config.__dict__:
+        if attr_name.startswith("__") or attr_name == "root":
+            continue
+        attr = getattr(config, attr_name)
+        if isinstance(attr, Config):
+            new_attr = deepcopy_config(attr)
+        else:
+            new_attr = attr
+
+        setattr(new_config, attr_name, new_attr)
+
+    return new_config
+
+
+@functools.lru_cache(maxsize=8)
+def _parse_config_dict(config: str) -> RootConfig:
+    config_obj = HomeServerConfig()
+    config_obj.parse_config_dict(json.loads(config), "", "")
+    return config_obj
+
+
+def make_homeserver_config_obj(config: Dict[str, Any]) -> RootConfig:
+    """Creates a :class:`HomeServerConfig` instance with the given configuration dict.
+
+    This is equivalent to::
+
+        config_obj = HomeServerConfig()
+        config_obj.parse_config_dict(config, "", "")
+
+    but it keeps a cache of `HomeServerConfig` instances and deepcopies them as needed,
+    to avoid validating the whole configuration every time.
+    """
+    config_obj = _parse_config_dict(json.dumps(config, sort_keys=True))
+    return deepcopy_config(config_obj)
+
+
 class TestCase(unittest.TestCase):
     """A subclass of twisted.trial's TestCase which looks for 'loglevel'
     attributes on both itself and its individual test methods, to override the
@@ -146,6 +197,9 @@ class TestCase(unittest.TestCase):
                     % (current_context(),)
                 )
 
+            # Disable GC for duration of test. See below for why.
+            gc.disable()
+
             old_level = logging.getLogger().level
             if level is not None and old_level != level:
 
@@ -163,12 +217,26 @@ class TestCase(unittest.TestCase):
 
             return orig()
 
+        # We want to force a GC to workaround problems with deferreds leaking
+        # logcontexts when they are GCed (see the logcontext docs).
+        #
+        # The easiest way to do this would be to do a full GC after each test
+        # run, but that is very expensive. Instead, we disable GC (above) for
+        # the duration of the test and only run a gen-0 GC, which is a lot
+        # quicker. This doesn't clean up everything, since the TestCase
+        # instance still holds references to objects created during the test,
+        # such as HomeServers, so we do a full GC every so often.
+
         @around(self)
         def tearDown(orig: Callable[[], R]) -> R:
             ret = orig()
-            # force a GC to workaround problems with deferreds leaking logcontexts when
-            # they are GCed (see the logcontext docs)
-            gc.collect()
+            gc.collect(0)
+            # Run a full GC every 50 gen-0 GCs.
+            gen0_stats = gc.get_stats()[0]
+            gen0_collections = gen0_stats["collections"]
+            if gen0_collections % 50 == 0:
+                gc.collect()
+            gc.enable()
             set_current_context(SENTINEL_CONTEXT)
 
             return ret
@@ -184,7 +252,7 @@ class TestCase(unittest.TestCase):
             except AssertionError as e:
                 raise (type(e))(f"Assert error for '.{key}':") from e
 
-    def assert_dict(self, required: dict, actual: dict) -> None:
+    def assert_dict(self, required: Mapping, actual: Mapping) -> None:
         """Does a partial assert of a dict.
 
         Args:
@@ -247,7 +315,7 @@ class HomeserverTestCase(TestCase):
         servlets: List of servlet registration function.
         user_id (str): The user ID to assume if auth is hijacked.
         hijack_auth: Whether to hijack auth to return the user specified
-        in user_id.
+           in user_id.
     """
 
     hijack_auth: ClassVar[bool] = True
@@ -292,11 +360,17 @@ class HomeserverTestCase(TestCase):
             server_version_string="1",
             max_request_body_size=4096,
             reactor=self.reactor,
+            hs=self.hs,
         )
 
         from tests.rest.client.utils import RestHelper
 
-        self.helper = RestHelper(self.hs, self.site, getattr(self, "user_id", None))
+        self.helper = RestHelper(
+            self.hs,
+            checked_cast(MemoryReactorClock, self.hs.get_reactor()),
+            self.site,
+            getattr(self, "user_id", None),
+        )
 
         if hasattr(self, "user_id"):
             if self.hijack_auth:
@@ -315,7 +389,7 @@ class HomeserverTestCase(TestCase):
 
                 # This has to be a function and not just a Mock, because
                 # `self.helper.auth_user_id` is temporarily reassigned in some tests
-                async def get_requester(*args, **kwargs) -> Requester:
+                async def get_requester(*args: Any, **kwargs: Any) -> Requester:
                     assert self.helper.auth_user_id is not None
                     return create_requester(
                         user_id=UserID.from_string(self.helper.auth_user_id),
@@ -323,9 +397,9 @@ class HomeserverTestCase(TestCase):
                     )
 
                 # Type ignore: mypy doesn't like us assigning to methods.
-                self.hs.get_auth().get_user_by_req = get_requester  # type: ignore[assignment]
-                self.hs.get_auth().get_user_by_access_token = get_requester  # type: ignore[assignment]
-                self.hs.get_auth().get_access_token_from_request = Mock(return_value=token)  # type: ignore[assignment]
+                self.hs.get_auth().get_user_by_req = get_requester  # type: ignore[method-assign]
+                self.hs.get_auth().get_user_by_access_token = get_requester  # type: ignore[method-assign]
+                self.hs.get_auth().get_access_token_from_request = Mock(return_value=token)  # type: ignore[method-assign]
 
         if self.needs_threadpool:
             self.reactor.threadpool = ThreadPool()  # type: ignore[assignment]
@@ -361,7 +435,9 @@ class HomeserverTestCase(TestCase):
                 store.db_pool.updates.do_next_background_update(False), by=0.1
             )
 
-    def make_homeserver(self, reactor: ThreadedMemoryReactorClock, clock: Clock):
+    def make_homeserver(
+        self, reactor: ThreadedMemoryReactorClock, clock: Clock
+    ) -> HomeServer:
         """
         Make and return a homeserver.
 
@@ -384,7 +460,7 @@ class HomeserverTestCase(TestCase):
         The default calls `self.create_resource_dict` and builds the resultant dict
         into a tree.
         """
-        root_resource = Resource()
+        root_resource = OptionsResource()
         create_resource_tree(self.create_resource_dict(), root_resource)
         return root_resource
 
@@ -491,7 +567,9 @@ class HomeserverTestCase(TestCase):
             client_ip,
         )
 
-    def setup_test_homeserver(self, *args: Any, **kwargs: Any) -> HomeServer:
+    def setup_test_homeserver(
+        self, name: Optional[str] = None, **kwargs: Any
+    ) -> HomeServer:
         """
         Set up the test homeserver, meant to be called by the overridable
         make_homeserver. It automatically passes through the test class's
@@ -510,16 +588,25 @@ class HomeserverTestCase(TestCase):
         else:
             config = kwargs["config"]
 
+        # The server name can be specified using either the `name` argument or a config
+        # override. The `name` argument takes precedence over any config overrides.
+        if name is not None:
+            config["server_name"] = name
+
         # Parse the config from a config dict into a HomeServerConfig
-        config_obj = HomeServerConfig()
-        config_obj.parse_config_dict(config, "", "")
+        config_obj = make_homeserver_config_obj(config)
         kwargs["config"] = config_obj
+
+        # The server name in the config is now `name`, if provided, or the `server_name`
+        # from a config override, or the default of "test". Whichever it is, we
+        # construct a homeserver with a matching name.
+        kwargs["name"] = config_obj.server.server_name
 
         async def run_bg_updates() -> None:
             with LoggingContext("run_bg_updates"):
                 self.get_success(stor.db_pool.updates.run_background_updates(False))
 
-        hs = setup_test_homeserver(self.addCleanup, *args, **kwargs)
+        hs = setup_test_homeserver(self.addCleanup, **kwargs)
         stor = hs.get_datastores().main
 
         # Run the database background updates, when running against "master".
@@ -716,7 +803,7 @@ class HomeserverTestCase(TestCase):
         event_creator = self.hs.get_event_creation_handler()
         requester = create_requester(user)
 
-        event, context = self.get_success(
+        event, unpersisted_context = self.get_success(
             event_creator.create_event(
                 requester,
                 {
@@ -728,7 +815,7 @@ class HomeserverTestCase(TestCase):
                 prev_event_ids=prev_event_ids,
             )
         )
-
+        context = self.get_success(unpersisted_context.persist(event))
         if soft_failed:
             event.internal_metadata.soft_failed = True
 
@@ -773,19 +860,22 @@ class FederatingHomeserverTestCase(HomeserverTestCase):
         verify_key_id = "%s:%s" % (verify_key.alg, verify_key.version)
 
         self.get_success(
-            hs.get_datastores().main.store_server_verify_keys(
+            hs.get_datastores().main.store_server_keys_response(
+                self.OTHER_SERVER_NAME,
                 from_server=self.OTHER_SERVER_NAME,
                 ts_added_ms=clock.time_msec(),
-                verify_keys=[
-                    (
-                        self.OTHER_SERVER_NAME,
-                        verify_key_id,
-                        FetchKeyResult(
-                            verify_key=verify_key,
-                            valid_until_ts=clock.time_msec() + 10000,
-                        ),
-                    )
-                ],
+                verify_keys={
+                    verify_key_id: FetchKeyResult(
+                        verify_key=verify_key, valid_until_ts=clock.time_msec() + 10000
+                    ),
+                },
+                response_json={
+                    "verify_keys": {
+                        verify_key_id: {
+                            "key": signedjson.key.encode_verify_key_base64(verify_key)
+                        }
+                    }
+                },
             )
         )
 

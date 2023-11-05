@@ -31,6 +31,7 @@ logger = logging.getLogger(__name__)
 
 class PasswordPolicyServlet(RestServlet):
     PATTERNS = client_patterns("/password_policy$")
+    CATEGORY = "Registration/login requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()

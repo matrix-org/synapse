@@ -155,9 +155,6 @@ class AccountDataHandler:
             max_stream_id = await self._store.remove_account_data_for_room(
                 user_id, room_id, account_data_type
             )
-            if max_stream_id is None:
-                # The referenced account data did not exist, so no delete occurred.
-                return None
 
             self._notifier.on_new_event(
                 StreamKeyType.ACCOUNT_DATA, max_stream_id, users=[user_id]
@@ -230,9 +227,6 @@ class AccountDataHandler:
             max_stream_id = await self._store.remove_account_data_for_user(
                 user_id, account_data_type
             )
-            if max_stream_id is None:
-                # The referenced account data did not exist, so no delete occurred.
-                return None
 
             self._notifier.on_new_event(
                 StreamKeyType.ACCOUNT_DATA, max_stream_id, users=[user_id]
@@ -248,7 +242,6 @@ class AccountDataHandler:
                 instance_name=random.choice(self._account_data_writers),
                 user_id=user_id,
                 account_data_type=account_data_type,
-                content={},
             )
             return response["max_stream_id"]
 
@@ -343,10 +336,12 @@ class AccountDataEventSource(EventSource[int, JsonDict]):
                 }
             )
 
-        (
-            account_data,
-            room_account_data,
-        ) = await self.store.get_updated_account_data_for_user(user_id, last_stream_id)
+        account_data = await self.store.get_updated_global_account_data_for_user(
+            user_id, last_stream_id
+        )
+        room_account_data = await self.store.get_updated_room_account_data_for_user(
+            user_id, last_stream_id
+        )
 
         for account_data_type, content in account_data.items():
             results.append({"type": account_data_type, "content": content})

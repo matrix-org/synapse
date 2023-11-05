@@ -1,4 +1,4 @@
-from frozendict import frozendict
+from immutabledict import immutabledict
 
 from synapse.api.constants import EventTypes
 from synapse.types.state import StateFilter
@@ -172,7 +172,7 @@ class StateFilterDifferenceTestCase(TestCase):
                 },
                 include_others=False,
             ),
-            StateFilter(types=frozendict(), include_others=True),
+            StateFilter(types=immutabledict(), include_others=True),
         )
 
         # (wildcard on state keys) - (no state keys)
@@ -188,7 +188,7 @@ class StateFilterDifferenceTestCase(TestCase):
                 include_others=False,
             ),
             StateFilter(
-                types=frozendict(),
+                types=immutabledict(),
                 include_others=True,
             ),
         )
@@ -279,7 +279,7 @@ class StateFilterDifferenceTestCase(TestCase):
                 {EventTypes.Member: None, EventTypes.CanonicalAlias: None},
                 include_others=True,
             ),
-            StateFilter(types=frozendict(), include_others=False),
+            StateFilter(types=immutabledict(), include_others=False),
         )
 
         # (wildcard on state keys) - (specific state keys)
@@ -332,7 +332,7 @@ class StateFilterDifferenceTestCase(TestCase):
                 include_others=True,
             ),
             StateFilter(
-                types=frozendict(),
+                types=immutabledict(),
                 include_others=False,
             ),
         )
@@ -403,7 +403,7 @@ class StateFilterDifferenceTestCase(TestCase):
                 {EventTypes.Member: None, EventTypes.CanonicalAlias: None},
                 include_others=True,
             ),
-            StateFilter(types=frozendict(), include_others=False),
+            StateFilter(types=immutabledict(), include_others=False),
         )
 
         # (wildcard on state keys) - (specific state keys)
@@ -450,7 +450,7 @@ class StateFilterDifferenceTestCase(TestCase):
                 include_others=True,
             ),
             StateFilter(
-                types=frozendict(),
+                types=immutabledict(),
                 include_others=False,
             ),
         )

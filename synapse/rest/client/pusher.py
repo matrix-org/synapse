@@ -126,7 +126,6 @@ class PushersSetRestServlet(RestServlet):
         try:
             await self.pusher_pool.add_or_update_pusher(
                 user_id=user.to_string(),
-                access_token=requester.access_token_id,
                 kind=content["kind"],
                 app_id=content["app_id"],
                 app_display_name=content["app_display_name"],

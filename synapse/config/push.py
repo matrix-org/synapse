@@ -42,11 +42,17 @@ class PushConfig(Config):
 
         # Now check for the one in the 'email' section and honour it,
         # with a warning.
-        push_config = config.get("email") or {}
-        redact_content = push_config.get("redact_content")
+        email_push_config = config.get("email") or {}
+        redact_content = email_push_config.get("redact_content")
         if redact_content is not None:
             print(
                 "The 'email.redact_content' option is deprecated: "
                 "please set push.include_content instead"
             )
             self.push_include_content = not redact_content
+
+        # Whether to apply a random delay to outbound push.
+        self.push_jitter_delay_ms = None
+        push_jitter_delay = push_config.get("jitter_delay", None)
+        if push_jitter_delay:
+            self.push_jitter_delay_ms = self.parse_duration(push_jitter_delay)

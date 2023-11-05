@@ -16,14 +16,14 @@
 import logging
 import re
 from enum import Enum
-from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Pattern
+from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Pattern, Sequence
 
 import attr
 from netaddr import IPSet
 
 from synapse.api.constants import EventTypes
 from synapse.events import EventBase
-from synapse.types import DeviceListUpdates, JsonDict, UserID
+from synapse.types import DeviceListUpdates, JsonDict, JsonMapping, UserID
 from synapse.util.caches.descriptors import _CacheContext, cached
 
 if TYPE_CHECKING:
@@ -86,6 +86,7 @@ class ApplicationService:
             url.rstrip("/") if isinstance(url, str) else None
         )  # url must not end with a slash
         self.hs_token = hs_token
+        # The full Matrix ID for this application service's sender.
         self.sender = sender
         self.namespaces = self._check_namespaces(namespaces)
         self.id = id
@@ -212,7 +213,7 @@ class ApplicationService:
             True if the application service is interested in the user, False if not.
         """
         return (
-            # User is the appservice's sender_localpart user
+            # User is the appservice's configured sender_localpart user
             user_id == self.sender
             # User is in the appservice's user namespace
             or self.is_user_in_namespace(user_id)
@@ -377,9 +378,9 @@ class AppServiceTransaction:
         self,
         service: ApplicationService,
         id: int,
-        events: List[EventBase],
-        ephemeral: List[JsonDict],
-        to_device_messages: List[JsonDict],
+        events: Sequence[EventBase],
+        ephemeral: List[JsonMapping],
+        to_device_messages: List[JsonMapping],
         one_time_keys_count: TransactionOneTimeKeysCount,
         unused_fallback_keys: TransactionUnusedFallbackKeys,
         device_list_summary: DeviceListUpdates,

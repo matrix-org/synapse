@@ -45,9 +45,7 @@ def fake_listdir(filepath: str) -> List[str]:
 
 class WorkerSchemaTests(HomeserverTestCase):
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
-        hs = self.setup_test_homeserver(
-            federation_http_client=None, homeserver_to_use=GenericWorkerServer
-        )
+        hs = self.setup_test_homeserver(homeserver_to_use=GenericWorkerServer)
         return hs
 
     def default_config(self) -> JsonDict:
@@ -55,6 +53,7 @@ class WorkerSchemaTests(HomeserverTestCase):
 
         # Mark this as a worker app.
         conf["worker_app"] = "yes"
+        conf["instance_map"] = {"main": {"host": "127.0.0.1", "port": 0}}
 
         return conf
 

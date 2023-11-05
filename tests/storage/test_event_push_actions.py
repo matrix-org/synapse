@@ -774,7 +774,7 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
         self.assertEqual(r, 3)
 
         # add a bunch of dummy events to the events table
-        for (stream_ordering, ts) in (
+        for stream_ordering, ts in (
             (3, 110),
             (4, 120),
             (5, 120),

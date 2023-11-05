@@ -60,11 +60,9 @@ class ObservableDeferredTest(TestCase):
         observer1.addBoth(check_called_first)
 
         # store the results
-        results: List[Optional[ObservableDeferred[int]]] = [None, None]
+        results: List[Optional[int]] = [None, None]
 
-        def check_val(
-            res: ObservableDeferred[int], idx: int
-        ) -> ObservableDeferred[int]:
+        def check_val(res: int, idx: int) -> int:
             results[idx] = res
             return res
 
@@ -93,14 +91,14 @@ class ObservableDeferredTest(TestCase):
         observer1.addBoth(check_called_first)
 
         # store the results
-        results: List[Optional[ObservableDeferred[str]]] = [None, None]
+        results: List[Optional[Failure]] = [None, None]
 
-        def check_val(res: ObservableDeferred[str], idx: int) -> None:
+        def check_failure(res: Failure, idx: int) -> None:
             results[idx] = res
             return None
 
-        observer1.addErrback(check_val, 0)
-        observer2.addErrback(check_val, 1)
+        observer1.addErrback(check_failure, 0)
+        observer2.addErrback(check_failure, 1)
 
         try:
             raise Exception("gah!")

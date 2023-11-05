@@ -4,6 +4,7 @@ on:
   push:
     branches: ["develop", "release-*"]
   pull_request:
+  merge_group:
   workflow_dispatch:
 
 concurrency:
@@ -11,12 +12,19 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  check-signoff:
+    if: "github.event_name == 'pull_request'"
+    uses: "matrix-org/backend-meta/.github/workflows/sign-off.yml@v2"
+
   # Job to detect what has changed so we don't run e.g. Rust checks on PRs that
   # don't modify Rust code.
   changes:
     runs-on: ubuntu-latest
     outputs:
       rust: ${{ !startsWith(github.ref, 'refs/pull/') || steps.filter.outputs.rust }}
+      trial: ${{ !startsWith(github.ref, 'refs/pull/') || steps.filter.outputs.trial }}
+      integration: ${{ !startsWith(github.ref, 'refs/pull/') || steps.filter.outputs.integration }}
+      linting: ${{ !startsWith(github.ref, 'refs/pull/') || steps.filter.outputs.linting }}
     steps:
     - uses: dorny/paths-filter@v2
       id: filter
@@ -28,11 +36,57 @@ jobs:
             - 'rust/**'
             - 'Cargo.toml'
             - 'Cargo.lock'
+            - '.rustfmt.toml'
+            - '.github/workflows/tests.yml'
+
+          trial:
+            - 'synapse/**'
+            - 'tests/**'
+            - 'rust/**'
+            - '.ci/scripts/calculate_jobs.py'
+            - 'Cargo.toml'
+            - 'Cargo.lock'
+            - 'pyproject.toml'
+            - 'poetry.lock'
+            - '.github/workflows/tests.yml'
+
+          integration:
+            - 'synapse/**'
+            - 'rust/**'
+            - 'docker/**'
+            - 'Cargo.toml'
+            - 'Cargo.lock'
+            - 'pyproject.toml'
+            - 'poetry.lock'
+            - 'docker/**'
+            - '.ci/**'
+            - 'scripts-dev/complement.sh'
+            - '.github/workflows/tests.yml'
+
+          linting:
+            - 'synapse/**'
+            - 'docker/**'
+            - 'tests/**'
+            - 'scripts-dev/**'
+            - 'contrib/**'
+            - 'synmark/**'
+            - 'stubs/**'
+            - '.ci/**'
+            - 'mypy.ini'
+            - 'pyproject.toml'
+            - 'poetry.lock'
+            - '.github/workflows/tests.yml'
 
   check-sampleconfig:
     runs-on: ubuntu-latest
+    needs: changes
+    if: ${{ needs.changes.outputs.linting == 'true' }}
+
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@1.61.0
+      - uses: Swatinem/rust-cache@v2
       - uses: matrix-org/setup-python-poetry@v1
         with:
           python-version: "3.x"
@@ -43,8 +97,11 @@ jobs:
 
   check-schema-delta:
     runs-on: ubuntu-latest
+    needs: changes
+    if: ${{ needs.changes.outputs.linting == 'true' }}
+
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v4
         with:
           python-version: "3.x"
@@ -54,21 +111,78 @@ jobs:
   check-lockfile:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v4
         with:
           python-version: "3.x"
       - run: .ci/scripts/check_lockfile.py
 
   lint:
-    uses: "matrix-org/backend-meta/.github/workflows/python-poetry-ci.yml@v2"
-    with:
-      typechecking-extras: "all"
+    runs-on: ubuntu-latest
+    needs: changes
+    if: ${{ needs.changes.outputs.linting == 'true' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Poetry
+        uses: matrix-org/setup-python-poetry@v1
+        with:
+          install-project: "false"
+
+      - name: Import order (isort)
+        run: poetry run isort --check --diff .
+
+      - name: Code style (black)
+        run: poetry run black --check --diff .
+
+      - name: Semantic checks (ruff)
+        # --quiet suppresses the update check.
+        run: poetry run ruff --quiet .
+
+  lint-mypy:
+    runs-on: ubuntu-latest
+    name: Typechecking
+    needs: changes
+    if: ${{ needs.changes.outputs.linting == 'true' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@1.61.0
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Setup Poetry
+        uses: matrix-org/setup-python-poetry@v1
+        with:
+          # We want to make use of type hints in optional dependencies too.
+          extras: all
+          # We have seen odd mypy failures that were resolved when we started
+          # installing the project again:
+          # https://github.com/matrix-org/synapse/pull/15376#issuecomment-1498983775
+          # To make CI green, err towards caution and install the project.
+          install-project: "true"
+
+      # Cribbed from
+      # https://github.com/AustinScola/mypy-cache-github-action/blob/85ea4f2972abed39b33bd02c36e341b28ca59213/src/restore.ts#L10-L17
+      - name: Restore/persist mypy's cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            .mypy_cache
+          key: mypy-cache-${{ github.context.sha }}
+          restore-keys: mypy-cache-
+
+      - name: Run mypy
+        run: poetry run mypy
 
   lint-crlf:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Check line endings
         run: scripts-dev/check_line_terminators.sh
 
@@ -76,7 +190,7 @@ jobs:
     if: ${{ (github.base_ref == 'develop'  || contains(github.base_ref, 'release-')) && github.actor != 'dependabot[bot]' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
@@ -90,10 +204,16 @@ jobs:
 
   lint-pydantic:
     runs-on: ubuntu-latest
+    needs: changes
+    if: ${{ needs.changes.outputs.linting == 'true' }}
+
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@1.61.0
+      - uses: Swatinem/rust-cache@v2
       - uses: matrix-org/setup-python-poetry@v1
         with:
           poetry-version: "1.3.2"
@@ -106,15 +226,11 @@ jobs:
     if: ${{ needs.changes.outputs.rust == 'true' }}
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install Rust
-        # There don't seem to be versioned releases of this action per se: for each rust
-        # version there is a branch which gets constantly rebased on top of master.
-        # We pin to a specific commit for paranoia's sake.
-        uses: dtolnay/rust-toolchain@9cd00a88a73addc8617065438eff914dd08d0955
+        uses: dtolnay/rust-toolchain@1.61.0
         with:
-            toolchain: 1.58.1
             components: clippy
       - uses: Swatinem/rust-cache@v2
 
@@ -128,13 +244,10 @@ jobs:
     if: ${{ needs.changes.outputs.rust == 'true' }}
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install Rust
-        # There don't seem to be versioned releases of this action per se: for each rust
-        # version there is a branch which gets constantly rebased on top of master.
-        # We pin to a specific commit for paranoia's sake.
-        uses: dtolnay/rust-toolchain@9cd00a88a73addc8617065438eff914dd08d0955
+        uses: dtolnay/rust-toolchain@master
         with:
             toolchain: nightly-2022-12-01
             components: clippy
@@ -148,15 +261,13 @@ jobs:
     if: ${{ needs.changes.outputs.rust == 'true' }}
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install Rust
-        # There don't seem to be versioned releases of this action per se: for each rust
-        # version there is a branch which gets constantly rebased on top of master.
-        # We pin to a specific commit for paranoia's sake.
-        uses: dtolnay/rust-toolchain@9cd00a88a73addc8617065438eff914dd08d0955
+        uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.58.1
+          # We use nightly so that it correctly groups together imports
+          toolchain: nightly-2022-12-01
           components: rustfmt
       - uses: Swatinem/rust-cache@v2
 
@@ -167,6 +278,7 @@ jobs:
     if: ${{ !cancelled() }} # Run this even if prior jobs were skipped
     needs:
       - lint
+      - lint-mypy
       - lint-crlf
       - lint-newsfile
       - lint-pydantic
@@ -184,7 +296,7 @@ jobs:
     needs: linting-done
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v4
         with:
           python-version: "3.x"
@@ -195,15 +307,17 @@ jobs:
       sytest_test_matrix: ${{ steps.get-matrix.outputs.sytest_test_matrix }}
 
   trial:
-    if: ${{ !cancelled() && !failure() }} # Allow previous steps to be skipped, but not fail
-    needs: calculate-test-jobs
+    if: ${{ !cancelled() && !failure() && needs.changes.outputs.trial == 'true' }} # Allow previous steps to be skipped, but not fail
+    needs:
+      - calculate-test-jobs
+      - changes
     runs-on: ubuntu-latest
     strategy:
       matrix:
         job:  ${{ fromJson(needs.calculate-test-jobs.outputs.trial_test_matrix) }}
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - run: sudo apt-get -qq install xmlsec1
       - name: Set up PostgreSQL ${{ matrix.job.postgres-version }}
         if: ${{ matrix.job.postgres-version }}
@@ -218,12 +332,7 @@ jobs:
             postgres:${{ matrix.job.postgres-version }}
 
       - name: Install Rust
-        # There don't seem to be versioned releases of this action per se: for each rust
-        # version there is a branch which gets constantly rebased on top of master.
-        # We pin to a specific commit for paranoia's sake.
-        uses: dtolnay/rust-toolchain@9cd00a88a73addc8617065438eff914dd08d0955
-        with:
-            toolchain: 1.58.1
+        uses: dtolnay/rust-toolchain@1.61.0
       - uses: Swatinem/rust-cache@v2
 
       - uses: matrix-org/setup-python-poetry@v1
@@ -256,59 +365,48 @@ jobs:
 
   trial-olddeps:
     # Note: sqlite only; no postgres
-    if: ${{ !cancelled() && !failure() }} # Allow previous steps to be skipped, but not fail
-    needs: linting-done
+    if: ${{ !cancelled() && !failure() && needs.changes.outputs.trial == 'true' }} # Allow previous steps to be skipped, but not fail
+    needs:
+      - linting-done
+      - changes
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install Rust
-        # There don't seem to be versioned releases of this action per se: for each rust
-        # version there is a branch which gets constantly rebased on top of master.
-        # We pin to a specific commit for paranoia's sake.
-        uses: dtolnay/rust-toolchain@9cd00a88a73addc8617065438eff914dd08d0955
-        with:
-            toolchain: 1.58.1
+        uses: dtolnay/rust-toolchain@1.61.0
       - uses: Swatinem/rust-cache@v2
 
       # There aren't wheels for some of the older deps, so we need to install
       # their build dependencies
       - run: |
+          sudo apt-get -qq update
           sudo apt-get -qq install build-essential libffi-dev python-dev \
-          libxml2-dev libxslt-dev xmlsec1 zlib1g-dev libjpeg-dev libwebp-dev
+            libxml2-dev libxslt-dev xmlsec1 zlib1g-dev libjpeg-dev libwebp-dev
 
       - uses: actions/setup-python@v4
         with:
-          python-version: '3.7'
+          python-version: '3.8'
 
-      # Calculating the old-deps actually takes a bunch of time, so we cache the
-      # pyproject.toml / poetry.lock. We need to cache pyproject.toml as
-      # otherwise the `poetry install` step will error due to the poetry.lock
-      # file being outdated.
-      #
-      # This caches the output of `Prepare old deps`, which should generate the
-      # same `pyproject.toml` and `poetry.lock` for a given `pyproject.toml` input.
-      - uses: actions/cache@v3
-        id: cache-poetry-old-deps
-        name: Cache poetry.lock
-        with:
-          path: |
-            poetry.lock
-            pyproject.toml
-          key: poetry-old-deps2-${{ hashFiles('pyproject.toml') }}
       - name: Prepare old deps
         if: steps.cache-poetry-old-deps.outputs.cache-hit != 'true'
         run: .ci/scripts/prepare_old_deps.sh
 
-      # We only now install poetry so that `setup-python-poetry` caches the
-      # right poetry.lock's dependencies.
-      - uses: matrix-org/setup-python-poetry@v1
-        with:
-          python-version: '3.7'
-          poetry-version: "1.3.2"
-          extras: "all test"
+      # Note: we install using `pip` here, not poetry. `poetry install` ignores the
+      # build-system section (https://github.com/python-poetry/poetry/issues/6154), but
+      # we explicitly want to test that you can `pip install` using the oldest version
+      # of poetry-core and setuptools-rust.
+      - run: pip install .[all,test]
 
-      - run: poetry run trial -j6 tests
+      # We nuke the local copy, as we've installed synapse into the virtualenv
+      # (rather than use an editable install, which we no longer support). If we
+      # don't do this then python can't find the native lib.
+      - run: rm -rf synapse/
+
+      # Sanity check we can import/run Synapse
+      - run: python -m synapse.app.homeserver --help
+
+      - run: python -m twisted.trial -j6 tests
       - name: Dump logs
         # Logs are most useful when the command fails, always include them.
         if: ${{ always() }}
@@ -325,16 +423,18 @@ jobs:
   trial-pypy:
     # Very slow; only run if the branch name includes 'pypy'
     # Note: sqlite only; no postgres. Completely untested since poetry move.
-    if: ${{ contains(github.ref, 'pypy') && !failure() && !cancelled() }}
-    needs: linting-done
+    if: ${{ contains(github.ref, 'pypy') && !failure() && !cancelled() && needs.changes.outputs.trial == 'true' }}
+    needs:
+      - linting-done
+      - changes
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["pypy-3.7"]
+        python-version: ["pypy-3.8"]
         extras: ["all"]
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       # Install libs necessary for PyPy to build binary wheels for dependencies
       - run: sudo apt-get -qq install xmlsec1 libxml2-dev libxslt-dev
       - uses: matrix-org/setup-python-poetry@v1
@@ -357,8 +457,10 @@ jobs:
           || true
 
   sytest:
-    if: ${{ !failure() && !cancelled() }}
-    needs: calculate-test-jobs
+    if: ${{ !failure() && !cancelled() && needs.changes.outputs.integration == 'true' }}
+    needs:
+      - calculate-test-jobs
+      - changes
     runs-on: ubuntu-latest
     container:
       image: matrixdotorg/sytest-synapse:${{ matrix.job.sytest-tag }}
@@ -367,7 +469,8 @@ jobs:
       env:
         SYTEST_BRANCH: ${{ github.head_ref }}
         POSTGRES: ${{ matrix.job.postgres && 1}}
-        MULTI_POSTGRES: ${{ (matrix.job.postgres == 'multi-postgres') && 1}}
+        MULTI_POSTGRES: ${{ (matrix.job.postgres == 'multi-postgres') || '' }}
+        ASYNCIO_REACTOR: ${{ (matrix.job.reactor == 'asyncio') || '' }}
         WORKERS: ${{ matrix.job.workers && 1 }}
         BLACKLIST: ${{ matrix.job.workers && 'synapse-blacklist-with-workers' }}
         TOP: ${{ github.workspace }}
@@ -378,17 +481,12 @@ jobs:
         job: ${{ fromJson(needs.calculate-test-jobs.outputs.sytest_test_matrix) }}
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Prepare test blacklist
         run: cat sytest-blacklist .ci/worker-blacklist > synapse-blacklist-with-workers
 
       - name: Install Rust
-        # There don't seem to be versioned releases of this action per se: for each rust
-        # version there is a branch which gets constantly rebased on top of master.
-        # We pin to a specific commit for paranoia's sake.
-        uses: dtolnay/rust-toolchain@9cd00a88a73addc8617065438eff914dd08d0955
-        with:
-            toolchain: 1.58.1
+        uses: dtolnay/rust-toolchain@1.61.0
       - uses: Swatinem/rust-cache@v2
 
       - name: Run SyTest
@@ -407,8 +505,8 @@ jobs:
             /logs/**/*.log*
 
   export-data:
-    if: ${{ !failure() && !cancelled() }} # Allow previous steps to be skipped, but not fail
-    needs: [linting-done, portdb]
+    if: ${{ !failure() && !cancelled() && needs.changes.outputs.integration == 'true'}} # Allow previous steps to be skipped, but not fail
+    needs: [linting-done, portdb, changes]
     runs-on: ubuntu-latest
     env:
       TOP: ${{ github.workspace }}
@@ -428,7 +526,7 @@ jobs:
           --health-retries 5
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - run: sudo apt-get -qq install xmlsec1 postgresql-client
       - uses: matrix-org/setup-python-poetry@v1
         with:
@@ -443,13 +541,15 @@ jobs:
 
 
   portdb:
-    if: ${{ !failure() && !cancelled() }} # Allow previous steps to be skipped, but not fail
-    needs: linting-done
+    if: ${{ !failure() && !cancelled() && needs.changes.outputs.integration == 'true'}} # Allow previous steps to be skipped, but not fail
+    needs:
+      - linting-done
+      - changes
     runs-on: ubuntu-latest
     strategy:
       matrix:
         include:
-          - python-version: "3.7"
+          - python-version: "3.8"
             postgres-version: "11"
 
           - python-version: "3.11"
@@ -470,7 +570,7 @@ jobs:
           --health-retries 5
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Add PostgreSQL apt repository
         # We need a version of pg_dump that can handle the version of
         # PostgreSQL being tested against. The Ubuntu package repository lags
@@ -504,8 +604,10 @@ jobs:
             schema_diff
 
   complement:
-    if: "${{ !failure() && !cancelled() }}"
-    needs: linting-done
+    if: "${{ !failure() && !cancelled() && needs.changes.outputs.integration == 'true' }}"
+    needs:
+      - linting-done
+      - changes
     runs-on: ubuntu-latest
 
     strategy:
@@ -522,26 +624,27 @@ jobs:
             database: Postgres
 
     steps:
-      - name: Run actions/checkout@v3 for synapse
-        uses: actions/checkout@v3
+      - name: Run actions/checkout@v4 for synapse
+        uses: actions/checkout@v4
         with:
           path: synapse
 
       - name: Install Rust
-        # There don't seem to be versioned releases of this action per se: for each rust
-        # version there is a branch which gets constantly rebased on top of master.
-        # We pin to a specific commit for paranoia's sake.
-        uses: dtolnay/rust-toolchain@9cd00a88a73addc8617065438eff914dd08d0955
-        with:
-            toolchain: 1.58.1
+        uses: dtolnay/rust-toolchain@1.61.0
       - uses: Swatinem/rust-cache@v2
 
       - name: Prepare Complement's Prerequisites
         run: synapse/.ci/scripts/setup_complement_prerequisites.sh
 
+      - uses: actions/setup-go@v4
+        with:
+          cache-dependency-path: complement/go.sum
+          go-version-file: complement/go.mod
+
+        # use p=1 concurrency as GHA boxes are underpowered and don't like running tons of synapses at once.
       - run: |
           set -o pipefail
-          COMPLEMENT_DIR=`pwd`/complement synapse/scripts-dev/complement.sh -json 2>&1 | synapse/.ci/scripts/gotestfmt
+          COMPLEMENT_DIR=`pwd`/complement synapse/scripts-dev/complement.sh -p 1 -json 2>&1 | synapse/.ci/scripts/gotestfmt
         shell: bash
         env:
           POSTGRES: ${{ (matrix.database == 'Postgres') && 1 || '' }}
@@ -556,15 +659,10 @@ jobs:
       - changes
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install Rust
-        # There don't seem to be versioned releases of this action per se: for each rust
-        # version there is a branch which gets constantly rebased on top of master.
-        # We pin to a specific commit for paranoia's sake.
-        uses: dtolnay/rust-toolchain@9cd00a88a73addc8617065438eff914dd08d0955
-        with:
-            toolchain: 1.58.1
+        uses: dtolnay/rust-toolchain@1.61.0
       - uses: Swatinem/rust-cache@v2
 
       - run: cargo test
@@ -579,13 +677,10 @@ jobs:
       - changes
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install Rust
-        # There don't seem to be versioned releases of this action per se: for each rust
-        # version there is a branch which gets constantly rebased on top of master.
-        # We pin to a specific commit for paranoia's sake.
-        uses: dtolnay/rust-toolchain@9cd00a88a73addc8617065438eff914dd08d0955
+        uses: dtolnay/rust-toolchain@master
         with:
             toolchain: nightly-2022-12-01
       - uses: Swatinem/rust-cache@v2
@@ -610,9 +705,16 @@ jobs:
         with:
           needs: ${{ toJSON(needs) }}
 
-          # The newsfile lint may be skipped on non PR builds
-          # Cargo test is skipped if there is no changes on Rust code
+          # Various bits are skipped if there was no applicable changes.
+          # The newsfile and signoff lint may be skipped on non PR builds.
           skippable: |
+            trial
+            trial-olddeps
+            sytest
+            portdb
+            export-data
+            complement
+            check-signoff
             lint-newsfile
             cargo-test
             cargo-bench

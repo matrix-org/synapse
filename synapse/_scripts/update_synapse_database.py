@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -38,7 +37,7 @@ class MockHomeserver(HomeServer):
     DATASTORE_CLASS = DataStore  # type: ignore [assignment]
 
     def __init__(self, config: HomeServerConfig):
-        super(MockHomeserver, self).__init__(
+        super().__init__(
             hostname=config.server.server_name,
             config=config,
             reactor=reactor,

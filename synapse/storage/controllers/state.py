@@ -12,36 +12,45 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+from itertools import chain
 from typing import (
     TYPE_CHECKING,
-    Any,
-    Awaitable,
+    AbstractSet,
     Callable,
     Collection,
     Dict,
+    FrozenSet,
     Iterable,
     List,
     Mapping,
     Optional,
-    Set,
     Tuple,
+    Union,
 )
 
-from synapse.api.constants import EventTypes
+from synapse.api.constants import EventTypes, Membership
 from synapse.events import EventBase
 from synapse.logging.opentracing import tag_args, trace
+from synapse.storage.databases.main.state_deltas import StateDelta
 from synapse.storage.roommember import ProfileInfo
 from synapse.storage.util.partial_state_events_tracker import (
     PartialCurrentStateTracker,
     PartialStateEventsTracker,
 )
-from synapse.types import MutableStateMap, StateMap
+from synapse.synapse_rust.acl import ServerAclEvaluator
+from synapse.types import MutableStateMap, StateMap, get_domain_from_id
 from synapse.types.state import StateFilter
+from synapse.util.async_helpers import Linearizer
+from synapse.util.caches import intern_string
+from synapse.util.caches.descriptors import cached
 from synapse.util.cancellation import cancellable
+from synapse.util.metrics import Measure
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
+    from synapse.state import _StateCacheEntry
     from synapse.storage.databases import Databases
+
 
 logger = logging.getLogger(__name__)
 
@@ -53,9 +62,14 @@ class StateStorageController:
 
     def __init__(self, hs: "HomeServer", stores: "Databases"):
         self._is_mine_id = hs.is_mine_id
+        self._clock = hs.get_clock()
         self.stores = stores
         self._partial_state_events_tracker = PartialStateEventsTracker(stores.main)
         self._partial_state_room_tracker = PartialCurrentStateTracker(stores.main)
+
+        # Used by `_get_joined_hosts` to ensure only one thing mutates the cache
+        # at a time. Keyed by room_id.
+        self._joined_host_linearizer = Linearizer("_JoinedHostsCache")
 
     def notify_event_un_partial_stated(self, event_id: str) -> None:
         self._partial_state_events_tracker.notify_un_partial_stated(event_id)
@@ -67,6 +81,8 @@ class StateStorageController:
         """
         self._partial_state_room_tracker.notify_un_partial_stated(room_id)
 
+    @trace
+    @tag_args
     async def get_state_group_delta(
         self, state_group: int
     ) -> Tuple[Optional[int], Optional[StateMap[str]]]:
@@ -84,6 +100,8 @@ class StateStorageController:
         state_group_delta = await self.stores.state.get_state_group_delta(state_group)
         return state_group_delta.prev_group, state_group_delta.delta_ids
 
+    @trace
+    @tag_args
     async def get_state_groups_ids(
         self, _room_id: str, event_ids: Collection[str], await_full_state: bool = True
     ) -> Dict[int, MutableStateMap[str]]:
@@ -114,6 +132,8 @@ class StateStorageController:
 
         return group_to_state
 
+    @trace
+    @tag_args
     async def get_state_ids_for_group(
         self, state_group: int, state_filter: Optional[StateFilter] = None
     ) -> StateMap[str]:
@@ -130,6 +150,8 @@ class StateStorageController:
 
         return group_to_state[state_group]
 
+    @trace
+    @tag_args
     async def get_state_groups(
         self, room_id: str, event_ids: Collection[str]
     ) -> Dict[int, List[EventBase]]:
@@ -165,9 +187,11 @@ class StateStorageController:
             for group, event_id_map in group_to_ids.items()
         }
 
-    def _get_state_groups_from_groups(
+    @trace
+    @tag_args
+    async def _get_state_groups_from_groups(
         self, groups: List[int], state_filter: StateFilter
-    ) -> Awaitable[Dict[int, StateMap[str]]]:
+    ) -> Dict[int, StateMap[str]]:
         """Returns the state groups for a given set of groups, filtering on
         types of state events.
 
@@ -180,9 +204,12 @@ class StateStorageController:
             Dict of state group to state map.
         """
 
-        return self.stores.state._get_state_groups_from_groups(groups, state_filter)
+        return await self.stores.state._get_state_groups_from_groups(
+            groups, state_filter
+        )
 
     @trace
+    @tag_args
     async def get_state_for_events(
         self, event_ids: Collection[str], state_filter: Optional[StateFilter] = None
     ) -> Dict[str, StateMap[EventBase]]:
@@ -280,6 +307,8 @@ class StateStorageController:
 
         return {event: event_to_state[event] for event in event_ids}
 
+    @trace
+    @tag_args
     async def get_state_for_event(
         self, event_id: str, state_filter: Optional[StateFilter] = None
     ) -> StateMap[EventBase]:
@@ -303,6 +332,7 @@ class StateStorageController:
         return state_map[event_id]
 
     @trace
+    @tag_args
     async def get_state_ids_for_event(
         self,
         event_id: str,
@@ -333,9 +363,11 @@ class StateStorageController:
         )
         return state_map[event_id]
 
-    def get_state_for_groups(
+    @trace
+    @tag_args
+    async def get_state_for_groups(
         self, groups: Iterable[int], state_filter: Optional[StateFilter] = None
-    ) -> Awaitable[Dict[int, MutableStateMap[str]]]:
+    ) -> Dict[int, MutableStateMap[str]]:
         """Gets the state at each of a list of state groups, optionally
         filtering by type/state_key
 
@@ -347,7 +379,7 @@ class StateStorageController:
         Returns:
             Dict of state group to state map.
         """
-        return self.stores.state._get_state_for_groups(
+        return await self.stores.state._get_state_for_groups(
             groups, state_filter or StateFilter.all()
         )
 
@@ -402,6 +434,8 @@ class StateStorageController:
             event_id, room_id, prev_group, delta_ids, current_state_ids
         )
 
+    @trace
+    @tag_args
     @cancellable
     async def get_current_state_ids(
         self,
@@ -442,6 +476,8 @@ class StateStorageController:
                 room_id, on_invalidate=on_invalidate
             )
 
+    @trace
+    @tag_args
     async def get_canonical_alias_for_room(self, room_id: str) -> Optional[str]:
         """Get canonical alias for room, if any
 
@@ -464,22 +500,39 @@ class StateStorageController:
         if not event:
             return None
 
-        return event.content.get("canonical_alias")
+        return event.content.get("alias")
 
+    @cached()
+    async def get_server_acl_for_room(
+        self, room_id: str
+    ) -> Optional[ServerAclEvaluator]:
+        """Get the server ACL evaluator for room, if any
+
+        This does up-front parsing of the content to ignore bad data and pre-compile
+        regular expressions.
+
+        Args:
+            room_id: The room ID
+
+        Returns:
+            The server ACL evaluator, if any
+        """
+
+        acl_event = await self.get_current_state_event(
+            room_id, EventTypes.ServerACL, ""
+        )
+
+        if not acl_event:
+            return None
+
+        return server_acl_evaluator_from_event(acl_event)
+
+    @trace
+    @tag_args
     async def get_current_state_deltas(
         self, prev_stream_id: int, max_stream_id: int
-    ) -> Tuple[int, List[Dict[str, Any]]]:
+    ) -> Tuple[int, List[StateDelta]]:
         """Fetch a list of room state changes since the given stream id
-
-        Each entry in the result contains the following fields:
-            - stream_id (int)
-            - room_id (str)
-            - type (str): event type
-            - state_key (str):
-            - event_id (str|None): new event_id for this state key. None if the
-                state has been deleted.
-            - prev_event_id (str|None): previous event_id for this state key. None
-                if it's new state.
 
         Args:
             prev_stream_id: point to get changes since (exclusive)
@@ -500,6 +553,7 @@ class StateStorageController:
         )
 
     @trace
+    @tag_args
     async def get_current_state(
         self, room_id: str, state_filter: Optional[StateFilter] = None
     ) -> StateMap[EventBase]:
@@ -516,6 +570,8 @@ class StateStorageController:
 
         return state_map
 
+    @trace
+    @tag_args
     async def get_current_state_event(
         self, room_id: str, event_type: str, state_key: str
     ) -> Optional[EventBase]:
@@ -527,7 +583,9 @@ class StateStorageController:
         )
         return state_map.get(key)
 
-    async def get_current_hosts_in_room(self, room_id: str) -> Set[str]:
+    @trace
+    @tag_args
+    async def get_current_hosts_in_room(self, room_id: str) -> AbstractSet[str]:
         """Get current hosts in room based on current state.
 
         Blocks until we have full state for the given room. This only happens for rooms
@@ -538,7 +596,9 @@ class StateStorageController:
 
         return await self.stores.main.get_current_hosts_in_room(room_id)
 
-    async def get_current_hosts_in_room_ordered(self, room_id: str) -> List[str]:
+    @trace
+    @tag_args
+    async def get_current_hosts_in_room_ordered(self, room_id: str) -> Tuple[str, ...]:
         """Get current hosts in room based on current state.
 
         Blocks until we have full state for the given room. This only happens for rooms
@@ -553,6 +613,8 @@ class StateStorageController:
 
         return await self.stores.main.get_current_hosts_in_room_ordered(room_id)
 
+    @trace
+    @tag_args
     async def get_current_hosts_in_room_or_partial_state_approximation(
         self, room_id: str
     ) -> Collection[str]:
@@ -582,9 +644,11 @@ class StateStorageController:
 
         return hosts
 
+    @trace
+    @tag_args
     async def get_users_in_room_with_profiles(
         self, room_id: str
-    ) -> Dict[str, ProfileInfo]:
+    ) -> Mapping[str, ProfileInfo]:
         """
         Get the current users in the room with their profiles.
         If the room is currently partial-stated, this will block until the room has
@@ -593,3 +657,155 @@ class StateStorageController:
         await self._partial_state_room_tracker.await_full_state(room_id)
 
         return await self.stores.main.get_users_in_room_with_profiles(room_id)
+
+    async def get_joined_hosts(
+        self, room_id: str, state_entry: "_StateCacheEntry"
+    ) -> FrozenSet[str]:
+        state_group: Union[object, int] = state_entry.state_group
+        if not state_group:
+            # If state_group is None it means it has yet to be assigned a
+            # state group, i.e. we need to make sure that calls with a state_group
+            # of None don't hit previous cached calls with a None state_group.
+            # To do this we set the state_group to a new object as object() != object()
+            state_group = object()
+
+        assert state_group is not None
+        with Measure(self._clock, "get_joined_hosts"):
+            return await self._get_joined_hosts(
+                room_id, state_group, state_entry=state_entry
+            )
+
+    @cached(num_args=2, max_entries=10000, iterable=True)
+    async def _get_joined_hosts(
+        self,
+        room_id: str,
+        state_group: Union[object, int],
+        state_entry: "_StateCacheEntry",
+    ) -> FrozenSet[str]:
+        # We don't use `state_group`, it's there so that we can cache based on
+        # it. However, its important that its never None, since two
+        # current_state's with a state_group of None are likely to be different.
+        #
+        # The `state_group` must match the `state_entry.state_group` (if not None).
+        assert state_group is not None
+        assert state_entry.state_group is None or state_entry.state_group == state_group
+
+        # We use a secondary cache of previous work to allow us to build up the
+        # joined hosts for the given state group based on previous state groups.
+        #
+        # We cache one object per room containing the results of the last state
+        # group we got joined hosts for. The idea is that generally
+        # `get_joined_hosts` is called with the "current" state group for the
+        # room, and so consecutive calls will be for consecutive state groups
+        # which point to the previous state group.
+        cache = await self.stores.main._get_joined_hosts_cache(room_id)
+
+        # If the state group in the cache matches, we already have the data we need.
+        if state_entry.state_group == cache.state_group:
+            return frozenset(cache.hosts_to_joined_users)
+
+        # Since we'll mutate the cache we need to lock.
+        async with self._joined_host_linearizer.queue(room_id):
+            if state_entry.state_group == cache.state_group:
+                # Same state group, so nothing to do. We've already checked for
+                # this above, but the cache may have changed while waiting on
+                # the lock.
+                pass
+            elif state_entry.prev_group == cache.state_group:
+                # The cached work is for the previous state group, so we work out
+                # the delta.
+                assert state_entry.delta_ids is not None
+                for (typ, state_key), event_id in state_entry.delta_ids.items():
+                    if typ != EventTypes.Member:
+                        continue
+
+                    host = intern_string(get_domain_from_id(state_key))
+                    user_id = state_key
+                    known_joins = cache.hosts_to_joined_users.setdefault(host, set())
+
+                    event = await self.stores.main.get_event(event_id)
+                    if event.membership == Membership.JOIN:
+                        known_joins.add(user_id)
+                    else:
+                        known_joins.discard(user_id)
+
+                        if not known_joins:
+                            cache.hosts_to_joined_users.pop(host, None)
+            else:
+                # The cache doesn't match the state group or prev state group,
+                # so we calculate the result from first principles.
+                #
+                # We need to fetch all hosts joined to the room according to `state` by
+                # inspecting all join memberships in `state`. However, if the `state` is
+                # relatively recent then many of its events are likely to be held in
+                # the current state of the room, which is easily available and likely
+                # cached.
+                #
+                # We therefore compute the set of `state` events not in the
+                # current state and only fetch those.
+                current_memberships = (
+                    await self.stores.main._get_approximate_current_memberships_in_room(
+                        room_id
+                    )
+                )
+                unknown_state_events = {}
+                joined_users_in_current_state = []
+
+                state = await state_entry.get_state(
+                    self, StateFilter.from_types([(EventTypes.Member, None)])
+                )
+
+                for (type, state_key), event_id in state.items():
+                    if event_id not in current_memberships:
+                        unknown_state_events[type, state_key] = event_id
+                    elif current_memberships[event_id] == Membership.JOIN:
+                        joined_users_in_current_state.append(state_key)
+
+                joined_user_ids = await self.stores.main.get_joined_user_ids_from_state(
+                    room_id, unknown_state_events
+                )
+
+                cache.hosts_to_joined_users = {}
+                for user_id in chain(joined_user_ids, joined_users_in_current_state):
+                    host = intern_string(get_domain_from_id(user_id))
+                    cache.hosts_to_joined_users.setdefault(host, set()).add(user_id)
+
+            if state_entry.state_group:
+                cache.state_group = state_entry.state_group
+            else:
+                cache.state_group = object()
+
+        return frozenset(cache.hosts_to_joined_users)
+
+
+def server_acl_evaluator_from_event(acl_event: EventBase) -> "ServerAclEvaluator":
+    """
+    Create a ServerAclEvaluator from a m.room.server_acl event's content.
+
+    This does up-front parsing of the content to ignore bad data. It then creates
+    the ServerAclEvaluator which will pre-compile regular expressions from the globs.
+    """
+
+    # first of all, parse if literal IPs are blocked.
+    allow_ip_literals = acl_event.content.get("allow_ip_literals", True)
+    if not isinstance(allow_ip_literals, bool):
+        logger.warning("Ignoring non-bool allow_ip_literals flag")
+        allow_ip_literals = True
+
+    # next, parse the deny list by ignoring any non-strings.
+    deny = acl_event.content.get("deny", [])
+    if not isinstance(deny, (list, tuple)):
+        logger.warning("Ignoring non-list deny ACL %s", deny)
+        deny = []
+    else:
+        deny = [s for s in deny if isinstance(s, str)]
+
+    # then the allow list.
+    allow = acl_event.content.get("allow", [])
+    if not isinstance(allow, (list, tuple)):
+        logger.warning("Ignoring non-list allow ACL %s", allow)
+        allow = []
+    else:
+        allow = [s for s in allow if isinstance(s, str)]
+
+    return ServerAclEvaluator(allow_ip_literals, allow, deny)

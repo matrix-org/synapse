@@ -51,8 +51,7 @@ if [[ -n "$SYNAPSE_COMPLEMENT_USE_WORKERS" ]]; then
   # -z True if the length of string is zero.
   if [[ -z "$SYNAPSE_WORKER_TYPES" ]]; then
     export SYNAPSE_WORKER_TYPES="\
-      event_persister, \
-      event_persister, \
+      event_persister:2, \
       background_worker, \
       frontend_proxy, \
       event_creator, \
@@ -64,10 +63,16 @@ if [[ -n "$SYNAPSE_COMPLEMENT_USE_WORKERS" ]]; then
       synchrotron, \
       client_reader, \
       appservice, \
-      pusher"
+      pusher, \
+      stream_writers=account_data+presence+receipts+to_device+typing"
 
   fi
   log "Workers requested: $SYNAPSE_WORKER_TYPES"
+  # adjust connection pool limits on worker mode as otherwise running lots of worker synapses
+  # can make docker unhappy (in GHA)
+  export POSTGRES_CP_MIN=1
+  export POSTGRES_CP_MAX=3
+  echo "using reduced connection pool limits for worker mode"
   # Improve startup times by using a launcher based on fork()
   export SYNAPSE_USE_EXPERIMENTAL_FORKING_LAUNCHER=1
 else

@@ -108,8 +108,44 @@ class UserMediaStatisticsRestServlet(RestServlet):
         users_media, total = await self.store.get_users_media_usage_paginate(
             start, limit, from_ts, until_ts, order_by, direction, search_term
         )
-        ret = {"users": users_media, "total": total}
+        ret = {
+            "users": [
+                {
+                    "user_id": r[0],
+                    "displayname": r[1],
+                    "media_count": r[2],
+                    "media_length": r[3],
+                }
+                for r in users_media
+            ],
+            "total": total,
+        }
         if (start + limit) < total:
             ret["next_token"] = start + len(users_media)
 
         return HTTPStatus.OK, ret
+
+
+class LargestRoomsStatistics(RestServlet):
+    """Get the largest rooms by database size.
+
+    Only works when using PostgreSQL.
+    """
+
+    PATTERNS = admin_patterns("/statistics/database/rooms$")
+
+    def __init__(self, hs: "HomeServer"):
+        self.auth = hs.get_auth()
+        self.stats_controller = hs.get_storage_controllers().stats
+
+    async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
+        await assert_requester_is_admin(self.auth, request)
+
+        room_sizes = await self.stats_controller.get_room_db_size_estimate()
+
+        return HTTPStatus.OK, {
+            "rooms": [
+                {"room_id": room_id, "estimated_size": size}
+                for room_id, size in room_sizes
+            ]
+        }

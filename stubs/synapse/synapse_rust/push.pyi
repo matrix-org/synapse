@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Collection, Dict, Mapping, Optional, Sequence, Set, Tuple, Union
+from typing import Any, Collection, Dict, Mapping, Optional, Sequence, Tuple, Union
 
-from synapse.types import JsonDict
+from synapse.types import JsonDict, JsonValue
 
 class PushRule:
     @property
@@ -46,8 +46,7 @@ class FilteredPushRules:
         msc1767_enabled: bool,
         msc3381_polls_enabled: bool,
         msc3664_enabled: bool,
-        msc3952_intentional_mentions: bool,
-        msc3958_suppress_edits_enabled: bool,
+        msc4028_push_encrypted_events: bool,
     ): ...
     def rules(self) -> Collection[Tuple[PushRule, bool]]: ...
 
@@ -56,14 +55,12 @@ def get_base_rule_ids() -> Collection[str]: ...
 class PushRuleEvaluator:
     def __init__(
         self,
-        flattened_keys: Mapping[str, str],
+        flattened_keys: Mapping[str, JsonValue],
         has_mentions: bool,
-        user_mentions: Set[str],
-        room_mention: bool,
         room_member_count: int,
         sender_power_level: Optional[int],
         notification_power_levels: Mapping[str, int],
-        related_events_flattened: Mapping[str, Mapping[str, str]],
+        related_events_flattened: Mapping[str, Mapping[str, JsonValue]],
         related_event_match_enabled: bool,
         room_version_feature_flags: Tuple[str, ...],
         msc3931_enabled: bool,

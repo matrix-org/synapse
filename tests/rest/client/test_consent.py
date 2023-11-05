@@ -38,7 +38,6 @@ class ConsentResourceTestCase(unittest.HomeserverTestCase):
     hijack_auth = False
 
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
-
         config = self.default_config()
         config["form_secret"] = "123abc"
 

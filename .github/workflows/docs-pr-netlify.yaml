@@ -14,7 +14,7 @@ jobs:
       # There's a 'download artifact' action, but it hasn't been updated for the workflow_run action
       # (https://github.com/actions/download-artifact/issues/60) so instead we get this mess:
       - name: 📥 Download artifact
-        uses: dawidd6/action-download-artifact@bd10f381a96414ce2b13a11bfa89902ba7cea07f # v2.24.3
+        uses: dawidd6/action-download-artifact@268677152d06ba59fcec7a7f0b5d961b6ccd7e1e # v2.28.0
         with:
           workflow: docs-pr.yaml
           run_id: ${{ github.event.workflow_run.id }}
@@ -22,7 +22,7 @@ jobs:
           path: book
 
       - name: 📤 Deploy to Netlify
-        uses: matrix-org/netlify-pr-preview@v1
+        uses: matrix-org/netlify-pr-preview@v2
         with:
           path: book
           owner: ${{ github.event.workflow_run.head_repository.owner.login }}

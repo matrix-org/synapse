@@ -6,13 +6,13 @@
 worker_app: "{{ app }}"
 worker_name: "{{ name }}"
 
-# The replication listener on the main synapse process.
-worker_replication_host: 127.0.0.1
-worker_replication_http_port: 9093
-
 worker_listeners:
   - type: http
+{% if using_unix_sockets %}
+    path: "/run/worker.{{ port }}"
+{% else %}
     port: {{ port }}
+{% endif %}
 {% if listener_resources %}
     resources:
       - names:

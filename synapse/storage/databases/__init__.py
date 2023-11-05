@@ -95,7 +95,7 @@ class Databases(Generic[DataStoreT]):
                     # If we're on a process that can persist events also
                     # instantiate a `PersistEventsStore`
                     if hs.get_instance_name() in hs.config.worker.writers.events:
-                        persist_events = PersistEventsStore(hs, database, main, db_conn)
+                        persist_events = PersistEventsStore(hs, database, main, db_conn)  # type: ignore[arg-type]
 
                 if "state" in database_config.databases:
                     logger.info(
@@ -133,6 +133,6 @@ class Databases(Generic[DataStoreT]):
 
         # We use local variables here to ensure that the databases do not have
         # optional types.
-        self.main = main
+        self.main = main  # type: ignore[assignment]
         self.state = state
         self.persist_events = persist_events

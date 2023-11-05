@@ -129,7 +129,7 @@ class ConsentResource(DirectServeHtmlResource):
             if u is None:
                 raise NotFoundError("Unknown user")
 
-            has_consented = u["consent_version"] == version
+            has_consented = u.consent_version == version
             userhmac = userhmac_bytes.decode("ascii")
 
         try:

@@ -49,6 +49,7 @@ from synapse.api.errors import (
     FederationPullAttemptBackoffError,
     HttpResponseException,
     NotFoundError,
+    PartialStateConflictError,
     RequestSendFailed,
     SynapseError,
 )
@@ -56,9 +57,10 @@ from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion
 from synapse.crypto.event_signing import compute_event_signature
 from synapse.event_auth import validate_event_for_room_version
 from synapse.events import EventBase
-from synapse.events.snapshot import EventContext
+from synapse.events.snapshot import EventContext, UnpersistedEventContextBase
 from synapse.events.validator import EventValidator
 from synapse.federation.federation_client import InvalidResponseError
+from synapse.handlers.pagination import PURGE_PAGINATION_LOCK_NAME
 from synapse.http.servlet import assert_params_in_dict
 from synapse.logging.context import nested_logging_context
 from synapse.logging.opentracing import SynapseTags, set_tag, tag_args, trace
@@ -68,7 +70,6 @@ from synapse.replication.http.federation import (
     ReplicationCleanRoomRestServlet,
     ReplicationStoreRoomOnOutlierMembershipRestServlet,
 )
-from synapse.storage.databases.main.events import PartialStateConflictError
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
 from synapse.types import JsonDict, StrCollection, get_domain_from_id
 from synapse.types.state import StateFilter
@@ -105,13 +106,11 @@ backfill_processing_before_timer = Histogram(
 )
 
 
+# TODO: We can refactor this away now that there is only one backfill point again
 class _BackfillPointType(Enum):
     # a regular backwards extremity (ie, an event which we don't yet have, but which
     # is referred to by other events in the DAG)
     BACKWARDS_EXTREMITY = enum.auto()
-
-    # an MSC2716 "insertion event"
-    INSERTION_PONT = enum.auto()
 
 
 @attr.s(slots=True, auto_attribs=True, frozen=True)
@@ -141,18 +140,20 @@ class FederationHandler:
         self.server_name = hs.hostname
         self.keyring = hs.get_keyring()
         self.is_mine_id = hs.is_mine_id
-        self.spam_checker = hs.get_spam_checker()
+        self.is_mine_server_name = hs.is_mine_server_name
+        self._spam_checker_module_callbacks = hs.get_module_api_callbacks().spam_checker
         self.event_creation_handler = hs.get_event_creation_handler()
         self.event_builder_factory = hs.get_event_builder_factory()
         self._event_auth_handler = hs.get_event_auth_handler()
         self._server_notices_mxid = hs.config.servernotices.server_notices_mxid
         self.config = hs.config
-        self.http_client = hs.get_proxied_blacklisted_http_client()
+        self.http_client = hs.get_proxied_blocklisted_http_client()
         self._replication = hs.get_replication_data_handler()
         self._federation_event_handler = hs.get_federation_event_handler()
         self._device_handler = hs.get_device_handler()
         self._bulk_push_rule_evaluator = hs.get_bulk_push_rule_evaluator()
         self._notifier = hs.get_notifier()
+        self._worker_locks = hs.get_worker_locks_handler()
 
         self._clean_room_for_join_client = ReplicationCleanRoomRestServlet.make_client(
             hs
@@ -169,7 +170,9 @@ class FederationHandler:
 
         self._room_backfill = Linearizer("room_backfill")
 
-        self.third_party_event_rules = hs.get_third_party_event_rules()
+        self._third_party_event_rules = (
+            hs.get_module_api_callbacks().third_party_event_rules
+        )
 
         # Tracks running partial state syncs by room ID.
         # Partial state syncs currently only run on the main process, so it's okay to
@@ -197,8 +200,9 @@ class FederationHandler:
             )
 
     @trace
+    @tag_args
     async def maybe_backfill(
-        self, room_id: str, current_depth: int, limit: int
+        self, room_id: str, current_depth: int, limit: int, record_time: bool = True
     ) -> bool:
         """Checks the database to see if we should backfill before paginating,
         and if so do.
@@ -211,19 +215,28 @@ class FederationHandler:
             limit: The number of events that the pagination request will
                 return. This is used as part of the heuristic to decide if we
                 should back paginate.
+            record_time: Whether to record the time it takes to backfill.
+
+        Returns:
+            True if we actually tried to backfill something, otherwise False.
         """
         # Starting the processing time here so we can include the room backfill
         # linearizer lock queue in the timing
-        processing_start_time = self.clock.time_msec()
+        processing_start_time = self.clock.time_msec() if record_time else 0
 
         async with self._room_backfill.queue(room_id):
-            return await self._maybe_backfill_inner(
-                room_id,
-                current_depth,
-                limit,
-                processing_start_time=processing_start_time,
-            )
+            async with self._worker_locks.acquire_read_write_lock(
+                PURGE_PAGINATION_LOCK_NAME, room_id, write=False
+            ):
+                return await self._maybe_backfill_inner(
+                    room_id,
+                    current_depth,
+                    limit,
+                    processing_start_time=processing_start_time,
+                )
 
+    @trace
+    @tag_args
     async def _maybe_backfill_inner(
         self,
         room_id: str,
@@ -244,6 +257,9 @@ class FederationHandler:
             limit: The max number of events to request from the remote federated server.
             processing_start_time: The time when `maybe_backfill` started processing.
                 Only used for timing. If `None`, no timing observation will be made.
+
+        Returns:
+            True if we actually tried to backfill something, otherwise False.
         """
         backwards_extremities = [
             _BackfillPoint(event_id, depth, _BackfillPointType.BACKWARDS_EXTREMITY)
@@ -261,32 +277,10 @@ class FederationHandler:
             )
         ]
 
-        insertion_events_to_be_backfilled: List[_BackfillPoint] = []
-        if self.hs.config.experimental.msc2716_enabled:
-            insertion_events_to_be_backfilled = [
-                _BackfillPoint(event_id, depth, _BackfillPointType.INSERTION_PONT)
-                for event_id, depth in await self.store.get_insertion_event_backward_extremities_in_room(
-                    room_id=room_id,
-                    current_depth=current_depth,
-                    # We only need to end up with 5 extremities combined with
-                    # the backfill points to make the `/backfill` request ...
-                    # (see the other comment above for more context).
-                    limit=50,
-                )
-            ]
-        logger.debug(
-            "_maybe_backfill_inner: backwards_extremities=%s insertion_events_to_be_backfilled=%s",
-            backwards_extremities,
-            insertion_events_to_be_backfilled,
-        )
-
         # we now have a list of potential places to backpaginate from. We prefer to
         # start with the most recent (ie, max depth), so let's sort the list.
         sorted_backfill_points: List[_BackfillPoint] = sorted(
-            itertools.chain(
-                backwards_extremities,
-                insertion_events_to_be_backfilled,
-            ),
+            backwards_extremities,
             key=lambda e: -int(e.depth),
         )
 
@@ -299,15 +293,39 @@ class FederationHandler:
             len(sorted_backfill_points),
             sorted_backfill_points,
         )
+        set_tag(
+            SynapseTags.RESULT_PREFIX + "sorted_backfill_points",
+            str(sorted_backfill_points),
+        )
+        set_tag(
+            SynapseTags.RESULT_PREFIX + "sorted_backfill_points.length",
+            str(len(sorted_backfill_points)),
+        )
 
-        # If we have no backfill points lower than the `current_depth` then
-        # either we can a) bail or b) still attempt to backfill. We opt to try
-        # backfilling anyway just in case we do get relevant events.
+        # If we have no backfill points lower than the `current_depth` then either we
+        # can a) bail or b) still attempt to backfill. We opt to try backfilling anyway
+        # just in case we do get relevant events. This is good for eventual consistency
+        # sake but we don't need to block the client for something that is just as
+        # likely not to return anything relevant so we backfill in the background. The
+        # only way, this could return something relevant is if we discover a new branch
+        # of history that extends all the way back to where we are currently paginating
+        # and it's within the 100 events that are returned from `/backfill`.
         if not sorted_backfill_points and current_depth != MAX_DEPTH:
+            # Check that we actually have later backfill points, if not just return.
+            have_later_backfill_points = await self.store.get_backfill_points_in_room(
+                room_id=room_id,
+                current_depth=MAX_DEPTH,
+                limit=1,
+            )
+            if not have_later_backfill_points:
+                return False
+
             logger.debug(
                 "_maybe_backfill_inner: all backfill points are *after* current depth. Trying again with later backfill points."
             )
-            return await self._maybe_backfill_inner(
+            run_as_background_process(
+                "_maybe_backfill_inner_anyway_with_max_depth",
+                self.maybe_backfill,
                 room_id=room_id,
                 # We use `MAX_DEPTH` so that we find all backfill points next
                 # time (all events are below the `MAX_DEPTH`)
@@ -316,8 +334,11 @@ class FederationHandler:
                 # We don't want to start another timing observation from this
                 # nested recursive call. The top-most call can record the time
                 # overall otherwise the smaller one will throw off the results.
-                processing_start_time=None,
+                record_time=False,
             )
+            # We return `False` because we're backfilling in the background and there is
+            # no new events immediately for the caller to know about yet.
+            return False
 
         # Even after recursing with `MAX_DEPTH`, we didn't find any
         # backward extremities to backfill from.
@@ -381,10 +402,7 @@ class FederationHandler:
             #   event but not anything before it. This would require looking at the
             #   state *before* the event, ignoring the special casing certain event
             #   types have.
-            if bp.type == _BackfillPointType.INSERTION_PONT:
-                event_ids_to_check = [bp.event_id]
-            else:
-                event_ids_to_check = await self.store.get_successor_events(bp.event_id)
+            event_ids_to_check = await self.store.get_successor_events(bp.event_id)
 
             events_to_check = await self.store.get_events_as_list(
                 event_ids_to_check,
@@ -392,7 +410,7 @@ class FederationHandler:
                 get_prev_content=False,
             )
 
-            # We set `check_history_visibility_only` as we might otherwise get false
+            # We unset `filter_out_erased_senders` as we might otherwise get false
             # positives from users having been erased.
             filtered_extremities = await filter_events_for_server(
                 self._storage_controllers,
@@ -400,7 +418,8 @@ class FederationHandler:
                 self.server_name,
                 events_to_check,
                 redact=False,
-                check_history_visibility_only=True,
+                filter_out_erased_senders=False,
+                filter_out_remote_partial_state_events=False,
             )
             if filtered_extremities:
                 extremities_to_request.append(bp.event_id)
@@ -450,7 +469,7 @@ class FederationHandler:
 
             for dom in domains:
                 # We don't want to ask our own server for information we don't have
-                if dom == self.server_name:
+                if self.is_mine_server_name(dom):
                     continue
 
                 try:
@@ -849,19 +868,10 @@ class FederationHandler:
         # This is a bit of a hack and is cribbing off of invites. Basically we
         # store the room state here and retrieve it again when this event appears
         # in the invitee's sync stream. It is stripped out for all other local users.
-        stripped_room_state = (
-            knock_response.get("knock_room_state")
-            # Since v1.37, Synapse incorrectly used "knock_state_events" for this field.
-            # Thus, we also check for a 'knock_state_events' to support old instances.
-            # See https://github.com/matrix-org/synapse/issues/14088.
-            or knock_response.get("knock_state_events")
-        )
+        stripped_room_state = knock_response.get("knock_room_state")
 
         if stripped_room_state is None:
-            raise KeyError(
-                "Missing 'knock_room_state' (or legacy 'knock_state_events') field in "
-                "send_knock response"
-            )
+            raise KeyError("Missing 'knock_room_state' field in send_knock response")
 
         event.unsigned["knock_room_state"] = stripped_room_state
 
@@ -952,7 +962,20 @@ class FederationHandler:
         #
         # Note that this requires the /send_join request to come back to the
         # same server.
-        if room_version.msc3083_join_rules:
+        prev_event_ids = None
+        if room_version.restricted_join_rule:
+            # Note that the room's state can change out from under us and render our
+            # nice join rules-conformant event non-conformant by the time we build the
+            # event. When this happens, our validation at the end fails and we respond
+            # to the requesting server with a 403, which is misleading — it indicates
+            # that the user is not allowed to join the room and the joining server
+            # should not bother retrying via this homeserver or any others, when
+            # in fact we've just messed up with building the event.
+            #
+            # To reduce the likelihood of this race, we capture the forward extremities
+            # of the room (prev_event_ids) just before fetching the current state, and
+            # hope that the state we fetch corresponds to the prev events we chose.
+            prev_event_ids = await self.store.get_prev_events_for_room(room_id)
             state_ids = await self._state_storage_controller.get_current_state_ids(
                 room_id
             )
@@ -990,15 +1013,21 @@ class FederationHandler:
         )
 
         try:
-            event, context = await self.event_creation_handler.create_new_client_event(
-                builder=builder
+            (
+                event,
+                unpersisted_context,
+            ) = await self.event_creation_handler.create_new_client_event(
+                builder=builder,
+                prev_event_ids=prev_event_ids,
             )
         except SynapseError as e:
             logger.warning("Failed to create join to %s because %s", room_id, e)
             raise
 
         # Ensure the user can even join the room.
-        await self._federation_event_handler.check_join_restrictions(context, event)
+        await self._federation_event_handler.check_join_restrictions(
+            unpersisted_context, event
+        )
 
         # The remote hasn't signed it yet, obviously. We'll do the full checks
         # when we get the event back in `on_send_join_request`
@@ -1022,7 +1051,7 @@ class FederationHandler:
         if self.hs.config.server.block_non_admin_invites:
             raise SynapseError(403, "This server does not accept room invites")
 
-        spam_check = await self.spam_checker.user_may_invite(
+        spam_check = await self._spam_checker_module_callbacks.user_may_invite(
             event.sender, event.state_key, event.room_id
         )
         if spam_check != NOT_SPAM:
@@ -1178,7 +1207,7 @@ class FederationHandler:
             },
         )
 
-        event, context = await self.event_creation_handler.create_new_client_event(
+        event, _ = await self.event_creation_handler.create_new_client_event(
             builder=builder
         )
 
@@ -1228,12 +1257,13 @@ class FederationHandler:
             },
         )
 
-        event, context = await self.event_creation_handler.create_new_client_event(
-            builder=builder
-        )
+        (
+            event,
+            unpersisted_context,
+        ) = await self.event_creation_handler.create_new_client_event(builder=builder)
 
-        event_allowed, _ = await self.third_party_event_rules.check_event_allowed(
-            event, context
+        event_allowed, _ = await self._third_party_event_rules.check_event_allowed(
+            event, unpersisted_context
         )
         if not event_allowed:
             logger.warning("Creation of knock %s forbidden by third-party rules", event)
@@ -1311,7 +1341,13 @@ class FederationHandler:
         )
 
         events = await filter_events_for_server(
-            self._storage_controllers, origin, self.server_name, events
+            self._storage_controllers,
+            origin,
+            self.server_name,
+            events,
+            redact=True,
+            filter_out_erased_senders=True,
+            filter_out_remote_partial_state_events=True,
         )
 
         return events
@@ -1342,7 +1378,13 @@ class FederationHandler:
         await self._event_auth_handler.assert_host_in_room(event.room_id, origin)
 
         events = await filter_events_for_server(
-            self._storage_controllers, origin, self.server_name, [event]
+            self._storage_controllers,
+            origin,
+            self.server_name,
+            [event],
+            redact=True,
+            filter_out_erased_senders=True,
+            filter_out_remote_partial_state_events=True,
         )
         event = events[0]
         return event
@@ -1370,7 +1412,13 @@ class FederationHandler:
         )
 
         missing_events = await filter_events_for_server(
-            self._storage_controllers, origin, self.server_name, missing_events
+            self._storage_controllers,
+            origin,
+            self.server_name,
+            missing_events,
+            redact=True,
+            filter_out_erased_senders=True,
+            filter_out_remote_partial_state_events=True,
         )
 
         return missing_events
@@ -1406,14 +1454,19 @@ class FederationHandler:
                 try:
                     (
                         event,
-                        context,
+                        unpersisted_context,
                     ) = await self.event_creation_handler.create_new_client_event(
                         builder=builder
                     )
 
-                    event, context = await self.add_display_name_to_third_party_invite(
-                        room_version_obj, event_dict, event, context
+                    (
+                        event,
+                        unpersisted_context,
+                    ) = await self.add_display_name_to_third_party_invite(
+                        room_version_obj, event_dict, event, unpersisted_context
                     )
+
+                    context = await unpersisted_context.persist(event)
 
                     EventValidator().validate_new(event, self.config)
 
@@ -1444,7 +1497,6 @@ class FederationHandler:
                     # in the meantime and context needs to be recomputed, so let's do so.
                     if i == max_retries - 1:
                         raise e
-                    pass
         else:
             destinations = {x.split(":", 1)[-1] for x in (sender_user_id, room_id)}
 
@@ -1483,13 +1535,18 @@ class FederationHandler:
             try:
                 (
                     event,
-                    context,
+                    unpersisted_context,
                 ) = await self.event_creation_handler.create_new_client_event(
                     builder=builder
                 )
-                event, context = await self.add_display_name_to_third_party_invite(
-                    room_version_obj, event_dict, event, context
+                (
+                    event,
+                    unpersisted_context,
+                ) = await self.add_display_name_to_third_party_invite(
+                    room_version_obj, event_dict, event, unpersisted_context
                 )
+
+                context = await unpersisted_context.persist(event)
 
                 try:
                     validate_event_for_room_version(event)
@@ -1515,23 +1572,20 @@ class FederationHandler:
                 # in the meantime and context needs to be recomputed, so let's do so.
                 if i == max_retries - 1:
                     raise e
-                pass
 
     async def add_display_name_to_third_party_invite(
         self,
         room_version_obj: RoomVersion,
         event_dict: JsonDict,
         event: EventBase,
-        context: EventContext,
-    ) -> Tuple[EventBase, EventContext]:
+        context: UnpersistedEventContextBase,
+    ) -> Tuple[EventBase, UnpersistedEventContextBase]:
         key = (
             EventTypes.ThirdPartyInvite,
             event.content["third_party_invite"]["signed"]["token"],
         )
         original_invite = None
-        prev_state_ids = await context.get_prev_state_ids(
-            StateFilter.from_types([(EventTypes.ThirdPartyInvite, None)])
-        )
+        prev_state_ids = await context.get_prev_state_ids(StateFilter.from_types([key]))
         original_invite_id = prev_state_ids.get(key)
         if original_invite_id:
             original_invite = await self.store.get_event(
@@ -1557,11 +1611,14 @@ class FederationHandler:
             room_version_obj, event_dict
         )
         EventValidator().validate_builder(builder)
-        event, context = await self.event_creation_handler.create_new_client_event(
-            builder=builder
-        )
+
+        (
+            event,
+            unpersisted_context,
+        ) = await self.event_creation_handler.create_new_client_event(builder=builder)
+
         EventValidator().validate_new(event, self.config)
-        return event, context
+        return event, unpersisted_context
 
     async def _check_signature(self, event: EventBase, context: EventContext) -> None:
         """
@@ -1581,7 +1638,7 @@ class FederationHandler:
         token = signed["token"]
 
         prev_state_ids = await context.get_prev_state_ids(
-            StateFilter.from_types([(EventTypes.ThirdPartyInvite, None)])
+            StateFilter.from_types([(EventTypes.ThirdPartyInvite, token)])
         )
         invite_event_id = prev_state_ids.get((EventTypes.ThirdPartyInvite, token))
 
@@ -1861,6 +1918,11 @@ class FederationHandler:
                 logger.info("Updating current state for %s", room_id)
                 # TODO(faster_joins): notify workers in notify_room_un_partial_stated
                 #   https://github.com/matrix-org/synapse/issues/12994
+                #
+                # NB: there's a potential race here. If room is purged just before we
+                # call this, we _might_ end up inserting rows into current_state_events.
+                # (The logic is hard to chase through.) We think this is fine, but if
+                # not the HS admin should purge the room again.
                 await self.state_handler.update_current_state(room_id)
 
                 logger.info("Handling any pending device list updates")
@@ -1892,27 +1954,25 @@ class FederationHandler:
             )
             for event in events:
                 for attempt in itertools.count():
+                    # We try a new destination on every iteration.
                     try:
-                        await self._federation_event_handler.update_state_for_partial_state_event(
-                            destination, event
-                        )
-                        break
-                    except FederationPullAttemptBackoffError as exc:
-                        # Log a warning about why we failed to process the event (the error message
-                        # for `FederationPullAttemptBackoffError` is pretty good)
-                        logger.warning("_sync_partial_state_room: %s", exc)
-                        # We do not record a failed pull attempt when we backoff fetching a missing
-                        # `prev_event` because not being able to fetch the `prev_events` just means
-                        # we won't be able to de-outlier the pulled event. But we can still use an
-                        # `outlier` in the state/auth chain for another event. So we shouldn't stop
-                        # a downstream event from trying to pull it.
-                        #
-                        # This avoids a cascade of backoff for all events in the DAG downstream from
-                        # one event backoff upstream.
-                    except FederationError as e:
-                        # TODO: We should `record_event_failed_pull_attempt` here,
-                        #   see https://github.com/matrix-org/synapse/issues/13700
+                        while True:
+                            try:
+                                await self._federation_event_handler.update_state_for_partial_state_event(
+                                    destination, event
+                                )
+                                break
+                            except FederationPullAttemptBackoffError as e:
+                                # We are in the backoff period for one of the event's
+                                # prev_events. Wait it out and try again after.
+                                logger.warning(
+                                    "%s; waiting for %d ms...", e, e.retry_after_ms
+                                )
+                                await self.clock.sleep(e.retry_after_ms / 1000)
 
+                        # Success, no need to try the rest of the destinations.
+                        break
+                    except FederationError as e:
                         if attempt == len(destinations) - 1:
                             # We have tried every remote server for this event. Give up.
                             # TODO(faster_joins) giving up isn't the right thing to do
@@ -1929,6 +1989,8 @@ class FederationHandler:
                                 destination,
                                 e,
                             )
+                            # TODO: We should `record_event_failed_pull_attempt` here,
+                            #   see https://github.com/matrix-org/synapse/issues/13700
                             raise
 
                         # Try the next remote server.

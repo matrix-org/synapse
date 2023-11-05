@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import re
-from typing import Any, Dict, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple, cast
 from unittest import mock
 from unittest.mock import Mock, patch
 
@@ -25,6 +25,11 @@ from synapse.rest.client import login, register, room
 from synapse.server import HomeServer
 from synapse.storage import DataStore
 from synapse.storage.background_updates import _BackgroundUpdateHandler
+from synapse.storage.databases.main import user_directory
+from synapse.storage.databases.main.user_directory import (
+    _parse_words_with_icu,
+    _parse_words_with_regex,
+)
 from synapse.storage.roommember import ProfileInfo
 from synapse.util import Clock
 
@@ -42,7 +47,7 @@ ALICE = "@alice:a"
 BOB = "@bob:b"
 BOBBY = "@bobby:a"
 # The localpart isn't 'Bela' on purpose so we can test looking up display names.
-BELA = "@somenickname:a"
+BELA = "@somenickname:example.org"
 
 
 class GetUserDirectoryTables:
@@ -57,14 +62,13 @@ class GetUserDirectoryTables:
         Returns a list of tuples (user_id, room_id) where room_id is public and
         contains the user with the given id.
         """
-        r = await self.store.db_pool.simple_select_list(
-            "users_in_public_rooms", None, ("user_id", "room_id")
+        r = cast(
+            List[Tuple[str, str]],
+            await self.store.db_pool.simple_select_list(
+                "users_in_public_rooms", None, ("user_id", "room_id")
+            ),
         )
-
-        retval = set()
-        for i in r:
-            retval.add((i["user_id"], i["room_id"]))
-        return retval
+        return set(r)
 
     async def get_users_who_share_private_rooms(self) -> Set[Tuple[str, str, str]]:
         """Fetch the entire `users_who_share_private_rooms` table.
@@ -73,27 +77,30 @@ class GetUserDirectoryTables:
         to the rows of `users_who_share_private_rooms`.
         """
 
-        rows = await self.store.db_pool.simple_select_list(
-            "users_who_share_private_rooms",
-            None,
-            ["user_id", "other_user_id", "room_id"],
+        rows = cast(
+            List[Tuple[str, str, str]],
+            await self.store.db_pool.simple_select_list(
+                "users_who_share_private_rooms",
+                None,
+                ["user_id", "other_user_id", "room_id"],
+            ),
         )
-        rv = set()
-        for row in rows:
-            rv.add((row["user_id"], row["other_user_id"], row["room_id"]))
-        return rv
+        return set(rows)
 
     async def get_users_in_user_directory(self) -> Set[str]:
         """Fetch the set of users in the `user_directory` table.
 
         This is useful when checking we've correctly excluded users from the directory.
         """
-        result = await self.store.db_pool.simple_select_list(
-            "user_directory",
-            None,
-            ["user_id"],
+        result = cast(
+            List[Tuple[str]],
+            await self.store.db_pool.simple_select_list(
+                "user_directory",
+                None,
+                ["user_id"],
+            ),
         )
-        return {row["user_id"] for row in result}
+        return {row[0] for row in result}
 
     async def get_profiles_in_user_directory(self) -> Dict[str, ProfileInfo]:
         """Fetch users and their profiles from the `user_directory` table.
@@ -102,16 +109,17 @@ class GetUserDirectoryTables:
         It's almost the entire contents of the `user_directory` table: the only
         thing missing is an unused room_id column.
         """
-        rows = await self.store.db_pool.simple_select_list(
-            "user_directory",
-            None,
-            ("user_id", "display_name", "avatar_url"),
+        rows = cast(
+            List[Tuple[str, Optional[str], Optional[str]]],
+            await self.store.db_pool.simple_select_list(
+                "user_directory",
+                None,
+                ("user_id", "display_name", "avatar_url"),
+            ),
         )
         return {
-            row["user_id"]: ProfileInfo(
-                display_name=row["display_name"], avatar_url=row["avatar_url"]
-            )
-            for row in rows
+            user_id: ProfileInfo(display_name=display_name, avatar_url=avatar_url)
+            for user_id, display_name, avatar_url in rows
         }
 
     async def get_tables(
@@ -423,6 +431,8 @@ class UserDirectoryInitialPopulationTestcase(HomeserverTestCase):
 
 
 class UserDirectoryStoreTestCase(HomeserverTestCase):
+    use_icu = False
+
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.store = hs.get_datastores().main
 
@@ -433,6 +443,12 @@ class UserDirectoryStoreTestCase(HomeserverTestCase):
         self.get_success(self.store.update_profile_in_user_dir(BOBBY, "bobby", None))
         self.get_success(self.store.update_profile_in_user_dir(BELA, "Bela", None))
         self.get_success(self.store.add_users_in_public_rooms("!room:id", (ALICE, BOB)))
+
+        self._restore_use_icu = user_directory.USE_ICU
+        user_directory.USE_ICU = self.use_icu
+
+    def tearDown(self) -> None:
+        user_directory.USE_ICU = self._restore_use_icu
 
     def test_search_user_dir(self) -> None:
         # normally when alice searches the directory she should just find
@@ -478,6 +494,159 @@ class UserDirectoryStoreTestCase(HomeserverTestCase):
             {"user_id": BELA, "display_name": "Bela", "avatar_url": None},
         )
 
+    @override_config({"user_directory": {"search_all_users": True}})
+    def test_search_user_dir_start_of_user_id(self) -> None:
+        """Tests that a user can look up another user by searching for the start
+        of their user ID.
+        """
+        r = self.get_success(self.store.search_user_dir(ALICE, "somenickname:exa", 10))
+        self.assertFalse(r["limited"])
+        self.assertEqual(1, len(r["results"]))
+        self.assertDictEqual(
+            r["results"][0],
+            {"user_id": BELA, "display_name": "Bela", "avatar_url": None},
+        )
+
+    @override_config({"user_directory": {"search_all_users": True}})
+    def test_search_user_dir_ascii_case_insensitivity(self) -> None:
+        """Tests that a user can look up another user by searching for their name in a
+        different case.
+        """
+        CHARLIE = "@someuser:example.org"
+        self.get_success(
+            self.store.update_profile_in_user_dir(CHARLIE, "Charlie", None)
+        )
+
+        r = self.get_success(self.store.search_user_dir(ALICE, "cHARLIE", 10))
+        self.assertFalse(r["limited"])
+        self.assertEqual(1, len(r["results"]))
+        self.assertDictEqual(
+            r["results"][0],
+            {"user_id": CHARLIE, "display_name": "Charlie", "avatar_url": None},
+        )
+
+    @override_config({"user_directory": {"search_all_users": True}})
+    def test_search_user_dir_unicode_case_insensitivity(self) -> None:
+        """Tests that a user can look up another user by searching for their name in a
+        different case.
+        """
+        IVAN = "@someuser:example.org"
+        self.get_success(self.store.update_profile_in_user_dir(IVAN, "Иван", None))
+
+        r = self.get_success(self.store.search_user_dir(ALICE, "иВАН", 10))
+        self.assertFalse(r["limited"])
+        self.assertEqual(1, len(r["results"]))
+        self.assertDictEqual(
+            r["results"][0],
+            {"user_id": IVAN, "display_name": "Иван", "avatar_url": None},
+        )
+
+    @override_config({"user_directory": {"search_all_users": True}})
+    def test_search_user_dir_dotted_dotless_i_case_insensitivity(self) -> None:
+        """Tests that a user can look up another user by searching for their name in a
+        different case, when their name contains dotted or dotless "i"s.
+
+        Some languages have dotted and dotless versions of "i", which are considered to
+        be different letters: i <-> İ, ı <-> I. To make things difficult, they reuse the
+        ASCII "i" and "I" code points, despite having different lowercase / uppercase
+        forms.
+        """
+        USER = "@someuser:example.org"
+
+        expected_matches = [
+            # (search_term, display_name)
+            # A search for "i" should match "İ".
+            ("iiiii", "İİİİİ"),
+            # A search for "I" should match "ı".
+            ("IIIII", "ııııı"),
+            # A search for "ı" should match "I".
+            ("ııııı", "IIIII"),
+            # A search for "İ" should match "i".
+            ("İİİİİ", "iiiii"),
+        ]
+
+        for search_term, display_name in expected_matches:
+            self.get_success(
+                self.store.update_profile_in_user_dir(USER, display_name, None)
+            )
+
+            r = self.get_success(self.store.search_user_dir(ALICE, search_term, 10))
+            self.assertFalse(r["limited"])
+            self.assertEqual(
+                1,
+                len(r["results"]),
+                f"searching for {search_term!r} did not match {display_name!r}",
+            )
+            self.assertDictEqual(
+                r["results"][0],
+                {"user_id": USER, "display_name": display_name, "avatar_url": None},
+            )
+
+        # We don't test for negative matches, to allow implementations that consider all
+        # the i variants to be the same.
+
+    test_search_user_dir_dotted_dotless_i_case_insensitivity.skip = "not supported"  # type: ignore
+
+    @override_config({"user_directory": {"search_all_users": True}})
+    def test_search_user_dir_unicode_normalization(self) -> None:
+        """Tests that a user can look up another user by searching for their name with
+        either composed or decomposed accents.
+        """
+        AMELIE = "@someuser:example.org"
+
+        expected_matches = [
+            # (search_term, display_name)
+            ("Ame\u0301lie", "Amélie"),
+            ("Amélie", "Ame\u0301lie"),
+        ]
+
+        for search_term, display_name in expected_matches:
+            self.get_success(
+                self.store.update_profile_in_user_dir(AMELIE, display_name, None)
+            )
+
+            r = self.get_success(self.store.search_user_dir(ALICE, search_term, 10))
+            self.assertFalse(r["limited"])
+            self.assertEqual(
+                1,
+                len(r["results"]),
+                f"searching for {search_term!r} did not match {display_name!r}",
+            )
+            self.assertDictEqual(
+                r["results"][0],
+                {"user_id": AMELIE, "display_name": display_name, "avatar_url": None},
+            )
+
+    @override_config({"user_directory": {"search_all_users": True}})
+    def test_search_user_dir_accent_insensitivity(self) -> None:
+        """Tests that a user can look up another user by searching for their name
+        without any accents.
+        """
+        AMELIE = "@someuser:example.org"
+        self.get_success(self.store.update_profile_in_user_dir(AMELIE, "Amélie", None))
+
+        r = self.get_success(self.store.search_user_dir(ALICE, "amelie", 10))
+        self.assertFalse(r["limited"])
+        self.assertEqual(1, len(r["results"]))
+        self.assertDictEqual(
+            r["results"][0],
+            {"user_id": AMELIE, "display_name": "Amélie", "avatar_url": None},
+        )
+
+        # It may be desirable for "é"s in search terms to not match plain "e"s and we
+        # really don't want "é"s in search terms to match "e"s with different accents.
+        # But we don't test for this to allow implementations that consider all
+        # "e"-lookalikes to be the same.
+
+    test_search_user_dir_accent_insensitivity.skip = "not supported yet"  # type: ignore
+
+
+class UserDirectoryStoreTestCaseWithIcu(UserDirectoryStoreTestCase):
+    use_icu = True
+
+    if not icu:
+        skip = "Requires PyICU"
+
 
 class UserDirectoryICUTestCase(HomeserverTestCase):
     if not icu:
@@ -512,4 +681,34 @@ class UserDirectoryICUTestCase(HomeserverTestCase):
         self.assertDictEqual(
             r["results"][0],
             {"user_id": ALICE, "display_name": display_name, "avatar_url": None},
+        )
+
+    def test_icu_word_boundary_punctuation(self) -> None:
+        """
+        Tests the behaviour of punctuation with the ICU tokeniser.
+
+        Seems to depend on underlying version of ICU.
+        """
+
+        # Note: either tokenisation is fine, because Postgres actually splits
+        # words itself afterwards.
+        self.assertIn(
+            _parse_words_with_icu("lazy'fox jumped:over the.dog"),
+            (
+                # ICU 66 on Ubuntu 20.04
+                ["lazy'fox", "jumped", "over", "the", "dog"],
+                # ICU 70 on Ubuntu 22.04
+                ["lazy'fox", "jumped:over", "the.dog"],
+                # pyicu 2.10.2 on Alpine edge / macOS
+                ["lazy'fox", "jumped", "over", "the.dog"],
+            ),
+        )
+
+    def test_regex_word_boundary_punctuation(self) -> None:
+        """
+        Tests the behaviour of punctuation with the non-ICU tokeniser
+        """
+        self.assertEqual(
+            _parse_words_with_regex("lazy'fox jumped:over the.dog"),
+            ["lazy", "fox", "jumped", "over", "the", "dog"],
         )

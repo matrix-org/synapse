@@ -11,8 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-from unittest.mock import Mock
+import logging
+from typing import List, Tuple, cast
+from unittest.mock import AsyncMock, Mock
 
 import yaml
 
@@ -20,12 +21,18 @@ from twisted.internet.defer import Deferred, ensureDeferred
 from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.server import HomeServer
-from synapse.storage.background_updates import BackgroundUpdater
+from synapse.storage.background_updates import (
+    BackgroundUpdater,
+    ForeignKeyConstraint,
+    NotNullConstraint,
+    run_validate_constraint_and_delete_rows_schema_delta,
+)
+from synapse.storage.database import LoggingTransaction
+from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 from synapse.types import JsonDict
 from synapse.util import Clock
 
 from tests import unittest
-from tests.test_utils import make_awaitable, simple_async_mock
 from tests.unittest import override_config
 
 
@@ -324,6 +331,28 @@ class BackgroundUpdateTestCase(unittest.HomeserverTestCase):
         self.update_handler.side_effect = update_short
         self.get_success(self.updates.do_next_background_update(False))
 
+    def test_failed_update_logs_exception_details(self) -> None:
+        needle = "RUH ROH RAGGY"
+
+        def failing_update(progress: JsonDict, count: int) -> int:
+            raise Exception(needle)
+
+        self.update_handler.side_effect = failing_update
+        self.update_handler.reset_mock()
+
+        self.get_success(
+            self.store.db_pool.simple_insert(
+                "background_updates",
+                values={"update_name": "test_update", "progress_json": "{}"},
+            )
+        )
+
+        with self.assertLogs(level=logging.ERROR) as logs:
+            # Expect a back-to-back RuntimeError to be raised
+            self.get_failure(self.updates.run_background_updates(False), RuntimeError)
+
+        self.assertTrue(any(needle in log for log in logs.output), logs.output)
+
 
 class BackgroundUpdateControllerTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
@@ -341,8 +370,8 @@ class BackgroundUpdateControllerTestCase(unittest.HomeserverTestCase):
 
         # Mock out the AsyncContextManager
         class MockCM:
-            __aenter__ = simple_async_mock(return_value=None)
-            __aexit__ = simple_async_mock(return_value=None)
+            __aenter__ = AsyncMock(return_value=None)
+            __aexit__ = AsyncMock(return_value=None)
 
         self._update_ctx_manager = MockCM
 
@@ -356,9 +385,9 @@ class BackgroundUpdateControllerTestCase(unittest.HomeserverTestCase):
         # Register the callbacks with more mocks
         self.hs.get_module_api().register_background_update_controller_callbacks(
             on_update=self._on_update,
-            min_batch_size=Mock(return_value=make_awaitable(self._default_batch_size)),
-            default_batch_size=Mock(
-                return_value=make_awaitable(self._default_batch_size),
+            min_batch_size=AsyncMock(return_value=self._default_batch_size),
+            default_batch_size=AsyncMock(
+                return_value=self._default_batch_size,
             ),
         )
 
@@ -404,3 +433,231 @@ class BackgroundUpdateControllerTestCase(unittest.HomeserverTestCase):
         self.pump()
         self._update_ctx_manager.__aexit__.assert_called()
         self.get_success(do_update_d)
+
+
+class BackgroundUpdateValidateConstraintTestCase(unittest.HomeserverTestCase):
+    """Tests the validate contraint and delete background handlers."""
+
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
+        self.updates: BackgroundUpdater = self.hs.get_datastores().main.db_pool.updates
+        # the base test class should have run the real bg updates for us
+        self.assertTrue(
+            self.get_success(self.updates.has_completed_background_updates())
+        )
+
+        self.store = self.hs.get_datastores().main
+
+    def test_not_null_constraint(self) -> None:
+        # Create the initial tables, where we have some invalid data.
+        """Tests adding a not null constraint."""
+        table_sql = """
+            CREATE TABLE test_constraint(
+                a INT PRIMARY KEY,
+                b INT
+            );
+        """
+        self.get_success(
+            self.store.db_pool.runInteraction(
+                "test_not_null_constraint", lambda txn: txn.execute(table_sql)
+            )
+        )
+
+        # We add an index so that we can check that its correctly recreated when
+        # using SQLite.
+        index_sql = "CREATE INDEX test_index ON test_constraint(a)"
+        self.get_success(
+            self.store.db_pool.runInteraction(
+                "test_not_null_constraint", lambda txn: txn.execute(index_sql)
+            )
+        )
+
+        self.get_success(
+            self.store.db_pool.simple_insert("test_constraint", {"a": 1, "b": 1})
+        )
+        self.get_success(
+            self.store.db_pool.simple_insert("test_constraint", {"a": 2, "b": None})
+        )
+        self.get_success(
+            self.store.db_pool.simple_insert("test_constraint", {"a": 3, "b": 3})
+        )
+
+        # Now lets do the migration
+
+        table2_sqlite = """
+            CREATE TABLE test_constraint2(
+                a INT PRIMARY KEY,
+                b INT,
+                CONSTRAINT test_constraint_name CHECK (b is NOT NULL)
+            );
+        """
+
+        def delta(txn: LoggingTransaction) -> None:
+            run_validate_constraint_and_delete_rows_schema_delta(
+                txn,
+                ordering=1000,
+                update_name="test_bg_update",
+                table="test_constraint",
+                constraint_name="test_constraint_name",
+                constraint=NotNullConstraint("b"),
+                sqlite_table_name="test_constraint2",
+                sqlite_table_schema=table2_sqlite,
+            )
+
+        self.get_success(
+            self.store.db_pool.runInteraction(
+                "test_not_null_constraint",
+                delta,
+            )
+        )
+
+        if isinstance(self.store.database_engine, PostgresEngine):
+            # Postgres uses a background update
+            self.updates.register_background_validate_constraint_and_delete_rows(
+                "test_bg_update",
+                table="test_constraint",
+                constraint_name="test_constraint_name",
+                constraint=NotNullConstraint("b"),
+                unique_columns=["a"],
+            )
+
+            # Tell the DataStore that it hasn't finished all updates yet
+            self.store.db_pool.updates._all_done = False
+
+            # Now let's actually drive the updates to completion
+            self.wait_for_background_updates()
+
+        # Check the correct values are in the new table.
+        rows = cast(
+            List[Tuple[int, int]],
+            self.get_success(
+                self.store.db_pool.simple_select_list(
+                    table="test_constraint",
+                    keyvalues={},
+                    retcols=("a", "b"),
+                )
+            ),
+        )
+
+        self.assertCountEqual(rows, [(1, 1), (3, 3)])
+
+        # And check that invalid rows get correctly rejected.
+        self.get_failure(
+            self.store.db_pool.simple_insert("test_constraint", {"a": 2, "b": None}),
+            exc=self.store.database_engine.module.IntegrityError,
+        )
+
+        # Check the index is still there for SQLite.
+        if isinstance(self.store.database_engine, Sqlite3Engine):
+            # Ensure the index exists in the schema.
+            self.get_success(
+                self.store.db_pool.simple_select_one_onecol(
+                    table="sqlite_master",
+                    keyvalues={"tbl_name": "test_constraint"},
+                    retcol="name",
+                )
+            )
+
+    def test_foreign_constraint(self) -> None:
+        """Tests adding a not foreign key constraint."""
+
+        # Create the initial tables, where we have some invalid data.
+        base_sql = """
+            CREATE TABLE base_table(
+                b INT PRIMARY KEY
+            );
+        """
+
+        table_sql = """
+            CREATE TABLE test_constraint(
+                a INT PRIMARY KEY,
+                b INT NOT NULL
+            );
+        """
+        self.get_success(
+            self.store.db_pool.runInteraction(
+                "test_foreign_key_constraint", lambda txn: txn.execute(base_sql)
+            )
+        )
+        self.get_success(
+            self.store.db_pool.runInteraction(
+                "test_foreign_key_constraint", lambda txn: txn.execute(table_sql)
+            )
+        )
+
+        self.get_success(self.store.db_pool.simple_insert("base_table", {"b": 1}))
+        self.get_success(
+            self.store.db_pool.simple_insert("test_constraint", {"a": 1, "b": 1})
+        )
+        self.get_success(
+            self.store.db_pool.simple_insert("test_constraint", {"a": 2, "b": 2})
+        )
+        self.get_success(self.store.db_pool.simple_insert("base_table", {"b": 3}))
+        self.get_success(
+            self.store.db_pool.simple_insert("test_constraint", {"a": 3, "b": 3})
+        )
+
+        table2_sqlite = """
+            CREATE TABLE test_constraint2(
+                a INT PRIMARY KEY,
+                b INT NOT NULL,
+                CONSTRAINT test_constraint_name FOREIGN KEY (b) REFERENCES base_table (b)
+            );
+        """
+
+        def delta(txn: LoggingTransaction) -> None:
+            run_validate_constraint_and_delete_rows_schema_delta(
+                txn,
+                ordering=1000,
+                update_name="test_bg_update",
+                table="test_constraint",
+                constraint_name="test_constraint_name",
+                constraint=ForeignKeyConstraint(
+                    "base_table", [("b", "b")], deferred=False
+                ),
+                sqlite_table_name="test_constraint2",
+                sqlite_table_schema=table2_sqlite,
+            )
+
+        self.get_success(
+            self.store.db_pool.runInteraction(
+                "test_foreign_key_constraint",
+                delta,
+            )
+        )
+
+        if isinstance(self.store.database_engine, PostgresEngine):
+            # Postgres uses a background update
+            self.updates.register_background_validate_constraint_and_delete_rows(
+                "test_bg_update",
+                table="test_constraint",
+                constraint_name="test_constraint_name",
+                constraint=ForeignKeyConstraint(
+                    "base_table", [("b", "b")], deferred=False
+                ),
+                unique_columns=["a"],
+            )
+
+            # Tell the DataStore that it hasn't finished all updates yet
+            self.store.db_pool.updates._all_done = False
+
+            # Now let's actually drive the updates to completion
+            self.wait_for_background_updates()
+
+        # Check the correct values are in the new table.
+        rows = cast(
+            List[Tuple[int, int]],
+            self.get_success(
+                self.store.db_pool.simple_select_list(
+                    table="test_constraint",
+                    keyvalues={},
+                    retcols=("a", "b"),
+                )
+            ),
+        )
+        self.assertCountEqual(rows, [(1, 1), (3, 3)])
+
+        # And check that invalid rows get correctly rejected.
+        self.get_failure(
+            self.store.db_pool.simple_insert("test_constraint", {"a": 2, "b": 2}),
+            exc=self.store.database_engine.module.IntegrityError,
+        )
