@@ -18,7 +18,6 @@ import logging
 import time
 import types
 from collections import defaultdict
-from sys import intern
 from time import monotonic as monotonic_time
 from typing import (
     TYPE_CHECKING,
@@ -31,10 +30,10 @@ from typing import (
     Iterator,
     List,
     Optional,
+    Sequence,
     Tuple,
     Type,
     TypeVar,
-    Union,
     cast,
     overload,
 )
@@ -358,7 +357,9 @@ class LoggingTransaction:
         return self.txn.rowcount
 
     @property
-    def description(self) -> Any:
+    def description(
+        self,
+    ) -> Optional[Sequence[Any]]:
         return self.txn.description
 
     def execute_batch(self, sql: str, args: Iterable[Iterable[Any]]) -> None:
@@ -407,16 +408,27 @@ class LoggingTransaction:
         return self._do_execute(
             # TODO: is it safe for values to be Iterable[Iterable[Any]] here?
             # https://www.psycopg.org/docs/extras.html?highlight=execute_batch#psycopg2.extras.execute_values says values should be Sequence[Sequence]
-            lambda the_sql: execute_values(
-                self.txn, the_sql, values, template=template, fetch=fetch
+            lambda the_sql, the_values: execute_values(
+                self.txn, the_sql, the_values, template=template, fetch=fetch
             ),
             sql,
+            values,
         )
 
     def execute(self, sql: str, parameters: SQLQueryParameters = ()) -> None:
         self._do_execute(self.txn.execute, sql, parameters)
 
     def executemany(self, sql: str, *args: Any) -> None:
+        """Repeatedly execute the same piece of SQL with different parameters.
+
+        See https://peps.python.org/pep-0249/#executemany. Note in particular that
+
+        > Use of this method for an operation which produces one or more result sets
+        > constitutes undefined behavior
+
+        so you can't use this for e.g. a SELECT, an UPDATE ... RETURNING, or a
+        DELETE FROM... RETURNING.
+        """
         # TODO: we should add a type for *args here. Looking at Cursor.executemany
         # and DBAPI2 it ought to be Sequence[_Parameter], but we pass in
         # Iterable[Iterable[Any]] in execute_batch and execute_values above, which mypy
@@ -602,13 +614,16 @@ class DatabasePool:
 
         If the background updates have not completed, wait 15 sec and check again.
         """
-        updates = await self.simple_select_list(
-            "background_updates",
-            keyvalues=None,
-            retcols=["update_name"],
-            desc="check_background_updates",
+        updates = cast(
+            List[Tuple[str]],
+            await self.simple_select_list(
+                "background_updates",
+                keyvalues=None,
+                retcols=["update_name"],
+                desc="check_background_updates",
+            ),
         )
-        background_update_names = [x["update_name"] for x in updates]
+        background_update_names = [x[0] for x in updates]
 
         for table, update_name in UNIQUE_INDEX_BACKGROUND_UPDATES.items():
             if update_name not in background_update_names:
@@ -1026,57 +1041,20 @@ class DatabasePool:
             self._db_pool.runWithConnection(inner_func, *args, **kwargs)
         )
 
-    @staticmethod
-    def cursor_to_dict(cursor: Cursor) -> List[Dict[str, Any]]:
-        """Converts a SQL cursor into an list of dicts.
-
-        Args:
-            cursor: The DBAPI cursor which has executed a query.
-        Returns:
-            A list of dicts where the key is the column header.
-        """
-        assert cursor.description is not None, "cursor.description was None"
-        col_headers = [intern(str(column[0])) for column in cursor.description]
-        results = [dict(zip(col_headers, row)) for row in cursor]
-        return results
-
-    @overload
-    async def execute(
-        self, desc: str, decoder: Literal[None], query: str, *args: Any
-    ) -> List[Tuple[Any, ...]]:
-        ...
-
-    @overload
-    async def execute(
-        self, desc: str, decoder: Callable[[Cursor], R], query: str, *args: Any
-    ) -> R:
-        ...
-
-    async def execute(
-        self,
-        desc: str,
-        decoder: Optional[Callable[[Cursor], R]],
-        query: str,
-        *args: Any,
-    ) -> Union[List[Tuple[Any, ...]], R]:
+    async def execute(self, desc: str, query: str, *args: Any) -> List[Tuple[Any, ...]]:
         """Runs a single query for a result set.
 
         Args:
             desc: description of the transaction, for logging and metrics
-            decoder - The function which can resolve the cursor results to
-                something meaningful.
             query - The query string to execute
             *args - Query args.
         Returns:
             The result of decoder(results)
         """
 
-        def interaction(txn: LoggingTransaction) -> Union[List[Tuple[Any, ...]], R]:
+        def interaction(txn: LoggingTransaction) -> List[Tuple[Any, ...]]:
             txn.execute(query, args)
-            if decoder:
-                return decoder(txn)
-            else:
-                return txn.fetchall()
+            return txn.fetchall()
 
         return await self.runInteraction(desc, interaction)
 
@@ -1177,6 +1155,7 @@ class DatabasePool:
         keyvalues: Dict[str, Any],
         values: Dict[str, Any],
         insertion_values: Optional[Dict[str, Any]] = None,
+        where_clause: Optional[str] = None,
         desc: str = "simple_upsert",
     ) -> bool:
         """Insert a row with values + insertion_values; on conflict, update with values.
@@ -1227,6 +1206,7 @@ class DatabasePool:
             keyvalues: The unique key columns and their new values
             values: The nonunique columns and their new values
             insertion_values: additional key/values to use only when inserting
+            where_clause: An index predicate to apply to the upsert.
             desc: description of the transaction, for logging and metrics
         Returns:
             Returns True if a row was inserted or updated (i.e. if `values` is
@@ -1247,6 +1227,7 @@ class DatabasePool:
                     keyvalues,
                     values,
                     insertion_values,
+                    where_clause,
                     db_autocommit=autocommit,
                 )
             except self.engine.module.IntegrityError as e:
@@ -1797,9 +1778,9 @@ class DatabasePool:
         keyvalues: Optional[Dict[str, Any]],
         retcols: Collection[str],
         desc: str = "simple_select_list",
-    ) -> List[Dict[str, Any]]:
+    ) -> List[Tuple[Any, ...]]:
         """Executes a SELECT query on the named table, which may return zero or
-        more rows, returning the result as a list of dicts.
+        more rows, returning the result as a list of tuples.
 
         Args:
             table: the table name
@@ -1810,8 +1791,7 @@ class DatabasePool:
             desc: description of the transaction, for logging and metrics
 
         Returns:
-            A list of dictionaries, one per result row, each a mapping between the
-            column names from `retcols` and that column's value for the row.
+            A list of tuples, one per result row, each the retcolumn's value for the row.
         """
         return await self.runInteraction(
             desc,
@@ -1829,9 +1809,9 @@ class DatabasePool:
         table: str,
         keyvalues: Optional[Dict[str, Any]],
         retcols: Iterable[str],
-    ) -> List[Dict[str, Any]]:
+    ) -> List[Tuple[Any, ...]]:
         """Executes a SELECT query on the named table, which may return zero or
-        more rows, returning the result as a list of dicts.
+        more rows, returning the result as a list of tuples.
 
         Args:
             txn: Transaction object
@@ -1842,8 +1822,7 @@ class DatabasePool:
             retcols: the names of the columns to return
 
         Returns:
-            A list of dictionaries, one per result row, each a mapping between the
-            column names from `retcols` and that column's value for the row.
+            A list of tuples, one per result row, each the retcolumn's value for the row.
         """
         if keyvalues:
             sql = "SELECT %s FROM %s WHERE %s" % (
@@ -1856,7 +1835,7 @@ class DatabasePool:
             sql = "SELECT %s FROM %s" % (", ".join(retcols), table)
             txn.execute(sql)
 
-        return cls.cursor_to_dict(txn)
+        return txn.fetchall()
 
     async def simple_select_many_batch(
         self,
@@ -1867,9 +1846,9 @@ class DatabasePool:
         keyvalues: Optional[Dict[str, Any]] = None,
         desc: str = "simple_select_many_batch",
         batch_size: int = 100,
-    ) -> List[Dict[str, Any]]:
+    ) -> List[Tuple[Any, ...]]:
         """Executes a SELECT query on the named table, which may return zero or
-        more rows, returning the result as a list of dicts.
+        more rows.
 
         Filters rows by whether the value of `column` is in `iterable`.
 
@@ -1881,10 +1860,13 @@ class DatabasePool:
             keyvalues: dict of column names and values to select the rows with
             desc: description of the transaction, for logging and metrics
             batch_size: the number of rows for each select query
+
+        Returns:
+            The results as a list of tuples.
         """
         keyvalues = keyvalues or {}
 
-        results: List[Dict[str, Any]] = []
+        results: List[Tuple[Any, ...]] = []
 
         for chunk in batch_iter(iterable, batch_size):
             rows = await self.runInteraction(
@@ -1911,9 +1893,9 @@ class DatabasePool:
         iterable: Collection[Any],
         keyvalues: Dict[str, Any],
         retcols: Iterable[str],
-    ) -> List[Dict[str, Any]]:
+    ) -> List[Tuple[Any, ...]]:
         """Executes a SELECT query on the named table, which may return zero or
-        more rows, returning the result as a list of dicts.
+        more rows.
 
         Filters rows by whether the value of `column` is in `iterable`.
 
@@ -1924,6 +1906,9 @@ class DatabasePool:
             iterable: list
             keyvalues: dict of column names and values to select the rows with
             retcols: list of strings giving the names of the columns to return
+
+        Returns:
+            The results as a list of tuples.
         """
         if not iterable:
             return []
@@ -1942,7 +1927,7 @@ class DatabasePool:
         )
 
         txn.execute(sql, values)
-        return cls.cursor_to_dict(txn)
+        return txn.fetchall()
 
     async def simple_update(
         self,
@@ -2411,7 +2396,7 @@ class DatabasePool:
         keyvalues: Optional[Dict[str, Any]] = None,
         exclude_keyvalues: Optional[Dict[str, Any]] = None,
         order_direction: str = "ASC",
-    ) -> List[Dict[str, Any]]:
+    ) -> List[Tuple[Any, ...]]:
         """
         Executes a SELECT query on the named table with start and limit,
         of row numbers, which may return zero or number of rows from start to limit,
@@ -2440,7 +2425,7 @@ class DatabasePool:
             order_direction: Whether the results should be ordered "ASC" or "DESC".
 
         Returns:
-            The result as a list of dictionaries.
+            The result as a list of tuples.
         """
         if order_direction not in ["ASC", "DESC"]:
             raise ValueError("order_direction must be one of 'ASC' or 'DESC'.")
@@ -2467,69 +2452,7 @@ class DatabasePool:
         )
         txn.execute(sql, arg_list + [limit, start])
 
-        return cls.cursor_to_dict(txn)
-
-    async def simple_search_list(
-        self,
-        table: str,
-        term: Optional[str],
-        col: str,
-        retcols: Collection[str],
-        desc: str = "simple_search_list",
-    ) -> Optional[List[Dict[str, Any]]]:
-        """Executes a SELECT query on the named table, which may return zero or
-        more rows, returning the result as a list of dicts.
-
-        Args:
-            table: the table name
-            term: term for searching the table matched to a column.
-            col: column to query term should be matched to
-            retcols: the names of the columns to return
-
-        Returns:
-            A list of dictionaries or None.
-        """
-
-        return await self.runInteraction(
-            desc,
-            self.simple_search_list_txn,
-            table,
-            term,
-            col,
-            retcols,
-            db_autocommit=True,
-        )
-
-    @classmethod
-    def simple_search_list_txn(
-        cls,
-        txn: LoggingTransaction,
-        table: str,
-        term: Optional[str],
-        col: str,
-        retcols: Iterable[str],
-    ) -> Optional[List[Dict[str, Any]]]:
-        """Executes a SELECT query on the named table, which may return zero or
-        more rows, returning the result as a list of dicts.
-
-        Args:
-            txn: Transaction object
-            table: the table name
-            term: term for searching the table matched to a column.
-            col: column to query term should be matched to
-            retcols: the names of the columns to return
-
-        Returns:
-            None if no term is given, otherwise a list of dictionaries.
-        """
-        if term:
-            sql = "SELECT %s FROM %s WHERE %s LIKE ?" % (", ".join(retcols), table, col)
-            termvalues = ["%%" + term + "%%"]
-            txn.execute(sql, termvalues)
-        else:
-            return None
-
-        return cls.cursor_to_dict(txn)
+        return txn.fetchall()
 
 
 def make_in_list_sql_clause(

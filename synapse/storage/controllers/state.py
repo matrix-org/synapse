@@ -16,7 +16,6 @@ from itertools import chain
 from typing import (
     TYPE_CHECKING,
     AbstractSet,
-    Any,
     Callable,
     Collection,
     Dict,
@@ -32,11 +31,13 @@ from typing import (
 from synapse.api.constants import EventTypes, Membership
 from synapse.events import EventBase
 from synapse.logging.opentracing import tag_args, trace
+from synapse.storage.databases.main.state_deltas import StateDelta
 from synapse.storage.roommember import ProfileInfo
 from synapse.storage.util.partial_state_events_tracker import (
     PartialCurrentStateTracker,
     PartialStateEventsTracker,
 )
+from synapse.synapse_rust.acl import ServerAclEvaluator
 from synapse.types import MutableStateMap, StateMap, get_domain_from_id
 from synapse.types.state import StateFilter
 from synapse.util.async_helpers import Linearizer
@@ -501,22 +502,37 @@ class StateStorageController:
 
         return event.content.get("alias")
 
+    @cached()
+    async def get_server_acl_for_room(
+        self, room_id: str
+    ) -> Optional[ServerAclEvaluator]:
+        """Get the server ACL evaluator for room, if any
+
+        This does up-front parsing of the content to ignore bad data and pre-compile
+        regular expressions.
+
+        Args:
+            room_id: The room ID
+
+        Returns:
+            The server ACL evaluator, if any
+        """
+
+        acl_event = await self.get_current_state_event(
+            room_id, EventTypes.ServerACL, ""
+        )
+
+        if not acl_event:
+            return None
+
+        return server_acl_evaluator_from_event(acl_event)
+
     @trace
     @tag_args
     async def get_current_state_deltas(
         self, prev_stream_id: int, max_stream_id: int
-    ) -> Tuple[int, List[Dict[str, Any]]]:
+    ) -> Tuple[int, List[StateDelta]]:
         """Fetch a list of room state changes since the given stream id
-
-        Each entry in the result contains the following fields:
-            - stream_id (int)
-            - room_id (str)
-            - type (str): event type
-            - state_key (str):
-            - event_id (str|None): new event_id for this state key. None if the
-                state has been deleted.
-            - prev_event_id (str|None): previous event_id for this state key. None
-                if it's new state.
 
         Args:
             prev_stream_id: point to get changes since (exclusive)
@@ -582,7 +598,7 @@ class StateStorageController:
 
     @trace
     @tag_args
-    async def get_current_hosts_in_room_ordered(self, room_id: str) -> List[str]:
+    async def get_current_hosts_in_room_ordered(self, room_id: str) -> Tuple[str, ...]:
         """Get current hosts in room based on current state.
 
         Blocks until we have full state for the given room. This only happens for rooms
@@ -760,3 +776,36 @@ class StateStorageController:
                 cache.state_group = object()
 
         return frozenset(cache.hosts_to_joined_users)
+
+
+def server_acl_evaluator_from_event(acl_event: EventBase) -> "ServerAclEvaluator":
+    """
+    Create a ServerAclEvaluator from a m.room.server_acl event's content.
+
+    This does up-front parsing of the content to ignore bad data. It then creates
+    the ServerAclEvaluator which will pre-compile regular expressions from the globs.
+    """
+
+    # first of all, parse if literal IPs are blocked.
+    allow_ip_literals = acl_event.content.get("allow_ip_literals", True)
+    if not isinstance(allow_ip_literals, bool):
+        logger.warning("Ignoring non-bool allow_ip_literals flag")
+        allow_ip_literals = True
+
+    # next, parse the deny list by ignoring any non-strings.
+    deny = acl_event.content.get("deny", [])
+    if not isinstance(deny, (list, tuple)):
+        logger.warning("Ignoring non-list deny ACL %s", deny)
+        deny = []
+    else:
+        deny = [s for s in deny if isinstance(s, str)]
+
+    # then the allow list.
+    allow = acl_event.content.get("allow", [])
+    if not isinstance(allow, (list, tuple)):
+        logger.warning("Ignoring non-list allow ACL %s", allow)
+        allow = []
+    else:
+        allow = [s for s in allow if isinstance(s, str)]
+
+    return ServerAclEvaluator(allow_ip_literals, allow, deny)

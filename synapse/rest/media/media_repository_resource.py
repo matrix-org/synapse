@@ -15,7 +15,7 @@
 from typing import TYPE_CHECKING
 
 from synapse.config._base import ConfigError
-from synapse.http.server import UnrecognizedRequestResource
+from synapse.http.server import HttpServer, JsonResource
 
 from .config_resource import MediaConfigResource
 from .download_resource import DownloadResource
@@ -27,7 +27,7 @@ if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 
-class MediaRepositoryResource(UnrecognizedRequestResource):
+class MediaRepositoryResource(JsonResource):
     """File uploading and downloading.
 
     Uploads are POSTed to a resource which returns a token which is used to GET
@@ -70,6 +70,11 @@ class MediaRepositoryResource(UnrecognizedRequestResource):
     width and height are close to the requested size and the aspect matches
     the requested size. The client should scale the image if it needs to fit
     within a given rectangle.
+
+    This gets mounted at various points under /_matrix/media, including:
+       * /_matrix/media/r0
+       * /_matrix/media/v1
+       * /_matrix/media/v3
     """
 
     def __init__(self, hs: "HomeServer"):
@@ -77,17 +82,23 @@ class MediaRepositoryResource(UnrecognizedRequestResource):
         if not hs.config.media.can_load_media_repo:
             raise ConfigError("Synapse is not configured to use a media repo.")
 
-        super().__init__()
+        JsonResource.__init__(self, hs, canonical_json=False)
+        self.register_servlets(self, hs)
+
+    @staticmethod
+    def register_servlets(http_server: HttpServer, hs: "HomeServer") -> None:
         media_repo = hs.get_media_repository()
 
-        self.putChild(b"upload", UploadResource(hs, media_repo))
-        self.putChild(b"download", DownloadResource(hs, media_repo))
-        self.putChild(
-            b"thumbnail", ThumbnailResource(hs, media_repo, media_repo.media_storage)
+        # Note that many of these should not exist as v1 endpoints, but empirically
+        # a lot of traffic still goes to them.
+
+        UploadResource(hs, media_repo).register(http_server)
+        DownloadResource(hs, media_repo).register(http_server)
+        ThumbnailResource(hs, media_repo, media_repo.media_storage).register(
+            http_server
         )
         if hs.config.media.url_preview_enabled:
-            self.putChild(
-                b"preview_url",
-                PreviewUrlResource(hs, media_repo, media_repo.media_storage),
+            PreviewUrlResource(hs, media_repo, media_repo.media_storage).register(
+                http_server
             )
-        self.putChild(b"config", MediaConfigResource(hs))
+        MediaConfigResource(hs).register(http_server)

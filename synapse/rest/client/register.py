@@ -376,8 +376,7 @@ class RegistrationTokenValidityRestServlet(RestServlet):
         self.ratelimiter = Ratelimiter(
             store=self.store,
             clock=hs.get_clock(),
-            rate_hz=hs.config.ratelimiting.rc_registration_token_validity.per_second,
-            burst_count=hs.config.ratelimiting.rc_registration_token_validity.burst_count,
+            cfg=hs.config.ratelimiting.rc_registration_token_validity,
         )
 
     async def on_GET(self, request: Request) -> Tuple[int, JsonDict]:

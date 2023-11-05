@@ -13,7 +13,17 @@
 # limitations under the License.
 import enum
 import logging
-from typing import TYPE_CHECKING, Collection, Dict, FrozenSet, Iterable, List, Optional
+from typing import (
+    TYPE_CHECKING,
+    Collection,
+    Dict,
+    FrozenSet,
+    Iterable,
+    List,
+    Mapping,
+    Optional,
+    Sequence,
+)
 
 import attr
 
@@ -157,7 +167,7 @@ class RelationsHandler:
         now = self._clock.time_msec()
         serialize_options = SerializeEventConfig(requester=requester)
         return_value: JsonDict = {
-            "chunk": self._event_serializer.serialize_events(
+            "chunk": await self._event_serializer.serialize_events(
                 events,
                 now,
                 bundle_aggregations=aggregations,
@@ -167,7 +177,9 @@ class RelationsHandler:
         if include_original_event:
             # Do not bundle aggregations when retrieving the original event because
             # we want the content before relations are applied to it.
-            return_value["original_event"] = self._event_serializer.serialize_event(
+            return_value[
+                "original_event"
+            ] = await self._event_serializer.serialize_event(
                 event,
                 now,
                 bundle_aggregations=None,
@@ -245,7 +257,7 @@ class RelationsHandler:
 
     async def get_references_for_events(
         self, event_ids: Collection[str], ignored_users: FrozenSet[str] = frozenset()
-    ) -> Dict[str, List[_RelatedEvent]]:
+    ) -> Mapping[str, Sequence[_RelatedEvent]]:
         """Get a list of references to the given events.
 
         Args:
@@ -592,7 +604,7 @@ class RelationsHandler:
         )
 
         now = self._clock.time_msec()
-        serialized_events = self._event_serializer.serialize_events(
+        serialized_events = await self._event_serializer.serialize_events(
             events, now, bundle_aggregations=aggregations
         )
 

@@ -17,6 +17,7 @@ import re
 from typing import (
     TYPE_CHECKING,
     Any,
+    Awaitable,
     Callable,
     Dict,
     Iterable,
@@ -45,6 +46,7 @@ from . import EventBase
 
 if TYPE_CHECKING:
     from synapse.handlers.relations import BundledAggregations
+    from synapse.server import HomeServer
 
 
 # Split strings on "." but not "\." (or "\\\.").
@@ -54,6 +56,13 @@ ESCAPE_SEQUENCE_PATTERN = re.compile(r"\\(.)")
 
 CANONICALJSON_MAX_INT = (2**53) - 1
 CANONICALJSON_MIN_INT = -CANONICALJSON_MAX_INT
+
+
+# Module API callback that allows adding fields to the unsigned section of
+# events that are sent to clients.
+ADD_EXTRA_FIELDS_TO_UNSIGNED_CLIENT_EVENT_CALLBACK = Callable[
+    [EventBase], Awaitable[JsonDict]
+]
 
 
 def prune_event(event: EventBase) -> EventBase:
@@ -394,7 +403,6 @@ def serialize_event(
     time_now_ms: int,
     *,
     config: SerializeEventConfig = _DEFAULT_SERIALIZE_EVENT_CONFIG,
-    msc3970_enabled: bool = False,
 ) -> JsonDict:
     """Serialize event for clients
 
@@ -402,8 +410,6 @@ def serialize_event(
         e
         time_now_ms
         config: Event serialization config
-        msc3970_enabled: Whether MSC3970 is enabled. It changes whether we should
-            include the `transaction_id` in the event's `unsigned` section.
 
     Returns:
         The serialized event dictionary.
@@ -429,38 +435,46 @@ def serialize_event(
             e.unsigned["redacted_because"],
             time_now_ms,
             config=config,
-            msc3970_enabled=msc3970_enabled,
         )
 
     # If we have a txn_id saved in the internal_metadata, we should include it in the
     # unsigned section of the event if it was sent by the same session as the one
     # requesting the event.
     txn_id: Optional[str] = getattr(e.internal_metadata, "txn_id", None)
-    if txn_id is not None and config.requester is not None:
-        # For the MSC3970 rules to be applied, we *need* to have the device ID in the
-        # event internal metadata. Since we were not recording them before, if it hasn't
-        # been recorded, we fallback to the old behaviour.
+    if (
+        txn_id is not None
+        and config.requester is not None
+        and config.requester.user.to_string() == e.sender
+    ):
+        # Some events do not have the device ID stored in the internal metadata,
+        # this includes old events as well as those created by appservice, guests,
+        # or with tokens minted with the admin API. For those events, fallback
+        # to using the access token instead.
         event_device_id: Optional[str] = getattr(e.internal_metadata, "device_id", None)
-        if msc3970_enabled and event_device_id is not None:
+        if event_device_id is not None:
             if event_device_id == config.requester.device_id:
                 d["unsigned"]["transaction_id"] = txn_id
 
         else:
-            # The pre-MSC3970 behaviour is to only include the transaction ID if the
-            # event was sent from the same access token. For regular users, we can use
-            # the access token ID to determine this. For guests, we can't, but since
-            # each guest only has one access token, we can just check that the event was
-            # sent by the same user as the one requesting the event.
+            # Fallback behaviour: only include the transaction ID if the event
+            # was sent from the same access token.
+            #
+            # For regular users, the access token ID can be used to determine this.
+            # This includes access tokens minted with the admin API.
+            #
+            # For guests and appservice users, we can't check the access token ID
+            # so assume it is the same session.
             event_token_id: Optional[int] = getattr(
                 e.internal_metadata, "token_id", None
             )
-            if config.requester.user.to_string() == e.sender and (
+            if (
                 (
                     event_token_id is not None
                     and config.requester.access_token_id is not None
                     and event_token_id == config.requester.access_token_id
                 )
                 or config.requester.is_guest
+                or config.requester.app_service
             ):
                 d["unsigned"]["transaction_id"] = txn_id
 
@@ -475,14 +489,16 @@ def serialize_event(
     if config.as_client_event:
         d = config.event_format(d)
 
-    # If the event is a redaction, copy the redacts field from the content to
-    # top-level for backwards compatibility.
-    if (
-        e.type == EventTypes.Redaction
-        and e.room_version.updated_redaction_rules
-        and e.redacts is not None
-    ):
-        d["redacts"] = e.redacts
+    # If the event is a redaction, the field with the redacted event ID appears
+    # in a different location depending on the room version. e.redacts handles
+    # fetching from the proper location; copy it to the other location for forwards-
+    # and backwards-compatibility with clients.
+    if e.type == EventTypes.Redaction and e.redacts is not None:
+        if e.room_version.updated_redaction_rules:
+            d["redacts"] = e.redacts
+        else:
+            d["content"] = dict(d["content"])
+            d["content"]["redacts"] = e.redacts
 
     only_event_fields = config.only_event_fields
     if only_event_fields:
@@ -502,10 +518,13 @@ class EventClientSerializer:
     clients.
     """
 
-    def __init__(self, *, msc3970_enabled: bool = False):
-        self._msc3970_enabled = msc3970_enabled
+    def __init__(self, hs: "HomeServer") -> None:
+        self._store = hs.get_datastores().main
+        self._add_extra_fields_to_unsigned_client_event_callbacks: List[
+            ADD_EXTRA_FIELDS_TO_UNSIGNED_CLIENT_EVENT_CALLBACK
+        ] = []
 
-    def serialize_event(
+    async def serialize_event(
         self,
         event: Union[JsonDict, EventBase],
         time_now: int,
@@ -529,14 +548,23 @@ class EventClientSerializer:
         if not isinstance(event, EventBase):
             return event
 
-        serialized_event = serialize_event(
-            event, time_now, config=config, msc3970_enabled=self._msc3970_enabled
-        )
+        serialized_event = serialize_event(event, time_now, config=config)
+
+        new_unsigned = {}
+        for callback in self._add_extra_fields_to_unsigned_client_event_callbacks:
+            u = await callback(event)
+            new_unsigned.update(u)
+
+        if new_unsigned:
+            # We do the `update` this way round so that modules can't clobber
+            # existing fields.
+            new_unsigned.update(serialized_event["unsigned"])
+            serialized_event["unsigned"] = new_unsigned
 
         # Check if there are any bundled aggregations to include with the event.
         if bundle_aggregations:
             if event.event_id in bundle_aggregations:
-                self._inject_bundled_aggregations(
+                await self._inject_bundled_aggregations(
                     event,
                     time_now,
                     config,
@@ -546,7 +574,7 @@ class EventClientSerializer:
 
         return serialized_event
 
-    def _inject_bundled_aggregations(
+    async def _inject_bundled_aggregations(
         self,
         event: EventBase,
         time_now: int,
@@ -588,7 +616,7 @@ class EventClientSerializer:
             # said that we should only include the `event_id`, `origin_server_ts` and
             # `sender` of the edit; however MSC3925 proposes extending it to the whole
             # of the edit, which is what we do here.
-            serialized_aggregations[RelationTypes.REPLACE] = self.serialize_event(
+            serialized_aggregations[RelationTypes.REPLACE] = await self.serialize_event(
                 event_aggregations.replace,
                 time_now,
                 config=config,
@@ -598,7 +626,7 @@ class EventClientSerializer:
         if event_aggregations.thread:
             thread = event_aggregations.thread
 
-            serialized_latest_event = self.serialize_event(
+            serialized_latest_event = await self.serialize_event(
                 thread.latest_event,
                 time_now,
                 config=config,
@@ -621,7 +649,7 @@ class EventClientSerializer:
                 "m.relations", {}
             ).update(serialized_aggregations)
 
-    def serialize_events(
+    async def serialize_events(
         self,
         events: Iterable[Union[JsonDict, EventBase]],
         time_now: int,
@@ -643,7 +671,7 @@ class EventClientSerializer:
             The list of serialized events
         """
         return [
-            self.serialize_event(
+            await self.serialize_event(
                 event,
                 time_now,
                 config=config,
@@ -651,6 +679,14 @@ class EventClientSerializer:
             )
             for event in events
         ]
+
+    def register_add_extra_fields_to_unsigned_client_event_callback(
+        self, callback: ADD_EXTRA_FIELDS_TO_UNSIGNED_CLIENT_EVENT_CALLBACK
+    ) -> None:
+        """Register a callback that returns additions to the unsigned section of
+        serialized events.
+        """
+        self._add_extra_fields_to_unsigned_client_event_callbacks.append(callback)
 
 
 _PowerLevel = Union[str, int]
@@ -700,7 +736,7 @@ def _copy_power_level_value_as_integer(
     :raises TypeError: if `old_value` is neither an integer nor a base-10 string
         representation of an integer.
     """
-    if type(old_value) is int:
+    if type(old_value) is int:  # noqa: E721
         power_levels[key] = old_value
         return
 
@@ -728,7 +764,7 @@ def validate_canonicaljson(value: Any) -> None:
     * Floats
     * NaN, Infinity, -Infinity
     """
-    if type(value) is int:
+    if type(value) is int:  # noqa: E721
         if value < CANONICALJSON_MIN_INT or CANONICALJSON_MAX_INT < value:
             raise SynapseError(400, "JSON integer out of range", Codes.BAD_JSON)
 

@@ -37,7 +37,6 @@ class HttpClient:
             Deferred: Succeeds when we get a 2xx HTTP response. The result
             will be the decoded JSON body.
         """
-        pass
 
     def get_json(self, url, args=None):
         """Gets some json from the given host homeserver and path
@@ -53,7 +52,6 @@ class HttpClient:
             Deferred: Succeeds when we get a 2xx HTTP response. The result
             will be the decoded JSON body.
         """
-        pass
 
 
 class TwistedHttpClient(HttpClient):

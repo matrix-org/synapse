@@ -77,6 +77,7 @@ from synapse.storage.databases.main.monthly_active_users import (
 )
 from synapse.storage.databases.main.presence import PresenceStore
 from synapse.storage.databases.main.profile import ProfileWorkerStore
+from synapse.storage.databases.main.purge_events import PurgeEventsStore
 from synapse.storage.databases.main.push_rule import PushRulesWorkerStore
 from synapse.storage.databases.main.pusher import PusherWorkerStore
 from synapse.storage.databases.main.receipts import ReceiptsWorkerStore
@@ -91,6 +92,7 @@ from synapse.storage.databases.main.state import StateGroupWorkerStore
 from synapse.storage.databases.main.stats import StatsStore
 from synapse.storage.databases.main.stream import StreamWorkerStore
 from synapse.storage.databases.main.tags import TagsWorkerStore
+from synapse.storage.databases.main.task_scheduler import TaskSchedulerWorkerStore
 from synapse.storage.databases.main.transactions import TransactionWorkerStore
 from synapse.storage.databases.main.ui_auth import UIAuthWorkerStore
 from synapse.storage.databases.main.user_directory import UserDirectoryStore
@@ -133,6 +135,7 @@ class GenericWorkerStore(
     RelationsWorkerStore,
     EventFederationWorkerStore,
     EventPushActionsWorkerStore,
+    PurgeEventsStore,
     StateGroupWorkerStore,
     SignatureWorkerStore,
     UserErasureWorkerStore,
@@ -144,6 +147,7 @@ class GenericWorkerStore(
     TransactionWorkerStore,
     LockStore,
     SessionStore,
+    TaskSchedulerWorkerStore,
 ):
     # Properties that multiple storage classes define. Tell mypy what the
     # expected type is.

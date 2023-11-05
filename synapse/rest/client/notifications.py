@@ -36,6 +36,8 @@ logger = logging.getLogger(__name__)
 class NotificationsServlet(RestServlet):
     PATTERNS = client_patterns("/notifications$")
 
+    CATEGORY = "Client API requests"
+
     def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.store = hs.get_datastores().main
@@ -85,7 +87,7 @@ class NotificationsServlet(RestServlet):
                 "actions": pa.actions,
                 "ts": pa.received_ts,
                 "event": (
-                    self._event_serializer.serialize_event(
+                    await self._event_serializer.serialize_event(
                         notif_events[pa.event_id],
                         now,
                         config=serialize_options,

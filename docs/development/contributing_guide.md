@@ -66,7 +66,7 @@ Of their installation methods, we recommend
 
 ```shell
 pip install --user pipx
-pipx install poetry
+pipx install poetry==1.5.2  # Problems with Poetry 1.6, see https://github.com/matrix-org/synapse/issues/16147
 ```
 
 but see poetry's [installation instructions](https://python-poetry.org/docs/#installation)
@@ -266,7 +266,7 @@ The easiest way to do so is to run Postgres via a docker container. In one
 terminal:
 
 ```shell
-docker run --rm -e POSTGRES_PASSWORD=mysecretpassword -e POSTGRES_USER=postgres -e POSTGRES_DB=postgress -p 5432:5432 postgres:14
+docker run --rm -e POSTGRES_PASSWORD=mysecretpassword -e POSTGRES_USER=postgres -e POSTGRES_DB=postgres -p 5432:5432 postgres:14
 ```
 
 If you see an error like

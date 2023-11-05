@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Any, Optional
 import attr
 import attr.validators
 
+from synapse.api.errors import LimitExceededError
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersions
 from synapse.config import ConfigError
 from synapse.config._base import Config, RootConfig
@@ -173,6 +174,13 @@ class MSC3861:
                 ("enable_registration",),
             )
 
+        # We only need to test the user consent version, as if it must be set if the user_consent section was present in the config
+        if root.consent.user_consent_version is not None:
+            raise ConfigError(
+                "User consent cannot be enabled when OAuth delegation is enabled",
+                ("user_consent",),
+            )
+
         if (
             root.oidc.oidc_enabled
             or root.saml2.saml2_enabled
@@ -216,10 +224,10 @@ class MSC3861:
                 ("session_lifetime",),
             )
 
-        if not root.experimental.msc3970_enabled:
+        if root.registration.enable_3pid_changes:
             raise ConfigError(
-                "experimental_features.msc3970_enabled must be 'true' when OAuth delegation is enabled",
-                ("experimental_features", "msc3970_enabled"),
+                "enable_3pid_changes cannot be enabled when OAuth delegation is enabled",
+                ("enable_3pid_changes",),
             )
 
 
@@ -376,11 +384,6 @@ class ExperimentalConfig(Config):
         # MSC3391: Removing account data.
         self.msc3391_enabled = experimental.get("msc3391_enabled", False)
 
-        # MSC3959: Do not generate notifications for edits.
-        self.msc3958_supress_edit_notifs = experimental.get(
-            "msc3958_supress_edit_notifs", False
-        )
-
         # MSC3967: Do not require UIA when first uploading cross signing keys
         self.msc3967_enabled = experimental.get("msc3967_enabled", False)
 
@@ -397,13 +400,22 @@ class ExperimentalConfig(Config):
                 "Invalid MSC3861 configuration", ("experimental", "msc3861")
             ) from exc
 
-        # MSC3970: Scope transaction IDs to devices
-        self.msc3970_enabled = experimental.get("msc3970_enabled", self.msc3861.enabled)
-
         # Check that none of the other config options conflict with MSC3861 when enabled
         self.msc3861.check_config_conflicts(self.root)
 
         # MSC4010: Do not allow setting m.push_rules account data.
         self.msc4010_push_rules_account_data = experimental.get(
             "msc4010_push_rules_account_data", False
+        )
+
+        # MSC4041: Use HTTP header Retry-After to enable library-assisted retry handling
+        #
+        # This is a bit hacky, but the most reasonable way to *alway* include the
+        # headers.
+        LimitExceededError.include_retry_after_header = experimental.get(
+            "msc4041_enabled", False
+        )
+
+        self.msc4028_push_encrypted_events = experimental.get(
+            "msc4028_push_encrypted_events", False
         )

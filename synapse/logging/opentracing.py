@@ -910,10 +910,10 @@ def _custom_sync_async_decorator(
         async def _wrapper(
             *args: P.args, **kwargs: P.kwargs
         ) -> Any:  # Return type is RInner
-            with wrapping_logic(func, *args, **kwargs):
-                # type-ignore: func() returns R, but mypy doesn't know that R is
-                # Awaitable here.
-                return await func(*args, **kwargs)  # type: ignore[misc]
+            # type-ignore: func() returns R, but mypy doesn't know that R is
+            # Awaitable here.
+            with wrapping_logic(func, *args, **kwargs):  # type: ignore[arg-type]
+                return await func(*args, **kwargs)
 
     else:
         # The other case here handles sync functions including those decorated with
@@ -980,8 +980,7 @@ def trace_with_opname(
     See the module's doc string for usage examples.
     """
 
-    # type-ignore: mypy bug, see https://github.com/python/mypy/issues/12909
-    @contextlib.contextmanager  # type: ignore[arg-type]
+    @contextlib.contextmanager
     def _wrapping_logic(
         func: Callable[P, R], *args: P.args, **kwargs: P.kwargs
     ) -> Generator[None, None, None]:
@@ -992,11 +991,7 @@ def trace_with_opname(
         if not opentracing:
             return func
 
-        # type-ignore: mypy seems to be confused by the ParamSpecs here.
-        # I think the problem is https://github.com/python/mypy/issues/12909
-        return _custom_sync_async_decorator(
-            func, _wrapping_logic  # type: ignore[arg-type]
-        )
+        return _custom_sync_async_decorator(func, _wrapping_logic)
 
     return _decorator
 
@@ -1024,12 +1019,14 @@ def tag_args(func: Callable[P, R]) -> Callable[P, R]:
     if not opentracing:
         return func
 
-    # type-ignore: mypy bug, see https://github.com/python/mypy/issues/12909
-    @contextlib.contextmanager  # type: ignore[arg-type]
+    # getfullargspec is somewhat expensive, so ensure it is only called a single
+    # time (the function signature shouldn't change anyway).
+    argspec = inspect.getfullargspec(func)
+
+    @contextlib.contextmanager
     def _wrapping_logic(
-        func: Callable[P, R], *args: P.args, **kwargs: P.kwargs
+        _func: Callable[P, R], *args: P.args, **kwargs: P.kwargs
     ) -> Generator[None, None, None]:
-        argspec = inspect.getfullargspec(func)
         # We use `[1:]` to skip the `self` object reference and `start=1` to
         # make the index line up with `argspec.args`.
         #
@@ -1042,9 +1039,7 @@ def tag_args(func: Callable[P, R]) -> Callable[P, R]:
         set_tag(SynapseTags.FUNC_KWARGS, str(kwargs))
         yield
 
-    # type-ignore: mypy seems to be confused by the ParamSpecs here.
-    # I think the problem is https://github.com/python/mypy/issues/12909
-    return _custom_sync_async_decorator(func, _wrapping_logic)  # type: ignore[arg-type]
+    return _custom_sync_async_decorator(func, _wrapping_logic)
 
 
 @contextlib.contextmanager

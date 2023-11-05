@@ -28,11 +28,12 @@ from typing import (
     Sequence,
     Tuple,
     Type,
+    cast,
 )
 
 import attr
-from pydantic import BaseModel
 
+from synapse._pydantic_compat import HAS_PYDANTIC_V2
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.engines import PostgresEngine
 from synapse.storage.types import Connection, Cursor
@@ -40,6 +41,11 @@ from synapse.types import JsonDict
 from synapse.util import Clock, json_encoder
 
 from . import engines
+
+if TYPE_CHECKING or HAS_PYDANTIC_V2:
+    from pydantic.v1 import BaseModel
+else:
+    from pydantic import BaseModel
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -62,7 +68,6 @@ class Constraint(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def make_check_clause(self, table: str) -> str:
         """Returns an SQL expression that checks the row passes the constraint."""
-        pass
 
     @abc.abstractmethod
     def make_constraint_clause_postgres(self) -> str:
@@ -70,7 +75,6 @@ class Constraint(metaclass=abc.ABCMeta):
 
         Only used on Postgres DBs
         """
-        pass
 
 
 @attr.s(auto_attribs=True)
@@ -238,6 +242,7 @@ class BackgroundUpdater:
     def __init__(self, hs: "HomeServer", database: "DatabasePool"):
         self._clock = hs.get_clock()
         self.db_pool = database
+        self.hs = hs
 
         self._database_name = database.name()
 
@@ -404,14 +409,14 @@ class BackgroundUpdater:
                 try:
                     result = await self.do_next_background_update(sleep)
                     back_to_back_failures = 0
-                except Exception:
+                except Exception as e:
+                    logger.exception("Error doing update: %s", e)
                     back_to_back_failures += 1
                     if back_to_back_failures >= 5:
                         self._aborted = True
                         raise RuntimeError(
                             "5 back-to-back background update failures; aborting."
                         )
-                    logger.exception("Error doing update")
                 else:
                     if result:
                         logger.info(
@@ -484,14 +489,14 @@ class BackgroundUpdater:
             True if we have finished running all the background updates, otherwise False
         """
 
-        def get_background_updates_txn(txn: Cursor) -> List[Dict[str, Any]]:
+        def get_background_updates_txn(txn: Cursor) -> List[Tuple[str, Optional[str]]]:
             txn.execute(
                 """
                 SELECT update_name, depends_on FROM background_updates
                 ORDER BY ordering, update_name
                 """
             )
-            return self.db_pool.cursor_to_dict(txn)
+            return cast(List[Tuple[str, Optional[str]]], txn.fetchall())
 
         if not self._current_background_update:
             all_pending_updates = await self.db_pool.runInteraction(
@@ -503,14 +508,13 @@ class BackgroundUpdater:
                 return True
 
             # find the first update which isn't dependent on another one in the queue.
-            pending = {update["update_name"] for update in all_pending_updates}
-            for upd in all_pending_updates:
-                depends_on = upd["depends_on"]
+            pending = {update_name for update_name, depends_on in all_pending_updates}
+            for update_name, depends_on in all_pending_updates:
                 if not depends_on or depends_on not in pending:
                     break
                 logger.info(
                     "Not starting on bg update %s until %s is done",
-                    upd["update_name"],
+                    update_name,
                     depends_on,
                 )
             else:
@@ -520,7 +524,7 @@ class BackgroundUpdater:
                     "another: dependency cycle?"
                 )
 
-            self._current_background_update = upd["update_name"]
+            self._current_background_update = update_name
 
         # We have a background update to run, otherwise we would have returned
         # early.
@@ -758,6 +762,11 @@ class BackgroundUpdater:
                 logger.debug("[SQL] %s", sql)
                 c.execute(sql)
 
+                # override the global statement timeout to avoid accidentally squashing
+                # a long-running index creation process
+                timeout_sql = "SET SESSION statement_timeout = 0"
+                c.execute(timeout_sql)
+
                 sql = (
                     "CREATE %(unique)s INDEX CONCURRENTLY %(name)s"
                     " ON %(table)s"
@@ -778,6 +787,12 @@ class BackgroundUpdater:
                     logger.debug("[SQL] %s", sql)
                     c.execute(sql)
             finally:
+                # mypy ignore - `statement_timeout` is defined on PostgresEngine
+                # reset the global timeout to the default
+                default_timeout = self.db_pool.engine.statement_timeout  # type: ignore[attr-defined]
+                undo_timeout_sql = f"SET statement_timeout = {default_timeout}"
+                conn.cursor().execute(undo_timeout_sql)
+
                 conn.set_session(autocommit=False)  # type: ignore
 
         def create_index_sqlite(conn: Connection) -> None:

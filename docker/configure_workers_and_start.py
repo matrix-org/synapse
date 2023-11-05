@@ -183,6 +183,7 @@ WORKERS_CONFIG: Dict[str, Dict[str, Any]] = {
             "^/_matrix/client/(r0|v3|unstable)/password_policy$",
             "^/_matrix/client/(api/v1|r0|v3|unstable)/directory/room/.*$",
             "^/_matrix/client/(r0|v3|unstable)/capabilities$",
+            "^/_matrix/client/(r0|v3|unstable)/notifications$",
         ],
         "shared_extra_conf": {},
         "worker_extra_conf": "",
@@ -861,7 +862,7 @@ def generate_worker_files(
         # Then a worker config file
         convert(
             "/conf/worker.yaml.j2",
-            "/conf/workers/{name}.yaml".format(name=worker_name),
+            f"/conf/workers/{worker_name}.yaml",
             **worker_config,
             worker_log_config_filepath=log_config_filepath,
             using_unix_sockets=using_unix_sockets,

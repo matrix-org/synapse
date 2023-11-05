@@ -15,7 +15,13 @@
 import logging
 from typing import TYPE_CHECKING, List, Optional, Tuple
 
-from pydantic import StrictStr
+from synapse._pydantic_compat import HAS_PYDANTIC_V2
+
+if TYPE_CHECKING or HAS_PYDANTIC_V2:
+    from pydantic.v1 import StrictStr
+else:
+    from pydantic import StrictStr
+
 from typing_extensions import Literal
 
 from twisted.web.server import Request

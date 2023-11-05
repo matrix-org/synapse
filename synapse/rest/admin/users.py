@@ -18,6 +18,8 @@ import secrets
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
+import attr
+
 from synapse.api.constants import Direction, UserTypes
 from synapse.api.errors import Codes, NotFoundError, SynapseError
 from synapse.http.servlet import (
@@ -39,7 +41,7 @@ from synapse.rest.admin._base import (
 from synapse.rest.client._base import client_patterns
 from synapse.storage.databases.main.registration import ExternalIDReuseException
 from synapse.storage.databases.main.stats import UserSortOrder
-from synapse.types import JsonDict, UserID
+from synapse.types import JsonDict, JsonMapping, UserID
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -66,6 +68,7 @@ class UsersRestServletV2(RestServlet):
     The parameter `deactivated` can be used to include deactivated users.
     The parameter `order_by` can be used to order the result.
     The parameter `not_user_type` can be used to exclude certain user types.
+    The parameter `locked` can be used to include locked users.
     Possible values are `bot`, `support` or "empty string".
     "empty string" here means to exclude users without a type.
     """
@@ -107,7 +110,10 @@ class UsersRestServletV2(RestServlet):
                 "The guests parameter is not supported when MSC3861 is enabled.",
                 errcode=Codes.INVALID_PARAM,
             )
+
         deactivated = parse_boolean(request, "deactivated", default=False)
+        locked = parse_boolean(request, "locked", default=False)
+        admins = parse_boolean(request, "admins")
 
         # If support for MSC3866 is not enabled, apply no filtering based on the
         # `approved` column.
@@ -130,6 +136,8 @@ class UsersRestServletV2(RestServlet):
                 UserSortOrder.AVATAR_URL.value,
                 UserSortOrder.SHADOW_BANNED.value,
                 UserSortOrder.CREATION_TS.value,
+                UserSortOrder.LAST_SEEN_TS.value,
+                UserSortOrder.LOCKED.value,
             ),
         )
 
@@ -146,18 +154,22 @@ class UsersRestServletV2(RestServlet):
             name,
             guests,
             deactivated,
+            admins,
             order_by,
             direction,
             approved,
             not_user_types,
+            locked,
         )
 
         # If support for MSC3866 is not enabled, don't show the approval flag.
+        filter = None
         if not self._msc3866_enabled:
-            for user in users:
-                del user["approved"]
 
-        ret = {"users": users, "total": total}
+            def _filter(a: attr.Attribute) -> bool:
+                return a.name != "approved"
+
+        ret = {"users": [attr.asdict(u, filter=filter) for u in users], "total": total}
         if (start + limit) < total:
             ret["next_token"] = str(start + len(users))
 
@@ -207,7 +219,7 @@ class UserRestServletV2(RestServlet):
 
     async def on_GET(
         self, request: SynapseRequest, user_id: str
-    ) -> Tuple[int, JsonDict]:
+    ) -> Tuple[int, JsonMapping]:
         await assert_requester_is_admin(self.auth, request)
 
         target_user = UserID.from_string(user_id)
@@ -222,7 +234,7 @@ class UserRestServletV2(RestServlet):
 
     async def on_PUT(
         self, request: SynapseRequest, user_id: str
-    ) -> Tuple[int, JsonDict]:
+    ) -> Tuple[int, JsonMapping]:
         requester = await self.auth.get_user_by_req(request)
         await assert_user_is_admin(self.auth, requester)
 
@@ -280,6 +292,17 @@ class UserRestServletV2(RestServlet):
                 HTTPStatus.BAD_REQUEST, "'deactivated' parameter is not of type boolean"
             )
 
+        lock = body.get("locked", False)
+        if not isinstance(lock, bool):
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST, "'locked' parameter is not of type boolean"
+            )
+
+        if deactivate and lock:
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST, "An user can't be deactivated and locked"
+            )
+
         approved: Optional[bool] = None
         if "approved" in body and self._msc3866_enabled:
             approved = body["approved"]
@@ -310,9 +333,8 @@ class UserRestServletV2(RestServlet):
 
             if threepids is not None:
                 # get changed threepids (added and removed)
-                # convert List[Dict[str, Any]] into Set[Tuple[str, str]]
                 cur_threepids = {
-                    (threepid["medium"], threepid["address"])
+                    (threepid.medium, threepid.address)
                     for threepid in await self.store.user_get_threepids(user_id)
                 }
                 add_threepids = new_threepids - cur_threepids
@@ -396,6 +418,12 @@ class UserRestServletV2(RestServlet):
                     await self.deactivate_account_handler.activate_account(
                         target_user.to_string()
                     )
+
+            if "locked" in body:
+                if lock and not user["locked"]:
+                    await self.store.set_user_locked_status(user_id, True)
+                elif not lock and user["locked"]:
+                    await self.store.set_user_locked_status(user_id, False)
 
             if "user_type" in body:
                 await self.store.set_user_type(target_user, user_type)
@@ -637,7 +665,7 @@ class WhoisRestServlet(RestServlet):
 
     async def on_GET(
         self, request: SynapseRequest, user_id: str
-    ) -> Tuple[int, JsonDict]:
+    ) -> Tuple[int, JsonMapping]:
         target_user = UserID.from_string(user_id)
         requester = await self.auth.get_user_by_req(request)
 
@@ -817,7 +845,18 @@ class SearchUsersRestServlet(RestServlet):
         logger.info("term: %s ", term)
 
         ret = await self.store.search_users(term)
-        return HTTPStatus.OK, ret
+        results = [
+            {
+                "name": name,
+                "password_hash": password_hash,
+                "is_guest": bool(is_guest),
+                "admin": bool(admin),
+                "user_type": user_type,
+            }
+            for name, password_hash, is_guest, admin, user_type in ret
+        ]
+
+        return HTTPStatus.OK, results
 
 
 class UserAdminServlet(RestServlet):
@@ -1152,14 +1191,17 @@ class RateLimitRestServlet(RestServlet):
         messages_per_second = body.get("messages_per_second", 0)
         burst_count = body.get("burst_count", 0)
 
-        if type(messages_per_second) is not int or messages_per_second < 0:
+        if (
+            type(messages_per_second) is not int  # noqa: E721
+            or messages_per_second < 0
+        ):
             raise SynapseError(
                 HTTPStatus.BAD_REQUEST,
                 "%r parameter must be a positive int" % (messages_per_second,),
                 errcode=Codes.INVALID_PARAM,
             )
 
-        if type(burst_count) is not int or burst_count < 0:
+        if type(burst_count) is not int or burst_count < 0:  # noqa: E721
             raise SynapseError(
                 HTTPStatus.BAD_REQUEST,
                 "%r parameter must be a positive int" % (burst_count,),

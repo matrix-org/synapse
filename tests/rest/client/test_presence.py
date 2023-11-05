@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from http import HTTPStatus
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 from twisted.test.proto_helpers import MemoryReactor
 
@@ -23,7 +23,6 @@ from synapse.types import UserID
 from synapse.util import Clock
 
 from tests import unittest
-from tests.test_utils import make_awaitable
 
 
 class PresenceTestCase(unittest.HomeserverTestCase):
@@ -36,7 +35,7 @@ class PresenceTestCase(unittest.HomeserverTestCase):
 
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         self.presence_handler = Mock(spec=PresenceHandler)
-        self.presence_handler.set_state.return_value = make_awaitable(None)
+        self.presence_handler.set_state = AsyncMock(return_value=None)
 
         hs = self.setup_test_homeserver(
             "red",
@@ -51,7 +50,7 @@ class PresenceTestCase(unittest.HomeserverTestCase):
         PUT to the status endpoint with use_presence enabled will call
         set_state on the presence handler.
         """
-        self.hs.config.server.use_presence = True
+        self.hs.config.server.presence_enabled = True
 
         body = {"presence": "here", "status_msg": "beep boop"}
         channel = self.make_request(
@@ -64,7 +63,22 @@ class PresenceTestCase(unittest.HomeserverTestCase):
     @unittest.override_config({"use_presence": False})
     def test_put_presence_disabled(self) -> None:
         """
-        PUT to the status endpoint with use_presence disabled will NOT call
+        PUT to the status endpoint with presence disabled will NOT call
+        set_state on the presence handler.
+        """
+
+        body = {"presence": "here", "status_msg": "beep boop"}
+        channel = self.make_request(
+            "PUT", "/presence/%s/status" % (self.user_id,), body
+        )
+
+        self.assertEqual(channel.code, HTTPStatus.OK)
+        self.assertEqual(self.presence_handler.set_state.call_count, 0)
+
+    @unittest.override_config({"presence": {"enabled": "untracked"}})
+    def test_put_presence_untracked(self) -> None:
+        """
+        PUT to the status endpoint with presence untracked will NOT call
         set_state on the presence handler.
         """
 

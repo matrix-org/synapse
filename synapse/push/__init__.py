@@ -101,7 +101,7 @@ if TYPE_CHECKING:
 class PusherConfig:
     """Parameters necessary to configure a pusher."""
 
-    id: Optional[str]
+    id: Optional[int]
     user_name: str
 
     profile_tag: str
@@ -182,7 +182,7 @@ class Pusher(metaclass=abc.ABCMeta):
         raise NotImplementedError()
 
     @abc.abstractmethod
-    def on_new_receipts(self, min_stream_id: int, max_stream_id: int) -> None:
+    def on_new_receipts(self) -> None:
         raise NotImplementedError()
 
     @abc.abstractmethod

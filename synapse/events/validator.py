@@ -12,10 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import collections.abc
-from typing import Iterable, List, Type, Union, cast
+from typing import TYPE_CHECKING, List, Type, Union, cast
 
 import jsonschema
-from pydantic import Field, StrictBool, StrictStr
+
+from synapse._pydantic_compat import HAS_PYDANTIC_V2
+
+if TYPE_CHECKING or HAS_PYDANTIC_V2:
+    from pydantic.v1 import Field, StrictBool, StrictStr
+else:
+    from pydantic import Field, StrictBool, StrictStr
 
 from synapse.api.constants import (
     MAX_ALIAS_LENGTH,
@@ -33,10 +39,10 @@ from synapse.events.utils import (
     CANONICALJSON_MIN_INT,
     validate_canonicaljson,
 )
-from synapse.federation.federation_server import server_matches_acl_event
 from synapse.http.servlet import validate_json_object
 from synapse.rest.models import RequestBodyModel
-from synapse.types import EventID, JsonDict, RoomID, UserID
+from synapse.storage.controllers.state import server_acl_evaluator_from_event
+from synapse.types import EventID, JsonDict, RoomID, StrCollection, UserID
 
 
 class EventValidator:
@@ -100,7 +106,10 @@ class EventValidator:
             self._validate_retention(event)
 
         elif event.type == EventTypes.ServerACL:
-            if not server_matches_acl_event(config.server.server_name, event):
+            server_acl_evaluator = server_acl_evaluator_from_event(event)
+            if not server_acl_evaluator.server_matches_acl_event(
+                config.server.server_name
+            ):
                 raise SynapseError(
                     400, "Can't create an ACL event that denies the local server"
                 )
@@ -151,7 +160,7 @@ class EventValidator:
         max_lifetime = event.content.get("max_lifetime")
 
         if min_lifetime is not None:
-            if type(min_lifetime) is not int:
+            if type(min_lifetime) is not int:  # noqa: E721
                 raise SynapseError(
                     code=400,
                     msg="'min_lifetime' must be an integer",
@@ -159,7 +168,7 @@ class EventValidator:
                 )
 
         if max_lifetime is not None:
-            if type(max_lifetime) is not int:
+            if type(max_lifetime) is not int:  # noqa: E721
                 raise SynapseError(
                     code=400,
                     msg="'max_lifetime' must be an integer",
@@ -225,7 +234,7 @@ class EventValidator:
 
             self._ensure_state_event(event)
 
-    def _ensure_strings(self, d: JsonDict, keys: Iterable[str]) -> None:
+    def _ensure_strings(self, d: JsonDict, keys: StrCollection) -> None:
         for s in keys:
             if s not in d:
                 raise SynapseError(400, "'%s' not in content" % (s,))

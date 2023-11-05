@@ -368,9 +368,14 @@ class ServerConfig(Config):
 
         # Whether to enable user presence.
         presence_config = config.get("presence") or {}
-        self.use_presence = presence_config.get("enabled")
-        if self.use_presence is None:
-            self.use_presence = config.get("use_presence", True)
+        presence_enabled = presence_config.get("enabled")
+        if presence_enabled is None:
+            presence_enabled = config.get("use_presence", True)
+
+        # Whether presence is enabled *at all*.
+        self.presence_enabled = bool(presence_enabled)
+        # Whether to internally track presence, requires that presence is enabled,
+        self.track_presence = self.presence_enabled and presence_enabled != "untracked"
 
         # Custom presence router module
         # This is the legacy way of configuring it (the config should now be put in the modules section)
@@ -485,6 +490,17 @@ class ServerConfig(Config):
             )
         else:
             self.redaction_retention_period = None
+
+        # How long to keep locally forgotten rooms before purging them from the DB.
+        forgotten_room_retention_period = config.get(
+            "forgotten_room_retention_period", None
+        )
+        if forgotten_room_retention_period is not None:
+            self.forgotten_room_retention_period: Optional[int] = self.parse_duration(
+                forgotten_room_retention_period
+            )
+        else:
+            self.forgotten_room_retention_period = None
 
         # How long to keep entries in the `users_ips` table.
         user_ips_max_age = config.get("user_ips_max_age", "28d")

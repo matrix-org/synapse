@@ -58,6 +58,7 @@ class InternalAuth(BaseAuth):
         request: SynapseRequest,
         allow_guest: bool = False,
         allow_expired: bool = False,
+        allow_locked: bool = False,
     ) -> Requester:
         """Get a registered user's ID.
 
@@ -79,7 +80,7 @@ class InternalAuth(BaseAuth):
         parent_span = active_span()
         with start_active_span("get_user_by_req"):
             requester = await self._wrapped_get_user_by_req(
-                request, allow_guest, allow_expired
+                request, allow_guest, allow_expired, allow_locked
             )
 
             if parent_span:
@@ -107,13 +108,14 @@ class InternalAuth(BaseAuth):
         request: SynapseRequest,
         allow_guest: bool,
         allow_expired: bool,
+        allow_locked: bool,
     ) -> Requester:
         """Helper for get_user_by_req
 
         Once get_user_by_req has set up the opentracing span, this does the actual work.
         """
         try:
-            ip_addr = request.getClientAddress().host
+            ip_addr = request.get_client_ip_if_available()
             user_agent = get_request_user_agent(request)
 
             access_token = self.get_access_token_from_request(request)
@@ -125,6 +127,17 @@ class InternalAuth(BaseAuth):
                 requester = await self.get_user_by_access_token(
                     access_token, allow_expired=allow_expired
                 )
+
+                # Deny the request if the user account is locked.
+                if not allow_locked and await self.store.get_user_locked_status(
+                    requester.user.to_string()
+                ):
+                    raise AuthError(
+                        401,
+                        "User account has been locked",
+                        errcode=Codes.USER_LOCKED,
+                        additional_fields={"soft_logout": True},
+                    )
 
                 # Deny the request if the user account has expired.
                 # This check is only done for regular users, not appservice ones.
@@ -255,7 +268,7 @@ class InternalAuth(BaseAuth):
             stored_user = await self.store.get_user_by_id(user_id)
             if not stored_user:
                 raise InvalidClientTokenError("Unknown user_id %s" % user_id)
-            if not stored_user["is_guest"]:
+            if not stored_user.is_guest:
                 raise InvalidClientTokenError(
                     "Guest access token used for regular user"
                 )

@@ -22,7 +22,6 @@ from synapse.storage.util.partial_state_events_tracker import (
     PartialStateEventsTracker,
 )
 
-from tests.test_utils import make_awaitable
 from tests.unittest import TestCase
 
 
@@ -124,16 +123,17 @@ class PartialStateEventsTrackerTestCase(TestCase):
 class PartialCurrentStateTrackerTestCase(TestCase):
     def setUp(self) -> None:
         self.mock_store = mock.Mock(spec_set=["is_partial_state_room"])
+        self.mock_store.is_partial_state_room = mock.AsyncMock()
 
         self.tracker = PartialCurrentStateTracker(self.mock_store)
 
     def test_does_not_block_for_full_state_rooms(self) -> None:
-        self.mock_store.is_partial_state_room.return_value = make_awaitable(False)
+        self.mock_store.is_partial_state_room.return_value = False
 
         self.successResultOf(ensureDeferred(self.tracker.await_full_state("room_id")))
 
     def test_blocks_for_partial_room_state(self) -> None:
-        self.mock_store.is_partial_state_room.return_value = make_awaitable(True)
+        self.mock_store.is_partial_state_room.return_value = True
 
         d = ensureDeferred(self.tracker.await_full_state("room_id"))
 
@@ -156,7 +156,7 @@ class PartialCurrentStateTrackerTestCase(TestCase):
         self.successResultOf(ensureDeferred(self.tracker.await_full_state("room_id")))
 
     def test_cancellation(self) -> None:
-        self.mock_store.is_partial_state_room.return_value = make_awaitable(True)
+        self.mock_store.is_partial_state_room.return_value = True
 
         d1 = ensureDeferred(self.tracker.await_full_state("room_id"))
         self.assertNoResult(d1)

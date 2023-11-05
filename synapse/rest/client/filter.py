@@ -19,7 +19,7 @@ from synapse.api.errors import AuthError, NotFoundError, StoreError, SynapseErro
 from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.http.site import SynapseRequest
-from synapse.types import JsonDict, UserID
+from synapse.types import JsonDict, JsonMapping, UserID
 
 from ._base import client_patterns, set_timeline_upper_limit
 
@@ -41,7 +41,7 @@ class GetFilterRestServlet(RestServlet):
 
     async def on_GET(
         self, request: SynapseRequest, user_id: str, filter_id: str
-    ) -> Tuple[int, JsonDict]:
+    ) -> Tuple[int, JsonMapping]:
         target_user = UserID.from_string(user_id)
         requester = await self.auth.get_user_by_req(request)
 

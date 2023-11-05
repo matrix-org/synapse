@@ -64,7 +64,7 @@ from synapse.federation.transport.client import SendJoinResponse
 from synapse.http.client import is_unknown_endpoint
 from synapse.http.types import QueryParams
 from synapse.logging.opentracing import SynapseTags, log_kv, set_tag, tag_args, trace
-from synapse.types import JsonDict, UserID, get_domain_from_id
+from synapse.types import JsonDict, StrCollection, UserID, get_domain_from_id
 from synapse.util.async_helpers import concurrently_execute
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.retryutils import NotRetryingDestination
@@ -1402,7 +1402,7 @@ class FederationClient(FederationBase):
             The remote homeserver return some state from the room. The response
             dictionary is in the form:
 
-            {"knock_state_events": [<state event dict>, ...]}
+            {"knock_room_state": [<state event dict>, ...]}
 
             The list of state events may be empty.
 
@@ -1429,7 +1429,7 @@ class FederationClient(FederationBase):
             The remote homeserver can optionally return some state from the room. The response
             dictionary is in the form:
 
-            {"knock_state_events": [<state event dict>, ...]}
+            {"knock_room_state": [<state event dict>, ...]}
 
             The list of state events may be empty.
         """
@@ -1704,7 +1704,7 @@ class FederationClient(FederationBase):
     async def timestamp_to_event(
         self,
         *,
-        destinations: List[str],
+        destinations: StrCollection,
         room_id: str,
         timestamp: int,
         direction: Direction,
@@ -1891,7 +1891,7 @@ class TimestampToEventResponse:
             )
 
         origin_server_ts = d.get("origin_server_ts")
-        if type(origin_server_ts) is not int:
+        if type(origin_server_ts) is not int:  # noqa: E721
             raise ValueError(
                 "Invalid response: 'origin_server_ts' must be a int but received %r"
                 % origin_server_ts

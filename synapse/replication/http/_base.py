@@ -238,7 +238,7 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
 
                     data[_STREAM_POSITION_KEY] = {
                         "streams": {
-                            stream.NAME: stream.current_token(local_instance_name)
+                            stream.NAME: stream.minimal_local_current_token()
                             for stream in streams
                         },
                         "instance_name": local_instance_name,
@@ -433,7 +433,7 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
 
         if self.WAIT_FOR_STREAMS:
             response[_STREAM_POSITION_KEY] = {
-                stream.NAME: stream.current_token(self._instance_name)
+                stream.NAME: stream.minimal_local_current_token()
                 for stream in self._streams
             }
 

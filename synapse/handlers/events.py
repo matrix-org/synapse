@@ -67,6 +67,7 @@ class EventStreamHandler:
 
         context = await presence_handler.user_syncing(
             requester.user.to_string(),
+            requester.device_id,
             affect_presence=affect_presence,
             presence_state=PresenceState.ONLINE,
         )
@@ -119,7 +120,7 @@ class EventStreamHandler:
 
             events.extend(to_add)
 
-            chunks = self._event_serializer.serialize_events(
+            chunks = await self._event_serializer.serialize_events(
                 events,
                 time_now,
                 config=SerializeEventConfig(

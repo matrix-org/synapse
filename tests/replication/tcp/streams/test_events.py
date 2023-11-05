@@ -12,7 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, List, Optional, Sequence
+from typing import Any, List, Optional
+
+from parameterized import parameterized
 
 from twisted.test.proto_helpers import MemoryReactor
 
@@ -21,6 +23,8 @@ from synapse.events import EventBase
 from synapse.replication.tcp.commands import RdataCommand
 from synapse.replication.tcp.streams._base import _STREAM_UPDATE_TARGET_ROW_COUNT
 from synapse.replication.tcp.streams.events import (
+    _MAX_STATE_UPDATES_PER_ROOM,
+    EventsStreamAllStateRow,
     EventsStreamCurrentStateRow,
     EventsStreamEventRow,
     EventsStreamRow,
@@ -106,11 +110,21 @@ class EventsStreamTestCase(BaseStreamTestCase):
 
         self.assertEqual([], received_rows)
 
-    def test_update_function_huge_state_change(self) -> None:
+    @parameterized.expand(
+        [(_STREAM_UPDATE_TARGET_ROW_COUNT, False), (_MAX_STATE_UPDATES_PER_ROOM, True)]
+    )
+    def test_update_function_huge_state_change(
+        self, num_state_changes: int, collapse_state_changes: bool
+    ) -> None:
         """Test replication with many state events
 
         Ensures that all events are correctly replicated when there are lots of
         state change rows to be replicated.
+
+        Args:
+            num_state_changes: The number of state changes to create.
+            collapse_state_changes: Whether the state changes are expected to be
+                collapsed or not.
         """
 
         # we want to generate lots of state changes at a single stream ID.
@@ -139,13 +153,13 @@ class EventsStreamTestCase(BaseStreamTestCase):
         )
 
         # this is the point in the DAG where we make a fork
-        fork_point: Sequence[str] = self.get_success(
+        fork_point = self.get_success(
             self.hs.get_datastores().main.get_latest_event_ids_in_room(self.room_id)
         )
 
         events = [
             self._inject_state_event(sender=OTHER_USER)
-            for _ in range(_STREAM_UPDATE_TARGET_ROW_COUNT)
+            for _ in range(num_state_changes)
         ]
 
         self.replicate()
@@ -202,8 +216,7 @@ class EventsStreamTestCase(BaseStreamTestCase):
             row for row in self.test_handler.received_rdata_rows if row[0] == "events"
         ]
 
-        # first check the first two rows, which should be state1
-
+        # first check the first two rows, which should be the state1 event.
         stream_name, token, row = received_rows.pop(0)
         self.assertEqual("events", stream_name)
         self.assertIsInstance(row, EventsStreamRow)
@@ -217,7 +230,7 @@ class EventsStreamTestCase(BaseStreamTestCase):
         self.assertIsInstance(row.data, EventsStreamCurrentStateRow)
         self.assertEqual(row.data.event_id, state1.event_id)
 
-        # now the last two rows, which should be state2
+        # now the last two rows, which should be the state2 event.
         stream_name, token, row = received_rows.pop(-2)
         self.assertEqual("events", stream_name)
         self.assertIsInstance(row, EventsStreamRow)
@@ -231,34 +244,54 @@ class EventsStreamTestCase(BaseStreamTestCase):
         self.assertIsInstance(row.data, EventsStreamCurrentStateRow)
         self.assertEqual(row.data.event_id, state2.event_id)
 
-        # that should leave us with the rows for the PL event
-        self.assertEqual(len(received_rows), len(events) + 2)
+        # Based on the number of
+        if collapse_state_changes:
+            # that should leave us with the rows for the PL event, the state changes
+            # get collapsed into a single row.
+            self.assertEqual(len(received_rows), 2)
 
-        stream_name, token, row = received_rows.pop(0)
-        self.assertEqual("events", stream_name)
-        self.assertIsInstance(row, EventsStreamRow)
-        self.assertEqual(row.type, "ev")
-        self.assertIsInstance(row.data, EventsStreamEventRow)
-        self.assertEqual(row.data.event_id, pl_event.event_id)
-
-        # the state rows are unsorted
-        state_rows: List[EventsStreamCurrentStateRow] = []
-        for stream_name, _, row in received_rows:
+            stream_name, token, row = received_rows.pop(0)
             self.assertEqual("events", stream_name)
             self.assertIsInstance(row, EventsStreamRow)
-            self.assertEqual(row.type, "state")
-            self.assertIsInstance(row.data, EventsStreamCurrentStateRow)
-            state_rows.append(row.data)
+            self.assertEqual(row.type, "ev")
+            self.assertIsInstance(row.data, EventsStreamEventRow)
+            self.assertEqual(row.data.event_id, pl_event.event_id)
 
-        state_rows.sort(key=lambda r: r.state_key)
+            stream_name, token, row = received_rows.pop(0)
+            self.assertIsInstance(row, EventsStreamRow)
+            self.assertEqual(row.type, "state-all")
+            self.assertIsInstance(row.data, EventsStreamAllStateRow)
+            self.assertEqual(row.data.room_id, state2.room_id)
 
-        sr = state_rows.pop(0)
-        self.assertEqual(sr.type, EventTypes.PowerLevels)
-        self.assertEqual(sr.event_id, pl_event.event_id)
-        for sr in state_rows:
-            self.assertEqual(sr.type, "test_state_event")
-            # "None" indicates the state has been deleted
-            self.assertIsNone(sr.event_id)
+        else:
+            # that should leave us with the rows for the PL event
+            self.assertEqual(len(received_rows), len(events) + 2)
+
+            stream_name, token, row = received_rows.pop(0)
+            self.assertEqual("events", stream_name)
+            self.assertIsInstance(row, EventsStreamRow)
+            self.assertEqual(row.type, "ev")
+            self.assertIsInstance(row.data, EventsStreamEventRow)
+            self.assertEqual(row.data.event_id, pl_event.event_id)
+
+            # the state rows are unsorted
+            state_rows: List[EventsStreamCurrentStateRow] = []
+            for stream_name, _, row in received_rows:
+                self.assertEqual("events", stream_name)
+                self.assertIsInstance(row, EventsStreamRow)
+                self.assertEqual(row.type, "state")
+                self.assertIsInstance(row.data, EventsStreamCurrentStateRow)
+                state_rows.append(row.data)
+
+            state_rows.sort(key=lambda r: r.state_key)
+
+            sr = state_rows.pop(0)
+            self.assertEqual(sr.type, EventTypes.PowerLevels)
+            self.assertEqual(sr.event_id, pl_event.event_id)
+            for sr in state_rows:
+                self.assertEqual(sr.type, "test_state_event")
+                # "None" indicates the state has been deleted
+                self.assertIsNone(sr.event_id)
 
     def test_update_function_state_row_limit(self) -> None:
         """Test replication with many state events over several stream ids."""
@@ -294,7 +327,7 @@ class EventsStreamTestCase(BaseStreamTestCase):
         )
 
         # this is the point in the DAG where we make a fork
-        fork_point: Sequence[str] = self.get_success(
+        fork_point = self.get_success(
             self.hs.get_datastores().main.get_latest_event_ids_in_room(self.room_id)
         )
 
@@ -316,14 +349,14 @@ class EventsStreamTestCase(BaseStreamTestCase):
         self.test_handler.received_rdata_rows.clear()
 
         # now roll back all that state by de-modding the users
-        prev_events = fork_point
+        prev_events = list(fork_point)
         pl_events = []
         for u in user_ids:
             pls["users"][u] = 0
             e = self.get_success(
                 inject_event(
                     self.hs,
-                    prev_event_ids=list(prev_events),
+                    prev_event_ids=prev_events,
                     type=EventTypes.PowerLevels,
                     state_key="",
                     sender=self.user_id,

@@ -59,7 +59,7 @@ class BasicProxyCredentials(ProxyCredentials):
             a Proxy-Authorization header.
         """
         # Encode as base64 and prepend the authorization type
-        return b"Basic " + base64.encodebytes(self.username_password)
+        return b"Basic " + base64.b64encode(self.username_password)
 
 
 @attr.s(auto_attribs=True)

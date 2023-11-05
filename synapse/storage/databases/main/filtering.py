@@ -13,10 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Optional, Tuple, Union, cast
+from typing import TYPE_CHECKING, Optional, Tuple, Union, cast
 
 from canonicaljson import encode_canonical_json
-from typing_extensions import TYPE_CHECKING
 
 from synapse.api.errors import Codes, StoreError, SynapseError
 from synapse.storage._base import SQLBaseStore, db_to_json
@@ -26,7 +25,7 @@ from synapse.storage.database import (
     LoggingTransaction,
 )
 from synapse.storage.engines import PostgresEngine
-from synapse.types import JsonDict, UserID
+from synapse.types import JsonDict, JsonMapping, UserID
 from synapse.util.caches.descriptors import cached
 
 if TYPE_CHECKING:
@@ -146,7 +145,7 @@ class FilteringWorkerStore(SQLBaseStore):
     @cached(num_args=2)
     async def get_user_filter(
         self, user_id: UserID, filter_id: Union[int, str]
-    ) -> JsonDict:
+    ) -> JsonMapping:
         # filter_id is BIGINT UNSIGNED, so if it isn't a number, fail
         # with a coherent error message rather than 500 M_UNKNOWN.
         try:

@@ -29,10 +29,8 @@ from typing import (
     Union,
 )
 
-from matrix_common.regex import glob_to_regex
 from prometheus_client import Counter, Gauge, Histogram
 
-from twisted.internet.abstract import isIPAddress
 from twisted.python import failure
 
 from synapse.api.constants import (
@@ -63,7 +61,7 @@ from synapse.federation.federation_base import (
 )
 from synapse.federation.persistence import TransactionActions
 from synapse.federation.units import Edu, Transaction
-from synapse.handlers.worker_lock import DELETE_ROOM_LOCK_NAME
+from synapse.handlers.worker_lock import NEW_EVENT_DURING_PURGE_LOCK_NAME
 from synapse.http.servlet import assert_params_in_dict
 from synapse.logging.context import (
     make_deferred_yieldable,
@@ -86,7 +84,7 @@ from synapse.replication.http.federation import (
 from synapse.storage.databases.main.lock import Lock
 from synapse.storage.databases.main.roommember import extract_heroes_from_room_summary
 from synapse.storage.roommember import MemberSummary
-from synapse.types import JsonDict, StateMap, get_domain_from_id
+from synapse.types import JsonDict, StateMap, UserID, get_domain_from_id
 from synapse.util import unwrapFirstError
 from synapse.util.async_helpers import Linearizer, concurrently_execute, gather_results
 from synapse.util.caches.response_cache import ResponseCache
@@ -852,14 +850,7 @@ class FederationServer(FederationBase):
                 context, self._room_prejoin_state_types
             )
         )
-        return {
-            "knock_room_state": stripped_room_state,
-            # Since v1.37, Synapse incorrectly used "knock_state_events" for this field.
-            # Thus, we also populate a 'knock_state_events' with the same content to
-            # support old instances.
-            # See https://github.com/matrix-org/synapse/issues/14088.
-            "knock_state_events": stripped_room_state,
-        }
+        return {"knock_room_state": stripped_room_state}
 
     async def _on_send_membership_event(
         self, origin: str, content: JsonDict, membership_type: str, room_id: str
@@ -1008,6 +999,12 @@ class FederationServer(FederationBase):
     async def on_claim_client_keys(
         self, query: List[Tuple[str, str, str, int]], always_include_fallback_keys: bool
     ) -> Dict[str, Any]:
+        if any(
+            not self.hs.is_mine(UserID.from_string(user_id))
+            for user_id, _, _, _ in query
+        ):
+            raise SynapseError(400, "User is not hosted on this homeserver")
+
         log_kv({"message": "Claiming one time keys.", "user, device pairs": query})
         results = await self._e2e_keys_handler.claim_local_one_time_keys(
             query, always_include_fallback_keys=always_include_fallback_keys
@@ -1245,7 +1242,7 @@ class FederationServer(FederationBase):
                         # while holding the `_INBOUND_EVENT_HANDLING_LOCK_NAME`
                         # lock.
                         async with self._worker_lock_handler.acquire_read_write_lock(
-                            DELETE_ROOM_LOCK_NAME, room_id, write=False
+                            NEW_EVENT_DURING_PURGE_LOCK_NAME, room_id, write=False
                         ):
                             await self._federation_event_handler.on_receive_pdu(
                                 origin, event
@@ -1324,75 +1321,13 @@ class FederationServer(FederationBase):
         Raises:
             AuthError if the server does not match the ACL
         """
-        acl_event = await self._storage_controllers.state.get_current_state_event(
-            room_id, EventTypes.ServerACL, ""
+        server_acl_evaluator = (
+            await self._storage_controllers.state.get_server_acl_for_room(room_id)
         )
-        if not acl_event or server_matches_acl_event(server_name, acl_event):
-            return
-
-        raise AuthError(code=403, msg="Server is banned from room")
-
-
-def server_matches_acl_event(server_name: str, acl_event: EventBase) -> bool:
-    """Check if the given server is allowed by the ACL event
-
-    Args:
-        server_name: name of server, without any port part
-        acl_event: m.room.server_acl event
-
-    Returns:
-        True if this server is allowed by the ACLs
-    """
-    logger.debug("Checking %s against acl %s", server_name, acl_event.content)
-
-    # first of all, check if literal IPs are blocked, and if so, whether the
-    # server name is a literal IP
-    allow_ip_literals = acl_event.content.get("allow_ip_literals", True)
-    if not isinstance(allow_ip_literals, bool):
-        logger.warning("Ignoring non-bool allow_ip_literals flag")
-        allow_ip_literals = True
-    if not allow_ip_literals:
-        # check for ipv6 literals. These start with '['.
-        if server_name[0] == "[":
-            return False
-
-        # check for ipv4 literals. We can just lift the routine from twisted.
-        if isIPAddress(server_name):
-            return False
-
-    # next,  check the deny list
-    deny = acl_event.content.get("deny", [])
-    if not isinstance(deny, (list, tuple)):
-        logger.warning("Ignoring non-list deny ACL %s", deny)
-        deny = []
-    for e in deny:
-        if _acl_entry_matches(server_name, e):
-            # logger.info("%s matched deny rule %s", server_name, e)
-            return False
-
-    # then the allow list.
-    allow = acl_event.content.get("allow", [])
-    if not isinstance(allow, (list, tuple)):
-        logger.warning("Ignoring non-list allow ACL %s", allow)
-        allow = []
-    for e in allow:
-        if _acl_entry_matches(server_name, e):
-            # logger.info("%s matched allow rule %s", server_name, e)
-            return True
-
-    # everything else should be rejected.
-    # logger.info("%s fell through", server_name)
-    return False
-
-
-def _acl_entry_matches(server_name: str, acl_entry: Any) -> bool:
-    if not isinstance(acl_entry, str):
-        logger.warning(
-            "Ignoring non-str ACL entry '%s' (is %s)", acl_entry, type(acl_entry)
-        )
-        return False
-    regex = glob_to_regex(acl_entry)
-    return bool(regex.match(server_name))
+        if server_acl_evaluator and not server_acl_evaluator.server_matches_acl_event(
+            server_name
+        ):
+            raise AuthError(code=403, msg="Server is banned from room")
 
 
 class FederationHandlerRegistry:
@@ -1466,7 +1401,7 @@ class FederationHandlerRegistry:
         self._edu_type_to_instance[edu_type] = instance_names
 
     async def on_edu(self, edu_type: str, origin: str, content: dict) -> None:
-        if not self.config.server.use_presence and edu_type == EduTypes.PRESENCE:
+        if not self.config.server.track_presence and edu_type == EduTypes.PRESENCE:
             return
 
         # Check if we have a handler on this instance

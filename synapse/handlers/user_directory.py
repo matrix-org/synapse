@@ -14,7 +14,7 @@
 
 import logging
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple
+from typing import TYPE_CHECKING, List, Optional, Set, Tuple
 
 from twisted.internet.interfaces import IDelayedCall
 
@@ -23,6 +23,7 @@ from synapse.api.constants import EventTypes, HistoryVisibility, JoinRules, Memb
 from synapse.api.errors import Codes, SynapseError
 from synapse.handlers.state_deltas import MatchChange, StateDeltasHandler
 from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.storage.databases.main.state_deltas import StateDelta
 from synapse.storage.databases.main.user_directory import SearchResult
 from synapse.storage.roommember import ProfileInfo
 from synapse.types import UserID
@@ -94,6 +95,7 @@ class UserDirectoryHandler(StateDeltasHandler):
         self.is_mine_id = hs.is_mine_id
         self.update_user_directory = hs.config.worker.should_update_user_directory
         self.search_all_users = hs.config.userdirectory.user_directory_search_all_users
+        self.show_locked_users = hs.config.userdirectory.show_locked_users
         self._spam_checker_module_callbacks = hs.get_module_api_callbacks().spam_checker
         self._hs = hs
 
@@ -144,7 +146,9 @@ class UserDirectoryHandler(StateDeltasHandler):
                     ]
                 }
         """
-        results = await self.store.search_user_dir(user_id, search_term, limit)
+        results = await self.store.search_user_dir(
+            user_id, search_term, limit, self.show_locked_users
+        )
 
         # Remove any spammy users from the results.
         non_spammy_users = []
@@ -244,32 +248,31 @@ class UserDirectoryHandler(StateDeltasHandler):
 
                 await self.store.update_user_directory_stream_pos(max_pos)
 
-    async def _handle_deltas(self, deltas: List[Dict[str, Any]]) -> None:
+    async def _handle_deltas(self, deltas: List[StateDelta]) -> None:
         """Called with the state deltas to process"""
         for delta in deltas:
-            typ = delta["type"]
-            state_key = delta["state_key"]
-            room_id = delta["room_id"]
-            event_id: Optional[str] = delta["event_id"]
-            prev_event_id: Optional[str] = delta["prev_event_id"]
-
-            logger.debug("Handling: %r %r, %s", typ, state_key, event_id)
+            logger.debug(
+                "Handling: %r %r, %s", delta.event_type, delta.state_key, delta.event_id
+            )
 
             # For join rule and visibility changes we need to check if the room
             # may have become public or not and add/remove the users in said room
-            if typ in (EventTypes.RoomHistoryVisibility, EventTypes.JoinRules):
+            if delta.event_type in (
+                EventTypes.RoomHistoryVisibility,
+                EventTypes.JoinRules,
+            ):
                 await self._handle_room_publicity_change(
-                    room_id, prev_event_id, event_id, typ
+                    delta.room_id, delta.prev_event_id, delta.event_id, delta.event_type
                 )
-            elif typ == EventTypes.Member:
+            elif delta.event_type == EventTypes.Member:
                 await self._handle_room_membership_event(
-                    room_id,
-                    prev_event_id,
-                    event_id,
-                    state_key,
+                    delta.room_id,
+                    delta.prev_event_id,
+                    delta.event_id,
+                    delta.state_key,
                 )
             else:
-                logger.debug("Ignoring irrelevant type: %r", typ)
+                logger.debug("Ignoring irrelevant type: %r", delta.event_type)
 
     async def _handle_room_publicity_change(
         self,

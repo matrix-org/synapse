@@ -53,7 +53,7 @@ from synapse.events.snapshot import EventContext, UnpersistedEventContextBase
 from synapse.events.utils import SerializeEventConfig, maybe_upsert_event_field
 from synapse.events.validator import EventValidator
 from synapse.handlers.directory import DirectoryHandler
-from synapse.handlers.worker_lock import DELETE_ROOM_LOCK_NAME
+from synapse.handlers.worker_lock import NEW_EVENT_DURING_PURGE_LOCK_NAME
 from synapse.logging import opentracing
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
@@ -244,7 +244,7 @@ class MessageHandler:
                 )
                 room_state = room_state_events[membership_event_id]
 
-        events = self._event_serializer.serialize_events(
+        events = await self._event_serializer.serialize_events(
             room_state.values(),
             self.clock.time_msec(),
             config=SerializeEventConfig(requester=requester),
@@ -379,7 +379,7 @@ class MessageHandler:
         """
 
         expiry_ts = event.content.get(EventContentFields.SELF_DESTRUCT_AFTER)
-        if type(expiry_ts) is not int or event.is_state():
+        if type(expiry_ts) is not int or event.is_state():  # noqa: E721
             return
 
         # _schedule_expiry_for_event won't actually schedule anything if there's already
@@ -560,8 +560,6 @@ class EventCreationHandler:
                 self.clock,
                 expiry_ms=30 * 60 * 1000,
             )
-
-        self._msc3970_enabled = hs.config.experimental.msc3970_enabled
 
     async def create_event(
         self,
@@ -830,13 +828,13 @@ class EventCreationHandler:
 
         u = await self.store.get_user_by_id(user_id)
         assert u is not None
-        if u["user_type"] in (UserTypes.SUPPORT, UserTypes.BOT):
+        if u.user_type in (UserTypes.SUPPORT, UserTypes.BOT):
             # support and bot users are not required to consent
             return
-        if u["appservice_id"] is not None:
+        if u.appservice_id is not None:
             # users registered by an appservice are exempt
             return
-        if u["consent_version"] == self.config.consent.user_consent_version:
+        if u.consent_version == self.config.consent.user_consent_version:
             return
 
         consent_uri = self._consent_uri_builder.build_user_consent_uri(user.localpart)
@@ -897,9 +895,8 @@ class EventCreationHandler:
         """
         existing_event_id = None
 
-        if self._msc3970_enabled and requester.device_id:
-            # When MSC3970 is enabled, we lookup for events sent by the same device first,
-            # and fallback to the old behaviour if none were found.
+        # According to the spec, transactions are scoped to a user's device ID.
+        if requester.device_id:
             existing_event_id = (
                 await self.store.get_event_id_from_transaction_id_and_device_id(
                     room_id,
@@ -910,18 +907,6 @@ class EventCreationHandler:
             )
             if existing_event_id:
                 return existing_event_id
-
-        # Pre-MSC3970, we looked up for events that were sent by the same session by
-        # using the access token ID.
-        if requester.access_token_id:
-            existing_event_id = (
-                await self.store.get_event_id_from_transaction_id_and_token_id(
-                    room_id,
-                    requester.user.to_string(),
-                    requester.access_token_id,
-                    txn_id,
-                )
-            )
 
         return existing_event_id
 
@@ -1014,7 +999,26 @@ class EventCreationHandler:
             raise ShadowBanError()
 
         if ratelimit:
-            await self.request_ratelimiter.ratelimit(requester, update=False)
+            room_id = event_dict["room_id"]
+            try:
+                room_version = await self.store.get_room_version(room_id)
+            except NotFoundError:
+                # The room doesn't exist.
+                raise AuthError(403, f"User {requester.user} not in room {room_id}")
+
+            if room_version.updated_redaction_rules:
+                redacts = event_dict["content"].get("redacts")
+            else:
+                redacts = event_dict.get("redacts")
+
+            is_admin_redaction = await self.is_admin_redaction(
+                event_type=event_dict["type"],
+                sender=event_dict["sender"],
+                redacts=redacts,
+            )
+            await self.request_ratelimiter.ratelimit(
+                requester, is_admin_redaction=is_admin_redaction, update=False
+            )
 
         # We limit the number of concurrent event sends in a room so that we
         # don't fork the DAG too much. If we don't limit then we can end up in
@@ -1036,7 +1040,7 @@ class EventCreationHandler:
                     )
 
         async with self._worker_lock_handler.acquire_read_write_lock(
-            DELETE_ROOM_LOCK_NAME, room_id, write=False
+            NEW_EVENT_DURING_PURGE_LOCK_NAME, room_id, write=False
         ):
             return await self._create_and_send_nonmember_event_locked(
                 requester=requester,
@@ -1148,7 +1152,6 @@ class EventCreationHandler:
                 # in the meantime and context needs to be recomputed, so let's do so.
                 if i == max_retries - 1:
                     raise e
-                pass
 
         # we know it was persisted, so must have a stream ordering
         assert ev.internal_metadata.stream_ordering
@@ -1476,23 +1479,23 @@ class EventCreationHandler:
 
         # We now persist the event (and update the cache in parallel, since we
         # don't want to block on it).
-        event, context = events_and_context[0]
+        #
+        # Note: mypy gets confused if we inline dl and check with twisted#11770.
+        # Some kind of bug in mypy's deduction?
+        deferreds = (
+            run_in_background(
+                self._persist_events,
+                requester=requester,
+                events_and_context=events_and_context,
+                ratelimit=ratelimit,
+                extra_users=extra_users,
+            ),
+            run_in_background(
+                self.cache_joined_hosts_for_events, events_and_context
+            ).addErrback(log_failure, "cache_joined_hosts_for_event failed"),
+        )
         result, _ = await make_deferred_yieldable(
-            gather_results(
-                (
-                    run_in_background(
-                        self._persist_events,
-                        requester=requester,
-                        events_and_context=events_and_context,
-                        ratelimit=ratelimit,
-                        extra_users=extra_users,
-                    ),
-                    run_in_background(
-                        self.cache_joined_hosts_for_events, events_and_context
-                    ).addErrback(log_failure, "cache_joined_hosts_for_event failed"),
-                ),
-                consumeErrors=True,
-            )
+            gather_results(deferreds, consumeErrors=True)
         ).addErrback(unwrapFirstError)
 
         return result
@@ -1524,6 +1527,18 @@ class EventCreationHandler:
                 first_event.room_id
             )
             if writer_instance != self._instance_name:
+                # Ratelimit before sending to the other event persister, to
+                # ensure that we correctly have ratelimits on both the event
+                # creators and event persisters.
+                if ratelimit:
+                    for event, _ in events_and_context:
+                        is_admin_redaction = await self.is_admin_redaction(
+                            event.type, event.sender, event.redacts
+                        )
+                        await self.request_ratelimiter.ratelimit(
+                            requester, is_admin_redaction=is_admin_redaction
+                        )
+
                 try:
                     result = await self.send_events(
                         instance_name=writer_instance,
@@ -1554,6 +1569,7 @@ class EventCreationHandler:
                     # stream_ordering entry manually (as it was persisted on
                     # another worker).
                     event.internal_metadata.stream_ordering = stream_id
+
                 return event
 
             event = await self.persist_and_notify_client_events(
@@ -1712,21 +1728,9 @@ class EventCreationHandler:
                 # can apply different ratelimiting. We do this by simply checking
                 # it's not a self-redaction (to avoid having to look up whether the
                 # user is actually admin or not).
-                is_admin_redaction = False
-                if event.type == EventTypes.Redaction:
-                    assert event.redacts is not None
-
-                    original_event = await self.store.get_event(
-                        event.redacts,
-                        redact_behaviour=EventRedactBehaviour.as_is,
-                        get_prev_content=False,
-                        allow_rejected=False,
-                        allow_none=True,
-                    )
-
-                    is_admin_redaction = bool(
-                        original_event and event.sender != original_event.sender
-                    )
+                is_admin_redaction = await self.is_admin_redaction(
+                    event.type, event.sender, event.redacts
+                )
 
                 await self.request_ratelimiter.ratelimit(
                     requester, is_admin_redaction=is_admin_redaction
@@ -1744,6 +1748,11 @@ class EventCreationHandler:
                     self._notifier.notify_user_joined_room(
                         event.event_id, event.room_id
                     )
+
+            if event.type == EventTypes.ServerACL:
+                self._storage_controllers.state.get_server_acl_for_room.invalidate(
+                    (event.room_id,)
+                )
 
             await self._maybe_kick_guest_users(event, context)
 
@@ -1923,7 +1932,10 @@ class EventCreationHandler:
                 # We don't want to block sending messages on any presence code. This
                 # matters as sometimes presence code can take a while.
                 run_as_background_process(
-                    "bump_presence_active_time", self._bump_active_time, requester.user
+                    "bump_presence_active_time",
+                    self._bump_active_time,
+                    requester.user,
+                    requester.device_id,
                 )
 
         async def _notify() -> None:
@@ -1937,6 +1949,27 @@ class EventCreationHandler:
         run_in_background(_notify)
 
         return persisted_events[-1]
+
+    async def is_admin_redaction(
+        self, event_type: str, sender: str, redacts: Optional[str]
+    ) -> bool:
+        """Return whether the event is a redaction made by an admin, and thus
+        should use a different ratelimiter.
+        """
+        if event_type != EventTypes.Redaction:
+            return False
+
+        assert redacts is not None
+
+        original_event = await self.store.get_event(
+            redacts,
+            redact_behaviour=EventRedactBehaviour.as_is,
+            get_prev_content=False,
+            allow_rejected=False,
+            allow_none=True,
+        )
+
+        return bool(original_event and sender != original_event.sender)
 
     async def _maybe_kick_guest_users(
         self, event: EventBase, context: EventContext
@@ -1960,10 +1993,10 @@ class EventCreationHandler:
         logger.info("maybe_kick_guest_users %r", current_state)
         await self.hs.get_room_member_handler().kick_guest_users(current_state)
 
-    async def _bump_active_time(self, user: UserID) -> None:
+    async def _bump_active_time(self, user: UserID, device_id: Optional[str]) -> None:
         try:
             presence = self.hs.get_presence_handler()
-            await presence.bump_presence_active_time(user)
+            await presence.bump_presence_active_time(user, device_id)
         except Exception:
             logger.exception("Error bumping presence active time")
 
@@ -1980,7 +2013,7 @@ class EventCreationHandler:
 
         for room_id in room_ids:
             async with self._worker_lock_handler.acquire_read_write_lock(
-                DELETE_ROOM_LOCK_NAME, room_id, write=False
+                NEW_EVENT_DURING_PURGE_LOCK_NAME, room_id, write=False
             ):
                 dummy_event_sent = await self._send_dummy_event_for_room(room_id)
 
@@ -2045,7 +2078,6 @@ class EventCreationHandler:
                         # in the meantime and context needs to be recomputed, so let's do so.
                         if i == max_retries - 1:
                             raise e
-                        pass
                 return True
             except AuthError:
                 logger.info(

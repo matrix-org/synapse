@@ -23,6 +23,7 @@ from typing import (
     Generator,
     Iterable,
     List,
+    Mapping,
     Optional,
     Tuple,
     TypeVar,
@@ -31,13 +32,15 @@ from typing import (
 
 import attr
 import jinja2
-from typing_extensions import ParamSpec
+from typing_extensions import Concatenate, ParamSpec
 
 from twisted.internet import defer
+from twisted.internet.interfaces import IDelayedCall
 from twisted.web.resource import Resource
 
 from synapse.api import errors
 from synapse.api.errors import SynapseError
+from synapse.api.presence import UserPresenceState
 from synapse.config import ConfigError
 from synapse.events import EventBase
 from synapse.events.presence_router import (
@@ -45,6 +48,7 @@ from synapse.events.presence_router import (
     GET_USERS_FOR_STATES_CALLBACK,
     PresenceRouter,
 )
+from synapse.events.utils import ADD_EXTRA_FIELDS_TO_UNSIGNED_CLIENT_EVENT_CALLBACK
 from synapse.handlers.account_data import ON_ACCOUNT_DATA_UPDATED_CALLBACK
 from synapse.handlers.auth import (
     CHECK_3PID_AUTH_CALLBACK,
@@ -256,6 +260,7 @@ class ModuleApi:
         self.custom_template_dir = hs.config.server.custom_template_directory
         self._callbacks = hs.get_module_api_callbacks()
         self.msc3861_oauth_delegation_enabled = hs.config.experimental.msc3861.enabled
+        self._event_serializer = hs.get_event_client_serializer()
 
         try:
             app_name = self._hs.config.email.email_app_name
@@ -487,6 +492,25 @@ class ModuleApi:
         """
         self._hs.register_module_web_resource(path, resource)
 
+    def register_add_extra_fields_to_unsigned_client_event_callbacks(
+        self,
+        *,
+        add_field_to_unsigned_callback: Optional[
+            ADD_EXTRA_FIELDS_TO_UNSIGNED_CLIENT_EVENT_CALLBACK
+        ] = None,
+    ) -> None:
+        """Registers a callback that can be used to add fields to the unsigned
+        section of events.
+
+        The callback is called every time an event is sent down to a client.
+
+        Added in Synapse 1.96.0
+        """
+        if add_field_to_unsigned_callback is not None:
+            self._event_serializer.register_add_extra_fields_to_unsigned_client_event_callback(
+                add_field_to_unsigned_callback
+            )
+
     #########################################################################
     # The following methods can be called by the module at any point in time.
 
@@ -571,7 +595,7 @@ class ModuleApi:
         Returns:
             UserInfo object if a user was found, otherwise None
         """
-        return await self._store.get_userinfo_by_id(user_id)
+        return await self._store.get_user_by_id(user_id)
 
     async def get_user_by_req(
         self,
@@ -677,7 +701,7 @@ class ModuleApi:
             "msisdn" for phone numbers, and an "address" key which value is the
             threepid's address.
         """
-        return await self._store.user_get_threepids(user_id)
+        return [attr.asdict(t) for t in await self._store.user_get_threepids(user_id)]
 
     def check_user_exists(self, user_id: str) -> "defer.Deferred[Optional[str]]":
         """Check if user exists.
@@ -884,7 +908,7 @@ class ModuleApi:
     def run_db_interaction(
         self,
         desc: str,
-        func: Callable[P, T],
+        func: Callable[Concatenate[LoggingTransaction, P], T],
         *args: P.args,
         **kwargs: P.kwargs,
     ) -> "defer.Deferred[T]":
@@ -1179,9 +1203,40 @@ class ModuleApi:
 
             # Send to remote destinations.
             destination = UserID.from_string(user).domain
-            presence_handler.get_federation_queue().send_presence_to_destinations(
+            await presence_handler.get_federation_queue().send_presence_to_destinations(
                 presence_events, [destination]
             )
+
+    async def set_presence_for_users(
+        self, users: Mapping[str, Tuple[str, Optional[str]]]
+    ) -> None:
+        """
+        Update the internal presence state of users.
+
+        This can be used for either local or remote users.
+
+        Note that this method can only be run on the process that is configured to write to the
+        presence stream. By default, this is the main process.
+
+        Added in Synapse v1.96.0.
+        """
+
+        # We pull out the presence handler here to break a cyclic
+        # dependency between the presence router and module API.
+        presence_handler = self._hs.get_presence_handler()
+
+        from synapse.handlers.presence import PresenceHandler
+
+        assert isinstance(presence_handler, PresenceHandler)
+
+        states = await presence_handler.current_state_for_users(users.keys())
+        for user_id, (state, status_msg) in users.items():
+            prev_state = states.setdefault(user_id, UserPresenceState.default(user_id))
+            states[user_id] = prev_state.copy_and_replace(
+                state=state, status_msg=status_msg
+            )
+
+        await presence_handler._update_states(states.values(), force_notify=True)
 
     def looping_background_call(
         self,
@@ -1229,6 +1284,58 @@ class ModuleApi:
                 "Not running looping call %s as the configuration forbids it",
                 f,
             )
+
+    def should_run_background_tasks(self) -> bool:
+        """
+        Return true if and only if the current worker is configured to run
+        background tasks.
+        There should only be one worker configured to run background tasks, so
+        this is helpful when you need to only run a task on one worker but don't
+        have any other good way to choose which one.
+
+        Added in Synapse v1.89.0.
+        """
+        return self._hs.config.worker.run_background_tasks
+
+    def delayed_background_call(
+        self,
+        msec: float,
+        f: Callable,
+        *args: object,
+        desc: Optional[str] = None,
+        **kwargs: object,
+    ) -> IDelayedCall:
+        """Wraps a function as a background process and calls it in a given number of milliseconds.
+
+        The scheduled call is not persistent: if the current Synapse instance is
+        restarted before the call is made, the call will not be made.
+
+        Added in Synapse v1.90.0.
+
+        Args:
+            msec: How long to wait before calling, in milliseconds.
+            f: The function to call once. f can be either synchronous or
+                asynchronous, and must follow Synapse's logcontext rules.
+                More info about logcontexts is available at
+                https://matrix-org.github.io/synapse/latest/log_contexts.html
+            *args: Positional arguments to pass to function.
+            desc: The background task's description. Default to the function's name.
+            **kwargs: Keyword arguments to pass to function.
+
+        Returns:
+            IDelayedCall handle from twisted, which allows to cancel the delayed call if desired.
+        """
+
+        if desc is None:
+            desc = f.__name__
+
+        return self._clock.call_later(
+            # convert ms to seconds as needed by call_later.
+            msec * 0.001,
+            run_as_background_process,
+            desc,
+            lambda: maybe_awaitable(f(*args, **kwargs)),
+        )
 
     async def sleep(self, seconds: float) -> None:
         """Sleeps for the given number of seconds.
@@ -1677,6 +1784,30 @@ class ModuleApi:
         room_alias_str = room_alias.to_string() if room_alias else None
         return room_id, room_alias_str
 
+    async def delete_room(self, room_id: str) -> None:
+        """
+        Schedules the deletion of a room from Synapse's database.
+
+        If the room is already being deleted, this method does nothing.
+        This method does not wait for the room to be deleted.
+
+        Added in Synapse v1.89.0.
+        """
+        # Future extensions to this method might want to e.g. allow use of `force_purge`.
+        # TODO In the future we should make sure this is persistent.
+        await self._hs.get_pagination_handler().start_shutdown_and_purge_room(
+            room_id,
+            {
+                "new_room_user_id": None,
+                "new_room_name": None,
+                "message": None,
+                "requester_user_id": None,
+                "block": False,
+                "purge": True,
+                "force_purge": False,
+            },
+        )
+
     async def set_displayname(
         self,
         user_id: UserID,
@@ -1812,7 +1943,7 @@ class AccountDataManager:
             raise TypeError(f"new_data must be a dict; got {type(new_data).__name__}")
 
         # Ensure the user exists, so we don't just write to users that aren't there.
-        if await self._store.get_userinfo_by_id(user_id) is None:
+        if await self._store.get_user_by_id(user_id) is None:
             raise ValueError(f"User {user_id} does not exist on this server.")
 
         await self._handler.add_account_data_for_user(user_id, data_type, new_data)

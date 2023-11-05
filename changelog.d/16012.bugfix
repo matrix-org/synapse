@@ -1,1 +1,0 @@
-Fix 404 not found code returned on profile endpoint when the display name is empty but not the avatar URL.

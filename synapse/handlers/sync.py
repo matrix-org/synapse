@@ -56,6 +56,8 @@ from synapse.storage.roommember import MemberSummary
 from synapse.types import (
     DeviceListUpdates,
     JsonDict,
+    JsonMapping,
+    MultiWriterStreamToken,
     MutableStateMap,
     Requester,
     RoomStreamToken,
@@ -233,7 +235,7 @@ class SyncResult:
     archived: List[ArchivedSyncResult]
     to_device: List[JsonDict]
     device_lists: DeviceListUpdates
-    device_one_time_keys_count: JsonDict
+    device_one_time_keys_count: JsonMapping
     device_unused_fallback_key_types: List[str]
 
     def __bool__(self) -> bool:
@@ -268,6 +270,7 @@ class SyncHandler:
         self._storage_controllers = hs.get_storage_controllers()
         self._state_storage_controller = self._storage_controllers.state
         self._device_handler = hs.get_device_handler()
+        self._task_scheduler = hs.get_task_scheduler()
 
         self.should_calculate_push_rules = hs.config.push.enable_push
 
@@ -361,7 +364,9 @@ class SyncHandler:
         if since_token is not None:
             since_stream_id = since_token.to_device_key
             deleted = await self.store.delete_messages_for_device(
-                sync_config.user.to_string(), sync_config.device_id, since_stream_id
+                sync_config.user.to_string(),
+                sync_config.device_id,
+                since_stream_id,
             )
             logger.debug(
                 "Deleted %d to-device messages up to %d", deleted, since_stream_id
@@ -387,16 +392,16 @@ class SyncHandler:
                 from_token=since_token,
             )
 
-            # if nothing has happened in any of the users' rooms since /sync was called,
-            # the resultant next_batch will be the same as since_token (since the result
-            # is generated when wait_for_events is first called, and not regenerated
-            # when wait_for_events times out).
-            #
-            # If that happens, we mustn't cache it, so that when the client comes back
-            # with the same cache token, we don't immediately return the same empty
-            # result, causing a tightloop. (#8518)
-            if result.next_batch == since_token:
-                cache_context.should_cache = False
+        # if nothing has happened in any of the users' rooms since /sync was called,
+        # the resultant next_batch will be the same as since_token (since the result
+        # is generated when wait_for_events is first called, and not regenerated
+        # when wait_for_events times out).
+        #
+        # If that happens, we mustn't cache it, so that when the client comes back
+        # with the same cache token, we don't immediately return the same empty
+        # result, causing a tightloop. (#8518)
+        if result.next_batch == since_token:
+            cache_context.should_cache = False
 
         if result:
             if sync_config.filter_collection.lazy_load_members():
@@ -473,7 +478,11 @@ class SyncHandler:
                 event_copy = {k: v for (k, v) in event.items() if k != "room_id"}
                 ephemeral_by_room.setdefault(room_id, []).append(event_copy)
 
-            receipt_key = since_token.receipt_key if since_token else 0
+            receipt_key = (
+                since_token.receipt_key
+                if since_token
+                else MultiWriterStreamToken(stream=0)
+            )
 
             receipt_source = self.event_sources.sources.receipt
             receipts, receipt_key = await receipt_source.get_new_events(
@@ -496,12 +505,27 @@ class SyncHandler:
     async def _load_filtered_recents(
         self,
         room_id: str,
+        sync_result_builder: "SyncResultBuilder",
         sync_config: SyncConfig,
-        now_token: StreamToken,
+        upto_token: StreamToken,
         since_token: Optional[StreamToken] = None,
         potential_recents: Optional[List[EventBase]] = None,
         newly_joined_room: bool = False,
     ) -> TimelineBatch:
+        """Create a timeline batch for the room
+
+        Args:
+            room_id
+            sync_result_builder
+            sync_config
+            upto_token: The token up to which we should fetch (more) events.
+                If `potential_results` is non-empty then this is *start* of
+                the the list.
+            since_token
+            potential_recents: If non-empty, the events between the since token
+                and current token to send down to clients.
+            newly_joined_room
+        """
         with Measure(self.clock, "load_filtered_recents"):
             timeline_limit = sync_config.filter_collection.timeline_limit()
             block_all_timeline = (
@@ -516,6 +540,20 @@ class SyncHandler:
                 limited = True
             else:
                 limited = False
+
+            # Check if there is a gap, if so we need to mark this as limited and
+            # recalculate which events to send down.
+            gap_token = await self.store.get_timeline_gaps(
+                room_id,
+                since_token.room_key if since_token else None,
+                sync_result_builder.now_token.room_key,
+            )
+            if gap_token:
+                # There's a gap, so we need to ignore the passed in
+                # `potential_recents`, and reset `upto_token` to match.
+                potential_recents = None
+                upto_token = sync_result_builder.now_token
+                limited = True
 
             log_kv({"limited": limited})
 
@@ -555,10 +593,10 @@ class SyncHandler:
                 recents = []
 
             if not limited or block_all_timeline:
-                prev_batch_token = now_token
+                prev_batch_token = upto_token
                 if recents:
                     room_key = recents[0].internal_metadata.before
-                    prev_batch_token = now_token.copy_and_replace(
+                    prev_batch_token = upto_token.copy_and_replace(
                         StreamKeyType.ROOM, room_key
                     )
 
@@ -569,11 +607,15 @@ class SyncHandler:
             filtering_factor = 2
             load_limit = max(timeline_limit * filtering_factor, 10)
             max_repeat = 5  # Only try a few times per room, otherwise
-            room_key = now_token.room_key
+            room_key = upto_token.room_key
             end_key = room_key
 
             since_key = None
-            if since_token and not newly_joined_room:
+            if since_token and gap_token:
+                # If there is a gap then we need to only include events after
+                # it.
+                since_key = gap_token
+            elif since_token and not newly_joined_room:
                 since_key = since_token.room_key
 
             while limited and len(recents) < timeline_limit and max_repeat:
@@ -643,7 +685,7 @@ class SyncHandler:
                 recents = recents[-timeline_limit:]
                 room_key = recents[0].internal_metadata.before
 
-            prev_batch_token = now_token.copy_and_replace(StreamKeyType.ROOM, room_key)
+            prev_batch_token = upto_token.copy_and_replace(StreamKeyType.ROOM, room_key)
 
         # Don't bother to bundle aggregations if the timeline is unlimited,
         # as clients will have all the necessary information.
@@ -658,7 +700,9 @@ class SyncHandler:
         return TimelineBatch(
             events=recents,
             prev_batch=prev_batch_token,
-            limited=limited or newly_joined_room,
+            # Also mark as limited if this is a new room or there has been a gap
+            # (to force client to paginate the gap).
+            limited=limited or newly_joined_room or gap_token is not None,
             bundled_aggregations=bundled_aggregations,
         )
 
@@ -1442,11 +1486,9 @@ class SyncHandler:
 
         # Now we have our list of joined room IDs, exclude as configured and freeze
         joined_room_ids = frozenset(
-            (
-                room_id
-                for room_id in mutable_joined_room_ids
-                if room_id not in mutable_rooms_to_exclude
-            )
+            room_id
+            for room_id in mutable_joined_room_ids
+            if room_id not in mutable_rooms_to_exclude
         )
 
         logger.debug(
@@ -1475,7 +1517,7 @@ class SyncHandler:
 
         # Presence data is included if the server has it enabled and not filtered out.
         include_presence_data = bool(
-            self.hs_config.server.use_presence
+            self.hs_config.server.presence_enabled
             and not sync_config.filter_collection.blocks_all_presence()
         )
         # Device list updates are sent if a since token is provided.
@@ -1534,7 +1576,7 @@ class SyncHandler:
 
         logger.debug("Fetching OTK data")
         device_id = sync_config.device_id
-        one_time_keys_count: JsonDict = {}
+        one_time_keys_count: JsonMapping = {}
         unused_fallback_key_types: List[str] = []
         if device_id:
             # TODO: We should have a way to let clients differentiate between the states of:
@@ -1770,19 +1812,23 @@ class SyncHandler:
             )
 
             if push_rules_changed:
-                global_account_data = dict(global_account_data)
-                global_account_data[
-                    AccountDataTypes.PUSH_RULES
-                ] = await self._push_rules_handler.push_rules_for_user(sync_config.user)
+                global_account_data = {
+                    AccountDataTypes.PUSH_RULES: await self._push_rules_handler.push_rules_for_user(
+                        sync_config.user
+                    ),
+                    **global_account_data,
+                }
         else:
             all_global_account_data = await self.store.get_global_account_data_for_user(
                 user_id
             )
 
-            global_account_data = dict(all_global_account_data)
-            global_account_data[
-                AccountDataTypes.PUSH_RULES
-            ] = await self._push_rules_handler.push_rules_for_user(sync_config.user)
+            global_account_data = {
+                AccountDataTypes.PUSH_RULES: await self._push_rules_handler.push_rules_for_user(
+                    sync_config.user
+                ),
+                **all_global_account_data,
+            }
 
         account_data_for_user = (
             await sync_config.filter_collection.filter_global_account_data(
@@ -1886,7 +1932,7 @@ class SyncHandler:
             blocks_all_rooms
             or sync_result_builder.sync_config.filter_collection.blocks_all_room_account_data()
         ):
-            account_data_by_room: Mapping[str, Mapping[str, JsonDict]] = {}
+            account_data_by_room: Mapping[str, Mapping[str, JsonMapping]] = {}
         elif since_token and not sync_result_builder.full_state:
             account_data_by_room = (
                 await self.store.get_updated_room_account_data_for_user(
@@ -2305,7 +2351,7 @@ class SyncHandler:
                             continue
 
                 leave_token = now_token.copy_and_replace(
-                    StreamKeyType.ROOM, RoomStreamToken(None, event.stream_ordering)
+                    StreamKeyType.ROOM, RoomStreamToken(stream=event.stream_ordering)
                 )
                 room_entries.append(
                     RoomSyncResultBuilder(
@@ -2326,8 +2372,8 @@ class SyncHandler:
         sync_result_builder: "SyncResultBuilder",
         room_builder: "RoomSyncResultBuilder",
         ephemeral: List[JsonDict],
-        tags: Optional[Mapping[str, Mapping[str, Any]]],
-        account_data: Mapping[str, JsonDict],
+        tags: Optional[Mapping[str, JsonMapping]],
+        account_data: Mapping[str, JsonMapping],
         always_include: bool = False,
     ) -> None:
         """Populates the `joined` and `archived` section of `sync_result_builder`
@@ -2391,8 +2437,9 @@ class SyncHandler:
 
             batch = await self._load_filtered_recents(
                 room_id,
+                sync_result_builder,
                 sync_config,
-                now_token=upto_token,
+                upto_token=upto_token,
                 since_token=since_token,
                 potential_recents=events,
                 newly_joined_room=newly_joined,

@@ -527,7 +527,7 @@ pub struct FilteredPushRules {
     msc1767_enabled: bool,
     msc3381_polls_enabled: bool,
     msc3664_enabled: bool,
-    msc3958_suppress_edits_enabled: bool,
+    msc4028_push_encrypted_events: bool,
 }
 
 #[pymethods]
@@ -539,7 +539,7 @@ impl FilteredPushRules {
         msc1767_enabled: bool,
         msc3381_polls_enabled: bool,
         msc3664_enabled: bool,
-        msc3958_suppress_edits_enabled: bool,
+        msc4028_push_encrypted_events: bool,
     ) -> Self {
         Self {
             push_rules,
@@ -547,7 +547,7 @@ impl FilteredPushRules {
             msc1767_enabled,
             msc3381_polls_enabled,
             msc3664_enabled,
-            msc3958_suppress_edits_enabled,
+            msc4028_push_encrypted_events,
         }
     }
 
@@ -584,8 +584,8 @@ impl FilteredPushRules {
                     return false;
                 }
 
-                if !self.msc3958_suppress_edits_enabled
-                    && rule.rule_id == "global/override/.org.matrix.msc3958.suppress_edits"
+                if !self.msc4028_push_encrypted_events
+                    && rule.rule_id == "global/override/.org.matrix.msc4028.encrypted_event"
                 {
                     return false;
                 }

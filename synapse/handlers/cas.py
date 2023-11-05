@@ -67,8 +67,10 @@ class CasHandler:
 
         self._cas_server_url = hs.config.cas.cas_server_url
         self._cas_service_url = hs.config.cas.cas_service_url
+        self._cas_protocol_version = hs.config.cas.cas_protocol_version
         self._cas_displayname_attribute = hs.config.cas.cas_displayname_attribute
         self._cas_required_attributes = hs.config.cas.cas_required_attributes
+        self._cas_enable_registration = hs.config.cas.cas_enable_registration
 
         self._http_client = hs.get_proxied_http_client()
 
@@ -76,12 +78,13 @@ class CasHandler:
         self.idp_id = "cas"
 
         # user-facing name of this auth provider
-        self.idp_name = "CAS"
+        self.idp_name = hs.config.cas.idp_name
 
-        # we do not currently support brands/icons for CAS auth, but this is required by
-        # the SsoIdentityProvider protocol type.
-        self.idp_icon = None
-        self.idp_brand = None
+        # MXC URI for icon for this auth provider
+        self.idp_icon = hs.config.cas.idp_icon
+
+        # optional brand identifier for this auth provider
+        self.idp_brand = hs.config.cas.idp_brand
 
         self._sso_handler = hs.get_sso_handler()
 
@@ -120,7 +123,10 @@ class CasHandler:
         Returns:
             The parsed CAS response.
         """
-        uri = self._cas_server_url + "/proxyValidate"
+        if self._cas_protocol_version == 3:
+            uri = self._cas_server_url + "/p3/proxyValidate"
+        else:
+            uri = self._cas_server_url + "/proxyValidate"
         args = {
             "ticket": ticket,
             "service": self._build_service_param(service_args),
@@ -390,4 +396,5 @@ class CasHandler:
             client_redirect_url,
             cas_response_to_user_attributes,
             grandfather_existing_users,
+            registration_enabled=self._cas_enable_registration,
         )

@@ -24,6 +24,7 @@ from typing import (
     Dict,
     Iterable,
     List,
+    Mapping,
     MutableMapping,
     Optional,
     Set,
@@ -1583,16 +1584,19 @@ class EventsWorkerStore(SQLBaseStore):
         """Given a list of event ids, check if we have already processed and
         stored them as non outliers.
         """
-        rows = await self.db_pool.simple_select_many_batch(
-            table="events",
-            retcols=("event_id",),
-            column="event_id",
-            iterable=list(event_ids),
-            keyvalues={"outlier": False},
-            desc="have_events_in_timeline",
+        rows = cast(
+            List[Tuple[str]],
+            await self.db_pool.simple_select_many_batch(
+                table="events",
+                retcols=("event_id",),
+                column="event_id",
+                iterable=list(event_ids),
+                keyvalues={"outlier": False},
+                desc="have_events_in_timeline",
+            ),
         )
 
-        return {r["event_id"] for r in rows}
+        return {r[0] for r in rows}
 
     @trace
     @tag_args
@@ -1633,7 +1637,7 @@ class EventsWorkerStore(SQLBaseStore):
         self,
         room_id: str,
         event_ids: Collection[str],
-    ) -> Dict[str, bool]:
+    ) -> Mapping[str, bool]:
         """Helper for have_seen_events
 
         Returns:
@@ -2022,25 +2026,6 @@ class EventsWorkerStore(SQLBaseStore):
             desc="get_next_event_to_expire", func=get_next_event_to_expire_txn
         )
 
-    async def get_event_id_from_transaction_id_and_token_id(
-        self, room_id: str, user_id: str, token_id: int, txn_id: str
-    ) -> Optional[str]:
-        """Look up if we have already persisted an event for the transaction ID,
-        returning the event ID if so.
-        """
-        return await self.db_pool.simple_select_one_onecol(
-            table="event_txn_id",
-            keyvalues={
-                "room_id": room_id,
-                "user_id": user_id,
-                "token_id": token_id,
-                "txn_id": txn_id,
-            },
-            retcol="event_id",
-            allow_none=True,
-            desc="get_event_id_from_transaction_id_and_token_id",
-        )
-
     async def get_event_id_from_transaction_id_and_device_id(
         self, room_id: str, user_id: str, device_id: str, txn_id: str
     ) -> Optional[str]:
@@ -2072,29 +2057,35 @@ class EventsWorkerStore(SQLBaseStore):
         """
 
         mapping = {}
-        txn_id_to_event: Dict[Tuple[str, int, str], str] = {}
+        txn_id_to_event: Dict[Tuple[str, str, str, str], str] = {}
 
         for event in events:
-            token_id = getattr(event.internal_metadata, "token_id", None)
+            device_id = getattr(event.internal_metadata, "device_id", None)
             txn_id = getattr(event.internal_metadata, "txn_id", None)
 
-            if token_id and txn_id:
+            if device_id and txn_id:
                 # Check if this is a duplicate of an event in the given events.
-                existing = txn_id_to_event.get((event.room_id, token_id, txn_id))
+                existing = txn_id_to_event.get(
+                    (event.room_id, event.sender, device_id, txn_id)
+                )
                 if existing:
                     mapping[event.event_id] = existing
                     continue
 
                 # Check if this is a duplicate of an event we've already
                 # persisted.
-                existing = await self.get_event_id_from_transaction_id_and_token_id(
-                    event.room_id, event.sender, token_id, txn_id
+                existing = await self.get_event_id_from_transaction_id_and_device_id(
+                    event.room_id, event.sender, device_id, txn_id
                 )
                 if existing:
                     mapping[event.event_id] = existing
-                    txn_id_to_event[(event.room_id, token_id, txn_id)] = existing
+                    txn_id_to_event[
+                        (event.room_id, event.sender, device_id, txn_id)
+                    ] = existing
                 else:
-                    txn_id_to_event[(event.room_id, token_id, txn_id)] = event.event_id
+                    txn_id_to_event[
+                        (event.room_id, event.sender, device_id, txn_id)
+                    ] = event.event_id
 
         return mapping
 
@@ -2104,12 +2095,6 @@ class EventsWorkerStore(SQLBaseStore):
 
         def _cleanup_old_transaction_ids_txn(txn: LoggingTransaction) -> None:
             one_day_ago = self._clock.time_msec() - 24 * 60 * 60 * 1000
-            sql = """
-                DELETE FROM event_txn_id
-                WHERE inserted_ts < ?
-            """
-            txn.execute(sql, (one_day_ago,))
-
             sql = """
                 DELETE FROM event_txn_id_device_id
                 WHERE inserted_ts < ?
@@ -2338,7 +2323,7 @@ class EventsWorkerStore(SQLBaseStore):
     @cachedList(cached_method_name="is_partial_state_event", list_name="event_ids")
     async def get_partial_state_events(
         self, event_ids: Collection[str]
-    ) -> Dict[str, bool]:
+    ) -> Mapping[str, bool]:
         """Checks which of the given events have partial state
 
         Args:
@@ -2348,15 +2333,18 @@ class EventsWorkerStore(SQLBaseStore):
             a dict mapping from event id to partial-stateness. We return True for
             any of the events which are unknown (or are outliers).
         """
-        result = await self.db_pool.simple_select_many_batch(
-            table="partial_state_events",
-            column="event_id",
-            iterable=event_ids,
-            retcols=["event_id"],
-            desc="get_partial_state_events",
+        result = cast(
+            List[Tuple[str]],
+            await self.db_pool.simple_select_many_batch(
+                table="partial_state_events",
+                column="event_id",
+                iterable=event_ids,
+                retcols=["event_id"],
+                desc="get_partial_state_events",
+            ),
         )
         # convert the result to a dict, to make @cachedList work
-        partial = {r["event_id"] for r in result}
+        partial = {r[0] for r in result}
         return {e_id: e_id in partial for e_id in event_ids}
 
     @cached()

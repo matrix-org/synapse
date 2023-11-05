@@ -19,6 +19,8 @@ from synapse.appservice import ApplicationService
 from synapse.streams import EventSource
 from synapse.types import (
     JsonDict,
+    JsonMapping,
+    MultiWriterStreamToken,
     ReadReceipt,
     StreamKeyType,
     UserID,
@@ -37,6 +39,8 @@ class ReceiptsHandler:
         self.server_name = hs.config.server.server_name
         self.store = hs.get_datastores().main
         self.event_auth_handler = hs.get_event_auth_handler()
+        self.event_handler = hs.get_event_handler()
+        self._storage_controllers = hs.get_storage_controllers()
 
         self.hs = hs
 
@@ -81,6 +85,20 @@ class ReceiptsHandler:
                 )
                 continue
 
+            # Let's check that the origin server is in the room before accepting the receipt.
+            # We don't want to block waiting on a partial state so take an
+            # approximation if needed.
+            domains = await self._storage_controllers.state.get_current_hosts_in_room_or_partial_state_approximation(
+                room_id
+            )
+            if origin not in domains:
+                logger.info(
+                    "Ignoring receipt for room %r from server %s as they're not in the room",
+                    room_id,
+                    origin,
+                )
+                continue
+
             for receipt_type, users in room_values.items():
                 for user_id, user_values in users.items():
                     if get_domain_from_id(user_id) != origin:
@@ -113,11 +131,10 @@ class ReceiptsHandler:
 
     async def _handle_new_receipts(self, receipts: List[ReadReceipt]) -> bool:
         """Takes a list of receipts, stores them and informs the notifier."""
-        min_batch_id: Optional[int] = None
-        max_batch_id: Optional[int] = None
 
+        receipts_persisted: List[ReadReceipt] = []
         for receipt in receipts:
-            res = await self.store.insert_receipt(
+            stream_id = await self.store.insert_receipt(
                 receipt.room_id,
                 receipt.receipt_type,
                 receipt.user_id,
@@ -126,30 +143,26 @@ class ReceiptsHandler:
                 receipt.data,
             )
 
-            if not res:
-                # res will be None if this receipt is 'old'
+            if stream_id is None:
+                # stream_id will be None if this receipt is 'old'
                 continue
 
-            stream_id, max_persisted_id = res
+            receipts_persisted.append(receipt)
 
-            if min_batch_id is None or stream_id < min_batch_id:
-                min_batch_id = stream_id
-            if max_batch_id is None or max_persisted_id > max_batch_id:
-                max_batch_id = max_persisted_id
-
-        # Either both of these should be None or neither.
-        if min_batch_id is None or max_batch_id is None:
+        if not receipts_persisted:
             # no new receipts
             return False
 
-        affected_room_ids = list({r.room_id for r in receipts})
+        max_batch_id = self.store.get_max_receipt_stream_id()
+
+        affected_room_ids = list({r.room_id for r in receipts_persisted})
 
         self.notifier.on_new_event(
             StreamKeyType.RECEIPT, max_batch_id, rooms=affected_room_ids
         )
         # Note that the min here shouldn't be relied upon to be accurate.
         await self.hs.get_pusherpool().on_new_receipts(
-            min_batch_id, max_batch_id, affected_room_ids
+            {r.user_id for r in receipts_persisted}
         )
 
         return True
@@ -158,17 +171,23 @@ class ReceiptsHandler:
         self,
         room_id: str,
         receipt_type: str,
-        user_id: str,
+        user_id: UserID,
         event_id: str,
         thread_id: Optional[str],
     ) -> None:
         """Called when a client tells us a local user has read up to the given
         event_id in the room.
         """
+
+        # Ensure the room/event exists, this will raise an error if the user
+        # cannot view the event.
+        if not await self.event_handler.get_event(user_id, room_id, event_id):
+            return
+
         receipt = ReadReceipt(
             room_id=room_id,
             receipt_type=receipt_type,
-            user_id=user_id,
+            user_id=user_id.to_string(),
             event_ids=[event_id],
             thread_id=thread_id,
             data={"ts": int(self.clock.time_msec())},
@@ -182,15 +201,15 @@ class ReceiptsHandler:
             await self.federation_sender.send_read_receipt(receipt)
 
 
-class ReceiptEventSource(EventSource[int, JsonDict]):
+class ReceiptEventSource(EventSource[MultiWriterStreamToken, JsonMapping]):
     def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastores().main
         self.config = hs.config
 
     @staticmethod
     def filter_out_private_receipts(
-        rooms: Sequence[JsonDict], user_id: str
-    ) -> List[JsonDict]:
+        rooms: Sequence[JsonMapping], user_id: str
+    ) -> List[JsonMapping]:
         """
         Filters a list of serialized receipts (as returned by /sync and /initialSync)
         and removes private read receipts of other users.
@@ -207,7 +226,7 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
             The same as rooms, but filtered.
         """
 
-        result = []
+        result: List[JsonMapping] = []
 
         # Iterate through each room's receipt content.
         for room in rooms:
@@ -255,13 +274,12 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
     async def get_new_events(
         self,
         user: UserID,
-        from_key: int,
+        from_key: MultiWriterStreamToken,
         limit: int,
         room_ids: Iterable[str],
         is_guest: bool,
         explicit_room_id: Optional[str] = None,
-    ) -> Tuple[List[JsonDict], int]:
-        from_key = int(from_key)
+    ) -> Tuple[List[JsonMapping], MultiWriterStreamToken]:
         to_key = self.get_current_key()
 
         if from_key == to_key:
@@ -278,8 +296,11 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
         return events, to_key
 
     async def get_new_events_as(
-        self, from_key: int, to_key: int, service: ApplicationService
-    ) -> Tuple[List[JsonDict], int]:
+        self,
+        from_key: MultiWriterStreamToken,
+        to_key: MultiWriterStreamToken,
+        service: ApplicationService,
+    ) -> Tuple[List[JsonMapping], MultiWriterStreamToken]:
         """Returns a set of new read receipt events that an appservice
         may be interested in.
 
@@ -294,8 +315,6 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
                   appservice may be interested in.
                 * The current read receipt stream token.
         """
-        from_key = int(from_key)
-
         if from_key == to_key:
             return [], to_key
 
@@ -315,5 +334,5 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
 
         return events, to_key
 
-    def get_current_key(self) -> int:
+    def get_current_key(self) -> MultiWriterStreamToken:
         return self.store.get_max_receipt_stream_id()

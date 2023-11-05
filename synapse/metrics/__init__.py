@@ -25,7 +25,6 @@ from typing import (
     Iterable,
     Mapping,
     Optional,
-    Sequence,
     Set,
     Tuple,
     Type,
@@ -49,6 +48,7 @@ import synapse.metrics._reactor_metrics  # noqa: F401
 from synapse.metrics._gc import MIN_TIME_BETWEEN_GCS, install_gc_manager
 from synapse.metrics._twisted_exposition import MetricsResource, generate_latest
 from synapse.metrics._types import Collector
+from synapse.types import StrSequence
 from synapse.util import SYNAPSE_VERSION
 
 logger = logging.getLogger(__name__)
@@ -81,7 +81,7 @@ class LaterGauge(Collector):
 
     name: str
     desc: str
-    labels: Optional[Sequence[str]] = attr.ib(hash=False)
+    labels: Optional[StrSequence] = attr.ib(hash=False)
     # callback: should either return a value (if there are no labels for this metric),
     # or dict mapping from a label tuple to a value
     caller: Callable[
@@ -143,8 +143,8 @@ class InFlightGauge(Generic[MetricsEntry], Collector):
         self,
         name: str,
         desc: str,
-        labels: Sequence[str],
-        sub_metrics: Sequence[str],
+        labels: StrSequence,
+        sub_metrics: StrSequence,
     ):
         self.name = name
         self.desc = desc

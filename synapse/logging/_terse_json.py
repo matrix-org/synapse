@@ -44,6 +44,7 @@ _IGNORED_LOG_RECORD_ATTRIBUTES = {
     "processName",
     "relativeCreated",
     "stack_info",
+    "taskName",
     "thread",
     "threadName",
 }

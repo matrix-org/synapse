@@ -5,6 +5,9 @@ on:
     - cron: 0 8 * * *
 
   workflow_dispatch:
+    # NB: inputs are only present when this workflow is dispatched manually.
+    # (The default below is the default field value in the form to trigger
+    # a manual dispatch). Otherwise the inputs will evaluate to null.
     inputs:
       twisted_ref:
         description: Commit, branch or tag to checkout from upstream Twisted.
@@ -37,7 +40,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -49,10 +52,10 @@ jobs:
           extras: "all"
       - run: |
           poetry remove twisted
-          poetry add --extras tls git+https://github.com/twisted/twisted.git#${{ inputs.twisted_ref }}
+          poetry add --extras tls git+https://github.com/twisted/twisted.git#${{ inputs.twisted_ref || 'trunk' }}
           poetry install --no-interaction --extras "all test"
-      - name: Remove warn_unused_ignores from mypy config
-        run: sed '/warn_unused_ignores = True/d' -i mypy.ini
+      - name: Remove unhelpful options from mypy config
+        run: sed -e '/warn_unused_ignores = True/d' -e '/warn_redundant_casts = True/d' -i mypy.ini
       - run: poetry run mypy
 
   trial:
@@ -61,7 +64,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - run: sudo apt-get -qq install xmlsec1
 
       - name: Install Rust
@@ -105,7 +108,7 @@ jobs:
         - ${{ github.workspace }}:/src
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -160,15 +163,18 @@ jobs:
             database: Postgres
 
     steps:
-      - name: Run actions/checkout@v3 for synapse
-        uses: actions/checkout@v3
+      - name: Run actions/checkout@v4 for synapse
+        uses: actions/checkout@v4
         with:
           path: synapse
 
-      - uses: actions/setup-go@v4
-
       - name: Prepare Complement's Prerequisites
         run: synapse/.ci/scripts/setup_complement_prerequisites.sh
+
+      - uses: actions/setup-go@v4
+        with:
+          cache-dependency-path: complement/go.sum
+          go-version-file: complement/go.mod
 
       # This step is specific to the 'Twisted trunk' test run:
       - name: Patch dependencies
@@ -200,7 +206,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: JasonEtco/create-an-issue@e27dddc79c92bc6e4562f268fffa5ed752639abd # v2.9.1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

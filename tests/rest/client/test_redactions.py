@@ -13,10 +13,12 @@
 # limitations under the License.
 from typing import List, Optional
 
+from parameterized import parameterized
+
 from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.api.constants import EventTypes, RelationTypes
-from synapse.api.room_versions import RoomVersions
+from synapse.api.room_versions import RoomVersion, RoomVersions
 from synapse.rest import admin
 from synapse.rest.client import login, room, sync
 from synapse.server import HomeServer
@@ -569,50 +571,81 @@ class RedactionsTestCase(HomeserverTestCase):
         self.assertIn("body", event_dict["content"], event_dict)
         self.assertEqual("I'm in a thread!", event_dict["content"]["body"])
 
-    def test_content_redaction(self) -> None:
-        """MSC2174 moved the redacts property to the content."""
+    @parameterized.expand(
+        [
+            # Tuples of:
+            #   Room version
+            #   Boolean: True if the redaction event content should include the event ID.
+            #   Boolean: true if the resulting redaction event is expected to include the
+            #            event ID in the content.
+            (RoomVersions.V10, False, False),
+            (RoomVersions.V11, True, True),
+            (RoomVersions.V11, False, True),
+        ]
+    )
+    def test_redaction_content(
+        self, room_version: RoomVersion, include_content: bool, expect_content: bool
+    ) -> None:
+        """
+        Room version 11 moved the redacts property to the content.
+
+        Ensure that the event gets created properly and that the Client-Server
+        API servers the proper backwards-compatible version.
+        """
         # Create a room with the newer room version.
         room_id = self.helper.create_room_as(
             self.mod_user_id,
             tok=self.mod_access_token,
-            room_version=RoomVersions.V11.identifier,
+            room_version=room_version.identifier,
         )
 
         # Create an event.
         b = self.helper.send(room_id=room_id, tok=self.mod_access_token)
         event_id = b["event_id"]
 
-        # Attempt to redact it with a bogus event ID.
-        self._redact_event(
+        # Ensure the event ID in the URL and the content must match.
+        if include_content:
+            self._redact_event(
+                self.mod_access_token,
+                room_id,
+                event_id,
+                expect_code=400,
+                content={"redacts": "foo"},
+            )
+
+        # Redact it for real.
+        result = self._redact_event(
             self.mod_access_token,
             room_id,
             event_id,
-            expect_code=400,
-            content={"redacts": "foo"},
+            content={"redacts": event_id} if include_content else {},
         )
-
-        # Redact it for real.
-        self._redact_event(self.mod_access_token, room_id, event_id)
+        redaction_event_id = result["event_id"]
 
         # Sync the room, to get the id of the create event
         timeline = self._sync_room_timeline(self.mod_access_token, room_id)
         redact_event = timeline[-1]
         self.assertEqual(redact_event["type"], EventTypes.Redaction)
-        # The redacts key should be in the content.
-        self.assertEquals(redact_event["content"]["redacts"], event_id)
-
-        # It should also be copied as the top-level redacts field for backwards
-        # compatibility.
-        self.assertEquals(redact_event["redacts"], event_id)
+        # The redacts key should be in the content and the redacts keys.
+        self.assertEqual(redact_event["content"]["redacts"], event_id)
+        self.assertEqual(redact_event["redacts"], event_id)
 
         # But it isn't actually part of the event.
         def get_event(txn: LoggingTransaction) -> JsonDict:
             return db_to_json(
-                main_datastore._fetch_event_rows(txn, [event_id])[event_id].json
+                main_datastore._fetch_event_rows(txn, [redaction_event_id])[
+                    redaction_event_id
+                ].json
             )
 
         main_datastore = self.hs.get_datastores().main
         event_json = self.get_success(
             main_datastore.db_pool.runInteraction("get_event", get_event)
         )
-        self.assertNotIn("redacts", event_json)
+        self.assertEqual(event_json["type"], EventTypes.Redaction)
+        if expect_content:
+            self.assertNotIn("redacts", event_json)
+            self.assertEqual(event_json["content"]["redacts"], event_id)
+        else:
+            self.assertEqual(event_json["redacts"], event_id)
+            self.assertNotIn("redacts", event_json["content"])

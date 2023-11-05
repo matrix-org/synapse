@@ -15,7 +15,9 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, List, Optional, Tuple, cast
+from typing import TYPE_CHECKING, List, Optional, Tuple, Union, cast
+
+import attr
 
 from synapse.api.constants import Direction
 from synapse.config.homeserver import HomeServerConfig
@@ -28,7 +30,7 @@ from synapse.storage.database import (
 from synapse.storage.databases.main.stats import UserSortOrder
 from synapse.storage.engines import BaseDatabaseEngine
 from synapse.storage.types import Cursor
-from synapse.types import JsonDict, get_domain_from_id
+from synapse.types import get_domain_from_id
 
 from .account_data import AccountDataStore
 from .appservice import ApplicationServiceStore, ApplicationServiceTransactionStore
@@ -70,6 +72,7 @@ from .state import StateStore
 from .stats import StatsStore
 from .stream import StreamWorkerStore
 from .tags import TagsStore
+from .task_scheduler import TaskSchedulerWorkerStore
 from .transactions import TransactionWorkerStore
 from .ui_auth import UIAuthStore
 from .user_directory import UserDirectoryStore
@@ -79,6 +82,25 @@ if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
+
+
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class UserPaginateResponse:
+    """This is very similar to UserInfo, but not quite the same."""
+
+    name: str
+    user_type: Optional[str]
+    is_guest: bool
+    admin: bool
+    deactivated: bool
+    shadow_banned: bool
+    displayname: Optional[str]
+    avatar_url: Optional[str]
+    creation_ts: Optional[int]
+    approved: bool
+    erased: bool
+    last_seen_ts: int
+    locked: bool
 
 
 class DataStore(
@@ -127,6 +149,7 @@ class DataStore(
     CacheInvalidationWorkerStore,
     LockStore,
     SessionStore,
+    TaskSchedulerWorkerStore,
 ):
     def __init__(
         self,
@@ -140,26 +163,6 @@ class DataStore(
 
         super().__init__(database, db_conn, hs)
 
-    async def get_users(self) -> List[JsonDict]:
-        """Function to retrieve a list of users in users table.
-
-        Returns:
-            A list of dictionaries representing users.
-        """
-        return await self.db_pool.simple_select_list(
-            table="users",
-            keyvalues={},
-            retcols=[
-                "name",
-                "password_hash",
-                "is_guest",
-                "admin",
-                "user_type",
-                "deactivated",
-            ],
-            desc="get_users",
-        )
-
     async def get_users_paginate(
         self,
         start: int,
@@ -168,11 +171,13 @@ class DataStore(
         name: Optional[str] = None,
         guests: bool = True,
         deactivated: bool = False,
+        admins: Optional[bool] = None,
         order_by: str = UserSortOrder.NAME.value,
         direction: Direction = Direction.FORWARDS,
         approved: bool = True,
         not_user_types: Optional[List[str]] = None,
-    ) -> Tuple[List[JsonDict], int]:
+        locked: bool = False,
+    ) -> Tuple[List[UserPaginateResponse], int]:
         """Function to retrieve a paginated list of users from
         users list. This will return a json list of users and the
         total number of users matching the filter criteria.
@@ -184,17 +189,21 @@ class DataStore(
             name: search for local part of user_id or display name
             guests: whether to in include guest users
             deactivated: whether to include deactivated users
+            admins: Optional flag to filter admins. If true, only admins are queried.
+                    if false, admins are excluded from the query. When it is
+                    none (the default), both admins and none-admins are queried.
             order_by: the sort order of the returned list
             direction: sort ascending or descending
             approved: whether to include approved users
             not_user_types: list of user types to exclude
+            locked: whether to include locked users
         Returns:
             A tuple of a list of mappings from user to information and a count of total users.
         """
 
         def get_users_paginate_txn(
             txn: LoggingTransaction,
-        ) -> Tuple[List[JsonDict], int]:
+        ) -> Tuple[List[UserPaginateResponse], int]:
             filters = []
             args: list = []
 
@@ -219,6 +228,15 @@ class DataStore(
 
             if not deactivated:
                 filters.append("deactivated = 0")
+
+            if not locked:
+                filters.append("locked IS FALSE")
+
+            if admins is not None:
+                if admins:
+                    filters.append("admin = 1")
+                else:
+                    filters.append("admin = 0")
 
             if not approved:
                 # We ignore NULL values for the approved flag because these should only
@@ -265,6 +283,10 @@ class DataStore(
                 FROM users as u
                 LEFT JOIN profiles AS p ON u.name = p.full_user_id
                 LEFT JOIN erased_users AS eu ON u.name = eu.user_id
+                LEFT JOIN (
+                    SELECT user_id, MAX(last_seen) AS last_seen_ts
+                    FROM user_ips GROUP BY user_id
+                ) ls ON u.name = ls.user_id
                 {where_clause}
                 """
             sql = "SELECT COUNT(*) as total_users " + sql_base
@@ -274,20 +296,31 @@ class DataStore(
             sql = f"""
                 SELECT name, user_type, is_guest, admin, deactivated, shadow_banned,
                 displayname, avatar_url, creation_ts * 1000 as creation_ts, approved,
-                eu.user_id is not null as erased
+                eu.user_id is not null as erased, last_seen_ts, locked
                 {sql_base}
                 ORDER BY {order_by_column} {order}, u.name ASC
                 LIMIT ? OFFSET ?
             """
             args += [limit, start]
             txn.execute(sql, args)
-            users = self.db_pool.cursor_to_dict(txn)
-
-            # some of those boolean values are returned as integers when we're on SQLite
-            columns_to_boolify = ["erased"]
-            for user in users:
-                for column in columns_to_boolify:
-                    user[column] = bool(user[column])
+            users = [
+                UserPaginateResponse(
+                    name=row[0],
+                    user_type=row[1],
+                    is_guest=bool(row[2]),
+                    admin=bool(row[3]),
+                    deactivated=bool(row[4]),
+                    shadow_banned=bool(row[5]),
+                    displayname=row[6],
+                    avatar_url=row[7],
+                    creation_ts=row[8],
+                    approved=bool(row[9]),
+                    erased=bool(row[10]),
+                    last_seen_ts=row[11],
+                    locked=bool(row[12]),
+                )
+                for row in txn
+            ]
 
             return users, count
 
@@ -295,7 +328,11 @@ class DataStore(
             "get_users_paginate_txn", get_users_paginate_txn
         )
 
-    async def search_users(self, term: str) -> Optional[List[JsonDict]]:
+    async def search_users(
+        self, term: str
+    ) -> List[
+        Tuple[str, Optional[str], Union[int, bool], Union[int, bool], Optional[str]]
+    ]:
         """Function to search users list for one or more users with
         the matched term.
 
@@ -303,15 +340,37 @@ class DataStore(
             term: search term
 
         Returns:
-            A list of dictionaries or None.
+            A list of tuples of name, password_hash, is_guest, admin, user_type or None.
         """
-        return await self.db_pool.simple_search_list(
-            table="users",
-            term=term,
-            col="name",
-            retcols=["name", "password_hash", "is_guest", "admin", "user_type"],
-            desc="search_users",
-        )
+
+        def search_users(
+            txn: LoggingTransaction,
+        ) -> List[
+            Tuple[str, Optional[str], Union[int, bool], Union[int, bool], Optional[str]]
+        ]:
+            search_term = "%%" + term + "%%"
+
+            sql = """
+            SELECT name, password_hash, is_guest, admin, user_type
+            FROM users
+            WHERE name LIKE ?
+            """
+            txn.execute(sql, (search_term,))
+
+            return cast(
+                List[
+                    Tuple[
+                        str,
+                        Optional[str],
+                        Union[int, bool],
+                        Union[int, bool],
+                        Optional[str],
+                    ]
+                ],
+                txn.fetchall(),
+            )
+
+        return await self.db_pool.runInteraction("search_users", search_users)
 
 
 def check_database_before_upgrade(

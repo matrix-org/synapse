@@ -25,8 +25,10 @@ messages from the database after 5 minutes, rather than 5 months.
 
 In addition, configuration options referring to size use the following suffixes:
 
-* `M` = MiB, or 1,048,576 bytes
 * `K` = KiB, or 1024 bytes
+* `M` = MiB, or 1,048,576 bytes
+* `G` = GiB, or 1,073,741,824 bytes
+* `T` = TiB, or 1,099,511,627,776 bytes
 
 For example, setting `max_avatar_size: 10M` means that Synapse will not accept files larger than 10,485,760 bytes
 for a user avatar.
@@ -228,6 +230,13 @@ Example configuration:
 presence:
   enabled: false
 ```
+
+`enabled` can also be set to a special value of "untracked" which ignores updates
+received via clients and federation, while still accepting updates from the
+[module API](../../modules/index.md).
+
+*The "untracked" option was added in Synapse 1.96.0.*
+
 ---
 ### `require_auth_for_profile_requests`
 
@@ -519,7 +528,7 @@ listeners:
 Example configuration #2:
 ```yaml
 listeners:
-  # Unsecure HTTP listener: for when matrix traffic passes through a reverse proxy
+  # Insecure HTTP listener: for when matrix traffic passes through a reverse proxy
   # that unwraps TLS.
   #
   # If you plan to use a reverse proxy, please see
@@ -934,6 +943,17 @@ Example configuration:
 redaction_retention_period: 28d
 ```
 ---
+### `forgotten_room_retention_period`
+
+How long to keep locally forgotten rooms before purging them from the DB.
+
+Defaults to `null`, meaning it's disabled.
+
+Example configuration:
+```yaml
+forgotten_room_retention_period: 28d
+```
+---
 ### `user_ips_max_age`
 
 How long to track users' last seen time and IPs in the database.
@@ -1013,11 +1033,8 @@ which are older than the room's maximum retention period. Synapse will also
 filter events received over federation so that events that should have been
 purged are ignored and not stored again.
 
-The message retention policies feature is disabled by default. Please be advised
-that enabling this feature carries some risk. There are known bugs with the implementation
-which can cause database corruption. Setting retention to delete older history
-is less risky than deleting newer history but in general caution is advised when enabling this
-experimental feature. You can read more about this feature [here](../../message_retention_policies.md).
+The message retention policies feature is disabled by default. You can read more
+about this feature [here](../../message_retention_policies.md).
 
 This setting has the following sub-options:
 * `default_policy`: Default retention policy. If set, Synapse will apply it to rooms that lack the
@@ -1120,14 +1137,14 @@ federation_verify_certificates: false
 
 The minimum TLS version that will be used for outbound federation requests.
 
-Defaults to `1`. Configurable to `1`, `1.1`, `1.2`, or `1.3`. Note
-that setting this value higher than `1.2` will prevent federation to most
-of the public Matrix network: only configure it to `1.3` if you have an
+Defaults to `"1"`. Configurable to `"1"`, `"1.1"`, `"1.2"`, or `"1.3"`. Note
+that setting this value higher than `"1.2"` will prevent federation to most
+of the public Matrix network: only configure it to `"1.3"` if you have an
 entirely private federation setup and you can ensure TLS 1.3 support.
 
 Example configuration:
 ```yaml
-federation_client_minimum_tls_version: 1.2
+federation_client_minimum_tls_version: "1.2"
 ```
 ---
 ### `federation_certificate_verification_whitelist`
@@ -1179,6 +1196,11 @@ N.B. we recommend also firewalling your federation listener to limit
 inbound federation traffic as early as possible, rather than relying
 purely on this application-layer restriction.  If not specified, the
 default is to whitelist everything.
+
+Note: this does not stop a server from joining rooms that servers not on the
+whitelist are in. As such, this option is really only useful to establish a
+"private federation", where a group of servers all whitelist each other and have
+the same whitelist.
 
 Example configuration:
 ```yaml
@@ -1242,6 +1264,14 @@ like sending a federation transaction.
 * `max_short_retries`: maximum number of retries for the short retry algo. Default to 3 attempts.
 * `max_long_retries`: maximum number of retries for the long retry algo. Default to 10 attempts.
 
+The following options control the retry logic when communicating with a specific homeserver destination.
+Unlike the previous configuration options, these values apply across all requests
+for a given destination and the state of the backoff is stored in the database.
+
+* `destination_min_retry_interval`: the initial backoff, after the first request fails. Defaults to 10m.
+* `destination_retry_multiplier`: how much we multiply the backoff by after each subsequent fail. Defaults to 2.
+* `destination_max_retry_interval`: a cap on the backoff. Defaults to a week.
+
 Example configuration:
 ```yaml
 federation:
@@ -1250,6 +1280,9 @@ federation:
   max_long_retry_delay: 100s
   max_short_retries: 5
   max_long_retries: 20
+  destination_min_retry_interval: 30s
+  destination_retry_multiplier: 5
+  destination_max_retry_interval: 12h
 ```
 ---
 ## Caching
@@ -2838,6 +2871,20 @@ Example configuration:
 track_appservice_user_ips: true
 ```
 ---
+### `use_appservice_legacy_authorization`
+
+Whether to send the application service access tokens via the `access_token` query parameter
+per older versions of the Matrix specification. Defaults to false. Set to true to enable sending
+access tokens via a query parameter.
+
+**Enabling this option is considered insecure and is not recommended. **
+
+Example configuration:
+```yaml
+use_appservice_legacy_authorization: true 
+```
+
+---
 ### `macaroon_secret_key`
 
 A secret which is used to sign
@@ -2918,7 +2965,7 @@ Normally, the connection to the key server is validated via TLS certificates.
 Additional security can be provided by configuring a `verify key`, which
 will make synapse check that the response is signed by that key.
 
-This setting supercedes an older setting named `perspectives`. The old format
+This setting supersedes an older setting named `perspectives`. The old format
 is still supported for backwards-compatibility, but it is deprecated.
 
 `trusted_key_servers` defaults to matrix.org, but using it will generate a
@@ -3000,6 +3047,16 @@ enable SAML login. You can either put your entire pysaml config inline using the
 option, or you can specify a path to a psyaml config file with the sub-option `config_path`.
 This setting has the following sub-options:
 
+* `idp_name`: A user-facing name for this identity provider, which is used to
+   offer the user a choice of login mechanisms.
+* `idp_icon`: An optional icon for this identity provider, which is presented
+   by clients and Synapse's own IdP picker page. If given, must be an
+   MXC URI of the format `mxc://<server-name>/<media-id>`. (An easy way to
+   obtain such an MXC URI is to upload an image to an (unencrypted) room
+   and then copy the "url" from the source of the event.)
+* `idp_brand`: An optional brand for this identity provider, allowing clients
+   to style the login flow according to the identity provider in question.
+   See the [spec](https://spec.matrix.org/latest/) for possible options here.
 * `sp_config`: the configuration for the pysaml2 Service Provider. See pysaml2 docs for format of config.
    Default values will be used for the `entityid` and `service` settings,
    so it is not normally necessary to specify them unless you need to
@@ -3151,7 +3208,7 @@ Options for each entry include:
 
 * `idp_icon`: An optional icon for this identity provider, which is presented
    by clients and Synapse's own IdP picker page. If given, must be an
-   MXC URI of the format mxc://<server-name>/<media-id>. (An easy way to
+   MXC URI of the format `mxc://<server-name>/<media-id>`. (An easy way to
    obtain such an MXC URI is to upload an image to an (unencrypted) room
    and then copy the "url" from the source of the event.)
 
@@ -3169,6 +3226,14 @@ Options for each entry include:
 
 * `client_secret`: oauth2 client secret to use. May be omitted if
   `client_secret_jwt_key` is given, or if `client_auth_method` is 'none'.
+  Must be omitted if `client_secret_path` is specified.
+
+* `client_secret_path`: path to the oauth2 client secret to use. With that
+   it's not necessary to leak secrets into the config file itself.
+   Mutually exclusive with `client_secret`. Can be omitted if
+   `client_secret_jwt_key` is specified.
+
+   *Added in Synapse 1.91.0.*
 
 * `client_secret_jwt_key`: Alternative to client_secret: details of a key used
    to create a JSON Web Token to be used as an OAuth2 client secret. If
@@ -3366,7 +3431,18 @@ Enable Central Authentication Service (CAS) for registration and login.
 Has the following sub-options:
 * `enabled`: Set this to true to enable authorization against a CAS server.
    Defaults to false.
+* `idp_name`: A user-facing name for this identity provider, which is used to
+   offer the user a choice of login mechanisms.
+* `idp_icon`: An optional icon for this identity provider, which is presented
+   by clients and Synapse's own IdP picker page. If given, must be an
+   MXC URI of the format `mxc://<server-name>/<media-id>`. (An easy way to
+   obtain such an MXC URI is to upload an image to an (unencrypted) room
+   and then copy the "url" from the source of the event.)
+* `idp_brand`: An optional brand for this identity provider, allowing clients
+   to style the login flow according to the identity provider in question.
+   See the [spec](https://spec.matrix.org/latest/) for possible options here.
 * `server_url`: The URL of the CAS authorization endpoint.
+* `protocol_version`: The CAS protocol version, defaults to none (version 3 is required if you want to use "required_attributes").
 * `displayname_attribute`: The attribute of the CAS response to use as the display name.
    If no name is given here, no displayname will be set.
 * `required_attributes`:  It is possible to configure Synapse to only allow logins if CAS attributes
@@ -3374,16 +3450,24 @@ Has the following sub-options:
    and the values must match the given value. Alternately if the given value
    is `None` then any value is allowed (the attribute just must exist).
    All of the listed attributes must match for the login to be permitted.
+* `enable_registration`: set to 'false' to disable automatic registration of new
+   users. This allows the CAS SSO flow to be limited to sign in only, rather than
+   automatically registering users that have a valid SSO login but do not have
+   a pre-registered account. Defaults to true.
+
+   *Added in Synapse 1.93.0.*
 
 Example configuration:
 ```yaml
 cas_config:
   enabled: true
   server_url: "https://cas-server.com"
+  protocol_version: 3
   displayname_attribute: name
   required_attributes:
     userGroup: "staff"
     department: None
+  enable_registration: true
 ```
 ---
 ### `sso`
@@ -3606,6 +3690,7 @@ This option has the following sub-options:
 * `prefer_local_users`: Defines whether to prefer local users in search query results.
    If set to true, local users are more likely to appear above remote users when searching the
    user directory. Defaults to false.
+* `show_locked_users`: Defines whether to show locked users in search query results. Defaults to false.
 
 Example configuration:
 ```yaml
@@ -3613,6 +3698,7 @@ user_directory:
     enabled: false
     search_all_users: true
     prefer_local_users: true
+    show_locked_users: true
 ```
 ---
 ### `user_consent`
@@ -3718,62 +3804,160 @@ enable_room_list_search: false
 ---
 ### `alias_creation_rules`
 
-The `alias_creation_rules` option controls who is allowed to create aliases
-on this server.
+The `alias_creation_rules` option allows server admins to prevent unwanted
+alias creation on this server.
 
-The format of this option is a list of rules that contain globs that
-match against user_id, room_id and the new alias (fully qualified with
-server name). The action in the first rule that matches is taken,
-which can currently either be "allow" or "deny".
+This setting is an optional list of 0 or more rules. By default, no list is
+provided, meaning that all alias creations are permitted.
 
-Missing user_id/room_id/alias fields default to "*".
+Otherwise, requests to create aliases are matched against each rule in order.
+The first rule that matches decides if the request is allowed or denied. If no 
+rule matches, the request is denied. In particular, this means that configuring
+an empty list of rules will deny every alias creation request.
 
-If no rules match the request is denied. An empty list means no one
-can create aliases.
+Each rule is a YAML object containing four fields, each of which is an optional string:
 
-Options for the rules include:
-* `user_id`: Matches against the creator of the alias. Defaults to "*".
-* `alias`: Matches against the alias being created. Defaults to "*".
-* `room_id`: Matches against the room ID the alias is being pointed at. Defaults to "*"
-* `action`: Whether to "allow" or "deny" the request if the rule matches. Defaults to allow.
+* `user_id`: a glob pattern that matches against the creator of the alias.
+* `alias`: a glob pattern that matches against the alias being created.
+* `room_id`: a glob pattern that matches against the room ID the alias is being pointed at.
+* `action`: either `allow` or `deny`. What to do with the request if the rule matches. Defaults to `allow`.
+
+Each of the glob patterns is optional, defaulting to `*` ("match anything").
+Note that the patterns match against fully qualified IDs, e.g. against 
+`@alice:example.com`, `#room:example.com` and `!abcdefghijk:example.com` instead
+of `alice`, `room` and `abcedgghijk`.
 
 Example configuration:
+
 ```yaml
+# No rule list specified. All alias creations are allowed.
+# This is the default behaviour.
 alias_creation_rules:
-  - user_id: "bad_user"
-    alias: "spammy_alias"
-    room_id: "*"
-    action: deny
 ```
+
+```yaml
+# A list of one rule which allows everything.
+# This has the same effect as the previous example.
+alias_creation_rules:
+  - "action": "allow"
+```
+
+```yaml
+# An empty list of rules. All alias creations are denied.
+alias_creation_rules: []
+```
+
+```yaml
+# A list of one rule which denies everything.
+# This has the same effect as the previous example.
+alias_creation_rules:
+  - "action": "deny"
+```
+
+```yaml
+# Prevent a specific user from creating aliases.
+# Allow other users to create any alias
+alias_creation_rules:
+  - user_id: "@bad_user:example.com"
+    action: deny
+    
+  - action: allow
+```
+
+```yaml
+# Prevent aliases being created which point to a specific room.
+alias_creation_rules:
+  - room_id: "!forbiddenRoom:example.com"
+    action: deny
+
+  - action: allow
+```
+
 ---
 ### `room_list_publication_rules`
 
-The `room_list_publication_rules` option controls who can publish and
-which rooms can be published in the public room list.
+The `room_list_publication_rules` option allows server admins to prevent
+unwanted entries from being published in the public room list.
 
 The format of this option is the same as that for
-`alias_creation_rules`.
+[`alias_creation_rules`](#alias_creation_rules): an optional list of 0 or more
+rules. By default, no list is provided, meaning that all rooms may be
+published to the room list.
 
-If the room has one or more aliases associated with it, only one of
-the aliases needs to match the alias rule. If there are no aliases
-then only rules with `alias: *` match.
+Otherwise, requests to publish a room are matched against each rule in order.
+The first rule that matches decides if the request is allowed or denied. If no
+rule matches, the request is denied. In particular, this means that configuring
+an empty list of rules will deny every alias creation request.
 
-If no rules match the request is denied. An empty list means no one
-can publish rooms.
+Each rule is a YAML object containing four fields, each of which is an optional string:
 
-Options for the rules include:
-* `user_id`: Matches against the creator of the alias. Defaults to "*".
-* `alias`: Matches against any current local or canonical aliases associated with the room. Defaults to "*".
-* `room_id`: Matches against the room ID being published. Defaults to "*".
-* `action`: Whether to "allow" or "deny" the request if the rule matches. Defaults to allow.
+* `user_id`: a glob pattern that matches against the user publishing the room.
+* `alias`: a glob pattern that matches against one of published room's aliases.
+  - If the room has no aliases, the alias match fails unless `alias` is unspecified or `*`.
+  - If the room has exactly one alias, the alias match succeeds if the `alias` pattern matches that alias.
+  - If the room has two or more aliases, the alias match succeeds if the pattern matches at least one of the aliases.
+* `room_id`: a glob pattern that matches against the room ID of the room being published.
+* `action`: either `allow` or `deny`. What to do with the request if the rule matches. Defaults to `allow`.
+
+Each of the glob patterns is optional, defaulting to `*` ("match anything").
+Note that the patterns match against fully qualified IDs, e.g. against
+`@alice:example.com`, `#room:example.com` and `!abcdefghijk:example.com` instead
+of `alice`, `room` and `abcedgghijk`.
+
 
 Example configuration:
+
 ```yaml
+# No rule list specified. Anyone may publish any room to the public list.
+# This is the default behaviour.
 room_list_publication_rules:
-  - user_id: "*"
-    alias: "*"
-    room_id: "*"
-    action: allow
+```
+
+```yaml
+# A list of one rule which allows everything.
+# This has the same effect as the previous example.
+room_list_publication_rules:
+  - "action": "allow"
+```
+
+```yaml
+# An empty list of rules. No-one may publish to the room list.
+room_list_publication_rules: []
+```
+
+```yaml
+# A list of one rule which denies everything.
+# This has the same effect as the previous example.
+room_list_publication_rules:
+  - "action": "deny"
+```
+
+```yaml
+# Prevent a specific user from publishing rooms.
+# Allow other users to publish anything.
+room_list_publication_rules:
+  - user_id: "@bad_user:example.com"
+    action: deny
+    
+  - action: allow
+```
+
+```yaml
+# Prevent publication of a specific room.
+room_list_publication_rules:
+  - room_id: "!forbiddenRoom:example.com"
+    action: deny
+
+  - action: allow
+```
+
+```yaml
+# Prevent publication of rooms with at least one alias containing the word "potato".
+room_list_publication_rules:
+  - alias: "#*potato*:example.com"
+    action: deny
+
+  - action: allow
 ```
 
 ---
@@ -3809,6 +3993,19 @@ normally or via a kick or ban. Defaults to false.
 Example configuration:
 ```yaml
 forget_rooms_on_leave: false
+```
+---
+### `exclude_rooms_from_sync`
+A list of rooms to exclude from sync responses. This is useful for server
+administrators wishing to group users into a room without these users being able
+to see it from their client.
+
+By default, no room is excluded.
+
+Example configuration:
+```yaml
+exclude_rooms_from_sync:
+    - !foo:example.com
 ```
 
 ---

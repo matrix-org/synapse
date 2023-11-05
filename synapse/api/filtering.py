@@ -37,7 +37,7 @@ from synapse.api.constants import EduTypes, EventContentFields
 from synapse.api.errors import SynapseError
 from synapse.api.presence import UserPresenceState
 from synapse.events import EventBase, relation_from_event
-from synapse.types import JsonDict, RoomID, UserID
+from synapse.types import JsonDict, JsonMapping, RoomID, UserID
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -191,7 +191,7 @@ FilterEvent = TypeVar("FilterEvent", EventBase, UserPresenceState, JsonDict)
 
 
 class FilterCollection:
-    def __init__(self, hs: "HomeServer", filter_json: JsonDict):
+    def __init__(self, hs: "HomeServer", filter_json: JsonMapping):
         self._filter_json = filter_json
 
         room_filter_json = self._filter_json.get("room", {})
@@ -219,7 +219,7 @@ class FilterCollection:
     def __repr__(self) -> str:
         return "<FilterCollection %s>" % (json.dumps(self._filter_json),)
 
-    def get_filter_json(self) -> JsonDict:
+    def get_filter_json(self) -> JsonMapping:
         return self._filter_json
 
     def timeline_limit(self) -> int:
@@ -313,7 +313,7 @@ class FilterCollection:
 
 
 class Filter:
-    def __init__(self, hs: "HomeServer", filter_json: JsonDict):
+    def __init__(self, hs: "HomeServer", filter_json: JsonMapping):
         self._hs = hs
         self._store = hs.get_datastores().main
         self.filter_json = filter_json

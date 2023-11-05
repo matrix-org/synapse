@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from typing import Dict, Iterable, List, Optional
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 from parameterized import parameterized
 
@@ -31,12 +31,17 @@ from synapse.appservice import (
 from synapse.handlers.appservice import ApplicationServicesHandler
 from synapse.rest.client import login, receipts, register, room, sendtodevice
 from synapse.server import HomeServer
-from synapse.types import JsonDict, RoomStreamToken
+from synapse.types import (
+    JsonDict,
+    MultiWriterStreamToken,
+    RoomStreamToken,
+    StreamKeyType,
+)
 from synapse.util import Clock
 from synapse.util.stringutils import random_string
 
 from tests import unittest
-from tests.test_utils import event_injection, make_awaitable, simple_async_mock
+from tests.test_utils import event_injection
 from tests.unittest import override_config
 from tests.utils import MockClock
 
@@ -46,15 +51,13 @@ class AppServiceHandlerTestCase(unittest.TestCase):
 
     def setUp(self) -> None:
         self.mock_store = Mock()
-        self.mock_as_api = Mock()
+        self.mock_as_api = AsyncMock()
         self.mock_scheduler = Mock()
         hs = Mock()
         hs.get_datastores.return_value = Mock(main=self.mock_store)
-        self.mock_store.get_appservice_last_pos.return_value = make_awaitable(None)
-        self.mock_store.set_appservice_last_pos.return_value = make_awaitable(None)
-        self.mock_store.set_appservice_stream_type_pos.return_value = make_awaitable(
-            None
-        )
+        self.mock_store.get_appservice_last_pos = AsyncMock(return_value=None)
+        self.mock_store.set_appservice_last_pos = AsyncMock(return_value=None)
+        self.mock_store.set_appservice_stream_type_pos = AsyncMock(return_value=None)
         hs.get_application_service_api.return_value = self.mock_as_api
         hs.get_application_service_scheduler.return_value = self.mock_scheduler
         hs.get_clock.return_value = MockClock()
@@ -69,22 +72,26 @@ class AppServiceHandlerTestCase(unittest.TestCase):
             self._mkservice(is_interested_in_event=False),
         ]
 
-        self.mock_as_api.query_user.return_value = make_awaitable(True)
+        self.mock_as_api.query_user.return_value = True
         self.mock_store.get_app_services.return_value = services
-        self.mock_store.get_user_by_id.return_value = make_awaitable([])
+        self.mock_store.get_user_by_id = AsyncMock(return_value=[])
 
         event = Mock(
             sender="@someone:anywhere", type="m.room.message", room_id="!foo:bar"
         )
-        self.mock_store.get_all_new_event_ids_stream.side_effect = [
-            make_awaitable((0, {})),
-            make_awaitable((1, {event.event_id: 0})),
-        ]
-        self.mock_store.get_events_as_list.side_effect = [
-            make_awaitable([]),
-            make_awaitable([event]),
-        ]
-        self.handler.notify_interested_services(RoomStreamToken(None, 1))
+        self.mock_store.get_all_new_event_ids_stream = AsyncMock(
+            side_effect=[
+                (0, {}),
+                (1, {event.event_id: 0}),
+            ]
+        )
+        self.mock_store.get_events_as_list = AsyncMock(
+            side_effect=[
+                [],
+                [event],
+            ]
+        )
+        self.handler.notify_interested_services(RoomStreamToken(stream=1))
 
         self.mock_scheduler.enqueue_for_appservice.assert_called_once_with(
             interested_service, events=[event]
@@ -95,15 +102,17 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         services = [self._mkservice(is_interested_in_event=True)]
         services[0].is_interested_in_user.return_value = True
         self.mock_store.get_app_services.return_value = services
-        self.mock_store.get_user_by_id.return_value = make_awaitable(None)
+        self.mock_store.get_user_by_id = AsyncMock(return_value=None)
 
         event = Mock(sender=user_id, type="m.room.message", room_id="!foo:bar")
-        self.mock_as_api.query_user.return_value = make_awaitable(True)
-        self.mock_store.get_all_new_event_ids_stream.side_effect = [
-            make_awaitable((0, {event.event_id: 0})),
-        ]
-        self.mock_store.get_events_as_list.side_effect = [make_awaitable([event])]
-        self.handler.notify_interested_services(RoomStreamToken(None, 0))
+        self.mock_as_api.query_user.return_value = True
+        self.mock_store.get_all_new_event_ids_stream = AsyncMock(
+            side_effect=[
+                (0, {event.event_id: 0}),
+            ]
+        )
+        self.mock_store.get_events_as_list = AsyncMock(side_effect=[[event]])
+        self.handler.notify_interested_services(RoomStreamToken(stream=0))
 
         self.mock_as_api.query_user.assert_called_once_with(services[0], user_id)
 
@@ -112,15 +121,17 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         services = [self._mkservice(is_interested_in_event=True)]
         services[0].is_interested_in_user.return_value = True
         self.mock_store.get_app_services.return_value = services
-        self.mock_store.get_user_by_id.return_value = make_awaitable({"name": user_id})
+        self.mock_store.get_user_by_id = AsyncMock(return_value={"name": user_id})
 
         event = Mock(sender=user_id, type="m.room.message", room_id="!foo:bar")
-        self.mock_as_api.query_user.return_value = make_awaitable(True)
-        self.mock_store.get_all_new_event_ids_stream.side_effect = [
-            make_awaitable((0, [event], {event.event_id: 0})),
-        ]
+        self.mock_as_api.query_user.return_value = True
+        self.mock_store.get_all_new_event_ids_stream = AsyncMock(
+            side_effect=[
+                (0, [event], {event.event_id: 0}),
+            ]
+        )
 
-        self.handler.notify_interested_services(RoomStreamToken(None, 0))
+        self.handler.notify_interested_services(RoomStreamToken(stream=0))
 
         self.assertFalse(
             self.mock_as_api.query_user.called,
@@ -141,15 +152,16 @@ class AppServiceHandlerTestCase(unittest.TestCase):
             self._mkservice_alias(is_room_alias_in_namespace=False),
         ]
 
-        self.mock_as_api.query_alias.return_value = make_awaitable(True)
+        self.mock_as_api.query_alias = AsyncMock(return_value=True)
         self.mock_store.get_app_services.return_value = services
-        self.mock_store.get_association_from_room_alias.return_value = make_awaitable(
-            Mock(room_id=room_id, servers=servers)
+        self.mock_store.get_association_from_room_alias = AsyncMock(
+            return_value=Mock(room_id=room_id, servers=servers)
         )
 
         result = self.successResultOf(
             defer.ensureDeferred(self.handler.query_room_alias_exists(room_alias))
         )
+        assert result is not None
 
         self.mock_as_api.query_alias.assert_called_once_with(
             interested_service, room_alias_str
@@ -177,7 +189,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
     def test_get_3pe_protocols_protocol_no_response(self) -> None:
         service = self._mkservice(False, ["my-protocol"])
         self.mock_store.get_app_services.return_value = [service]
-        self.mock_as_api.get_3pe_protocol.return_value = make_awaitable(None)
+        self.mock_as_api.get_3pe_protocol.return_value = None
         response = self.successResultOf(
             defer.ensureDeferred(self.handler.get_3pe_protocols())
         )
@@ -189,9 +201,10 @@ class AppServiceHandlerTestCase(unittest.TestCase):
     def test_get_3pe_protocols_select_one_protocol(self) -> None:
         service = self._mkservice(False, ["my-protocol"])
         self.mock_store.get_app_services.return_value = [service]
-        self.mock_as_api.get_3pe_protocol.return_value = make_awaitable(
-            {"x-protocol-data": 42, "instances": []}
-        )
+        self.mock_as_api.get_3pe_protocol.return_value = {
+            "x-protocol-data": 42,
+            "instances": [],
+        }
         response = self.successResultOf(
             defer.ensureDeferred(self.handler.get_3pe_protocols("my-protocol"))
         )
@@ -205,9 +218,10 @@ class AppServiceHandlerTestCase(unittest.TestCase):
     def test_get_3pe_protocols_one_protocol(self) -> None:
         service = self._mkservice(False, ["my-protocol"])
         self.mock_store.get_app_services.return_value = [service]
-        self.mock_as_api.get_3pe_protocol.return_value = make_awaitable(
-            {"x-protocol-data": 42, "instances": []}
-        )
+        self.mock_as_api.get_3pe_protocol.return_value = {
+            "x-protocol-data": 42,
+            "instances": [],
+        }
         response = self.successResultOf(
             defer.ensureDeferred(self.handler.get_3pe_protocols())
         )
@@ -222,9 +236,10 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         service_one = self._mkservice(False, ["my-protocol"])
         service_two = self._mkservice(False, ["other-protocol"])
         self.mock_store.get_app_services.return_value = [service_one, service_two]
-        self.mock_as_api.get_3pe_protocol.return_value = make_awaitable(
-            {"x-protocol-data": 42, "instances": []}
-        )
+        self.mock_as_api.get_3pe_protocol.return_value = {
+            "x-protocol-data": 42,
+            "instances": [],
+        }
         response = self.successResultOf(
             defer.ensureDeferred(self.handler.get_3pe_protocols())
         )
@@ -287,17 +302,17 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         interested_service = self._mkservice(is_interested_in_event=True)
         services = [interested_service]
         self.mock_store.get_app_services.return_value = services
-        self.mock_store.get_type_stream_id_for_appservice.return_value = make_awaitable(
-            579
-        )
+        self.mock_store.get_type_stream_id_for_appservice = AsyncMock(return_value=579)
 
         event = Mock(event_id="event_1")
-        self.event_source.sources.receipt.get_new_events_as.return_value = (
-            make_awaitable(([event], None))
+        self.event_source.sources.receipt.get_new_events_as = AsyncMock(
+            return_value=([event], None)
         )
 
         self.handler.notify_interested_services_ephemeral(
-            "receipt_key", 580, ["@fakerecipient:example.com"]
+            StreamKeyType.RECEIPT,
+            MultiWriterStreamToken(stream=580),
+            ["@fakerecipient:example.com"],
         )
         self.mock_scheduler.enqueue_for_appservice.assert_called_once_with(
             interested_service, ephemeral=[event]
@@ -317,17 +332,17 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         services = [interested_service]
 
         self.mock_store.get_app_services.return_value = services
-        self.mock_store.get_type_stream_id_for_appservice.return_value = make_awaitable(
-            580
-        )
+        self.mock_store.get_type_stream_id_for_appservice = AsyncMock(return_value=580)
 
         event = Mock(event_id="event_1")
-        self.event_source.sources.receipt.get_new_events_as.return_value = (
-            make_awaitable(([event], None))
+        self.event_source.sources.receipt.get_new_events_as = AsyncMock(
+            return_value=([event], None)
         )
 
         self.handler.notify_interested_services_ephemeral(
-            "receipt_key", 580, ["@fakerecipient:example.com"]
+            StreamKeyType.RECEIPT,
+            MultiWriterStreamToken(stream=580),
+            ["@fakerecipient:example.com"],
         )
         # This method will be called, but with an empty list of events
         self.mock_scheduler.enqueue_for_appservice.assert_called_once_with(
@@ -350,9 +365,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
             A mock representing the ApplicationService.
         """
         service = Mock()
-        service.is_interested_in_event.return_value = make_awaitable(
-            is_interested_in_event
-        )
+        service.is_interested_in_event = AsyncMock(return_value=is_interested_in_event)
         service.token = "mock_service_token"
         service.url = "mock_service_url"
         service.protocols = protocols
@@ -396,12 +409,12 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
         self.hs = hs
         # Mock the ApplicationServiceScheduler's _TransactionController's send method so that
         # we can track any outgoing ephemeral events
-        self.send_mock = simple_async_mock()
-        hs.get_application_service_handler().scheduler.txn_ctrl.send = self.send_mock  # type: ignore[assignment]
+        self.send_mock = AsyncMock()
+        hs.get_application_service_handler().scheduler.txn_ctrl.send = self.send_mock  # type: ignore[method-assign]
 
         # Mock out application services, and allow defining our own in tests
         self._services: List[ApplicationService] = []
-        self.hs.get_datastores().main.get_app_services = Mock(  # type: ignore[assignment]
+        self.hs.get_datastores().main.get_app_services = Mock(  # type: ignore[method-assign]
             return_value=self._services
         )
 
@@ -419,6 +432,18 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
             "exclusive_as_user", "password", self.exclusive_as_user_device_id
         )
 
+        self.exclusive_as_user_2_device_id = "exclusive_as_device_2"
+        self.exclusive_as_user_2 = self.register_user("exclusive_as_user_2", "password")
+        self.exclusive_as_user_2_token = self.login(
+            "exclusive_as_user_2", "password", self.exclusive_as_user_2_device_id
+        )
+
+        self.exclusive_as_user_3_device_id = "exclusive_as_device_3"
+        self.exclusive_as_user_3 = self.register_user("exclusive_as_user_3", "password")
+        self.exclusive_as_user_3_token = self.login(
+            "exclusive_as_user_3", "password", self.exclusive_as_user_3_device_id
+        )
+
     def _notify_interested_services(self) -> None:
         # This is normally set in `notify_interested_services` but we need to call the
         # internal async version so the reactor gets pushed to completion.
@@ -426,7 +451,7 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
         self.get_success(
             self.hs.get_application_service_handler()._notify_interested_services(
                 RoomStreamToken(
-                    None, self.hs.get_application_service_handler().current_max
+                    stream=self.hs.get_application_service_handler().current_max
                 )
             )
         )
@@ -619,8 +644,8 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
             self.get_success(
                 self.hs.get_application_service_handler()._notify_interested_services_ephemeral(
                     services=[interested_appservice],
-                    stream_key="receipt_key",
-                    new_token=stream_token,
+                    stream_key=StreamKeyType.RECEIPT,
+                    new_token=MultiWriterStreamToken(stream=stream_token),
                     users=[self.exclusive_as_user],
                 )
             )
@@ -846,6 +871,119 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
         for count in service_id_to_message_count.values():
             self.assertEqual(count, number_of_messages)
 
+    @unittest.override_config(
+        {"experimental_features": {"msc2409_to_device_messages_enabled": True}}
+    )
+    def test_application_services_receive_local_to_device_for_many_users(self) -> None:
+        """
+        Test that when a user sends a to-device message to many users
+        in an application service's user namespace, the
+        application service will receive all of them.
+        """
+        interested_appservice = self._register_application_service(
+            namespaces={
+                ApplicationService.NS_USERS: [
+                    {
+                        "regex": "@exclusive_as_user:.+",
+                        "exclusive": True,
+                    },
+                    {
+                        "regex": "@exclusive_as_user_2:.+",
+                        "exclusive": True,
+                    },
+                    {
+                        "regex": "@exclusive_as_user_3:.+",
+                        "exclusive": True,
+                    },
+                ],
+            },
+        )
+
+        # Have local_user send a to-device message to exclusive_as_users
+        message_content = {"some_key": "some really interesting value"}
+        chan = self.make_request(
+            "PUT",
+            "/_matrix/client/r0/sendToDevice/m.room_key_request/3",
+            content={
+                "messages": {
+                    self.exclusive_as_user: {
+                        self.exclusive_as_user_device_id: message_content
+                    },
+                    self.exclusive_as_user_2: {
+                        self.exclusive_as_user_2_device_id: message_content
+                    },
+                    self.exclusive_as_user_3: {
+                        self.exclusive_as_user_3_device_id: message_content
+                    },
+                }
+            },
+            access_token=self.local_user_token,
+        )
+        self.assertEqual(chan.code, 200, chan.result)
+
+        # Have exclusive_as_user send a to-device message to local_user
+        for user_token in [
+            self.exclusive_as_user_token,
+            self.exclusive_as_user_2_token,
+            self.exclusive_as_user_3_token,
+        ]:
+            chan = self.make_request(
+                "PUT",
+                "/_matrix/client/r0/sendToDevice/m.room_key_request/4",
+                content={
+                    "messages": {
+                        self.local_user: {self.local_user_device_id: message_content}
+                    }
+                },
+                access_token=user_token,
+            )
+            self.assertEqual(chan.code, 200, chan.result)
+
+        # Check if our application service - that is interested in exclusive_as_user - received
+        # the to-device message as part of an AS transaction.
+        # Only the local_user -> exclusive_as_user to-device message should have been forwarded to the AS.
+        #
+        # The uninterested application service should not have been notified at all.
+        self.send_mock.assert_called_once()
+        (
+            service,
+            _events,
+            _ephemeral,
+            to_device_messages,
+            _otks,
+            _fbks,
+            _device_list_summary,
+        ) = self.send_mock.call_args[0]
+
+        # Assert that this was the same to-device message that local_user sent
+        self.assertEqual(service, interested_appservice)
+
+        # Assert expected number of messages
+        self.assertEqual(len(to_device_messages), 3)
+
+        for device_msg in to_device_messages:
+            self.assertEqual(device_msg["type"], "m.room_key_request")
+            self.assertEqual(device_msg["sender"], self.local_user)
+            self.assertEqual(device_msg["content"], message_content)
+
+        self.assertEqual(to_device_messages[0]["to_user_id"], self.exclusive_as_user)
+        self.assertEqual(
+            to_device_messages[0]["to_device_id"],
+            self.exclusive_as_user_device_id,
+        )
+
+        self.assertEqual(to_device_messages[1]["to_user_id"], self.exclusive_as_user_2)
+        self.assertEqual(
+            to_device_messages[1]["to_device_id"],
+            self.exclusive_as_user_2_device_id,
+        )
+
+        self.assertEqual(to_device_messages[2]["to_user_id"], self.exclusive_as_user_3)
+        self.assertEqual(
+            to_device_messages[2]["to_device_id"],
+            self.exclusive_as_user_3_device_id,
+        )
+
     def _register_application_service(
         self,
         namespaces: Optional[Dict[str, Iterable[Dict]]] = None,
@@ -894,12 +1032,12 @@ class ApplicationServicesHandlerDeviceListsTestCase(unittest.HomeserverTestCase)
 
         # Mock ApplicationServiceApi's put_json, so we can verify the raw JSON that
         # will be sent over the wire
-        self.put_json = simple_async_mock()
-        hs.get_application_service_api().put_json = self.put_json  # type: ignore[assignment]
+        self.put_json = AsyncMock()
+        hs.get_application_service_api().put_json = self.put_json  # type: ignore[method-assign]
 
         # Mock out application services, and allow defining our own in tests
         self._services: List[ApplicationService] = []
-        self.hs.get_datastores().main.get_app_services = Mock(  # type: ignore[assignment]
+        self.hs.get_datastores().main.get_app_services = Mock(  # type: ignore[method-assign]
             return_value=self._services
         )
 
@@ -1000,8 +1138,8 @@ class ApplicationServicesHandlerOtkCountsTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         # Mock the ApplicationServiceScheduler's _TransactionController's send method so that
         # we can track what's going out
-        self.send_mock = simple_async_mock()
-        hs.get_application_service_handler().scheduler.txn_ctrl.send = self.send_mock  # type: ignore[assignment]  # We assign to a method.
+        self.send_mock = AsyncMock()
+        hs.get_application_service_handler().scheduler.txn_ctrl.send = self.send_mock  # type: ignore[method-assign]  # We assign to a method.
 
         # Define an application service for the tests
         self._service_token = "VERYSECRET"

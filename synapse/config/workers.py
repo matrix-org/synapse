@@ -15,10 +15,16 @@
 
 import argparse
 import logging
-from typing import Any, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 
 import attr
-from pydantic import BaseModel, Extra, StrictBool, StrictInt, StrictStr
+
+from synapse._pydantic_compat import HAS_PYDANTIC_V2
+
+if TYPE_CHECKING or HAS_PYDANTIC_V2:
+    from pydantic.v1 import BaseModel, Extra, StrictBool, StrictInt, StrictStr
+else:
+    from pydantic import BaseModel, Extra, StrictBool, StrictInt, StrictStr
 
 from synapse.config._base import (
     Config,
@@ -352,9 +358,9 @@ class WorkerConfig(Config):
                 "Must only specify one instance to handle `account_data` messages."
             )
 
-        if len(self.writers.receipts) != 1:
+        if len(self.writers.receipts) == 0:
             raise ConfigError(
-                "Must only specify one instance to handle `receipts` messages."
+                "Must specify at least one instance to handle `receipts` messages."
             )
 
         if len(self.writers.events) == 0:

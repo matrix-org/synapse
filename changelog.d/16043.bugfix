@@ -1,1 +1,0 @@
-Fix a long-standing bug where the `synapse_port_db` failed to configure sequences for application services and partial stated rooms.

@@ -13,7 +13,17 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, Collection, Dict, Iterable, List, Optional, Set, Tuple
+from typing import (
+    TYPE_CHECKING,
+    Collection,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Set,
+    Tuple,
+    cast,
+)
 
 import attr
 
@@ -144,16 +154,22 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
             if not prev_group:
                 return _GetStateGroupDelta(None, None)
 
-            delta_ids = self.db_pool.simple_select_list_txn(
-                txn,
-                table="state_groups_state",
-                keyvalues={"state_group": state_group},
-                retcols=("type", "state_key", "event_id"),
+            delta_ids = cast(
+                List[Tuple[str, str, str]],
+                self.db_pool.simple_select_list_txn(
+                    txn,
+                    table="state_groups_state",
+                    keyvalues={"state_group": state_group},
+                    retcols=("type", "state_key", "event_id"),
+                ),
             )
 
             return _GetStateGroupDelta(
                 prev_group,
-                {(row["type"], row["state_key"]): row["event_id"] for row in delta_ids},
+                {
+                    (event_type, state_key): event_id
+                    for event_type, state_key, event_id in delta_ids
+                },
             )
 
         return await self.db_pool.runInteraction(
@@ -730,19 +746,22 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
             "[purge] found %i state groups to delete", len(state_groups_to_delete)
         )
 
-        rows = self.db_pool.simple_select_many_txn(
-            txn,
-            table="state_group_edges",
-            column="prev_state_group",
-            iterable=state_groups_to_delete,
-            keyvalues={},
-            retcols=("state_group",),
+        rows = cast(
+            List[Tuple[int]],
+            self.db_pool.simple_select_many_txn(
+                txn,
+                table="state_group_edges",
+                column="prev_state_group",
+                iterable=state_groups_to_delete,
+                keyvalues={},
+                retcols=("state_group",),
+            ),
         )
 
         remaining_state_groups = {
-            row["state_group"]
-            for row in rows
-            if row["state_group"] not in state_groups_to_delete
+            state_group
+            for state_group, in rows
+            if state_group not in state_groups_to_delete
         }
 
         logger.info(
@@ -799,16 +818,19 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
             A mapping from state group to previous state group.
         """
 
-        rows = await self.db_pool.simple_select_many_batch(
-            table="state_group_edges",
-            column="prev_state_group",
-            iterable=state_groups,
-            keyvalues={},
-            retcols=("prev_state_group", "state_group"),
-            desc="get_previous_state_groups",
+        rows = cast(
+            List[Tuple[int, int]],
+            await self.db_pool.simple_select_many_batch(
+                table="state_group_edges",
+                column="prev_state_group",
+                iterable=state_groups,
+                keyvalues={},
+                retcols=("state_group", "prev_state_group"),
+                desc="get_previous_state_groups",
+            ),
         )
 
-        return {row["state_group"]: row["prev_state_group"] for row in rows}
+        return dict(rows)
 
     async def purge_room_state(
         self, room_id: str, state_groups_to_delete: Collection[int]
