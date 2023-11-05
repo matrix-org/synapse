@@ -506,18 +506,23 @@ class PushRuleStore(PushRulesWorkerStore):
         conditions_json: str,
         actions_json: str,
     ) -> None:
-        sql = """
-            SELECT COUNT(*), MAX(priority) FROM push_rules
-            WHERE user_name = ? and priority_class = ?
-        """
-
         if isinstance(self.database_engine, PostgresEngine):
-            sql += " FOR UPDATE"
+            # Postgres doesn't do FOR UPDATE on aggregate functions, so select the rows first
+            # then re-select the count/max below.
+            sql = """
+                SELECT * FROM push_rules
+                WHERE user_name = ? and priority_class = ?
+                FOR UPDATE
+            """
         else:
             # Annoyingly SQLite doesn't support row level locking, so lock the whole table
             self.database_engine.lock_table(txn, "push_rules")
 
         # find the highest priority rule in that class
+        sql = (
+            "SELECT COUNT(*), MAX(priority) FROM push_rules"
+            " WHERE user_name = ? and priority_class = ?"
+        )
         txn.execute(sql, (user_id, priority_class))
         res = txn.fetchall()
         (how_many, highest_prio) = res[0]
