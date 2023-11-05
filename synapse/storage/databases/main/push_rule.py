@@ -507,7 +507,7 @@ class PushRuleStore(PushRulesWorkerStore):
         actions_json: str,
     ) -> None:
         sql = """
-            SELECT COUNT(*), MAX(priority) FROM push_rules"
+            SELECT COUNT(*), MAX(priority) FROM push_rules
             WHERE user_name = ? and priority_class = ?
         """
 
