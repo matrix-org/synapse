@@ -404,7 +404,7 @@ class PushRuleStore(PushRulesWorkerStore):
         """
 
         if isinstance(self.database_engine, PostgresEngine):
-            sql += " FOR SHARE"
+            sql += " FOR UPDATE"
         else:
             # Annoyingly SQLite doesn't support row level locking, so lock the whole table
             self.database_engine.lock_table(txn, "push_rules")
