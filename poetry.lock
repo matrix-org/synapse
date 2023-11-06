@@ -2012,12 +2012,12 @@ plugins = ["importlib-metadata"]
 
 [[package]]
 name = "pyicu"
-version = "2.11"
+version = "2.12"
 description = "Python extension wrapping the ICU C++ API"
 optional = true
 python-versions = "*"
 files = [
-    {file = "PyICU-2.11.tar.gz", hash = "sha256:3ab531264cfe9132b3d2ac5d708da9a4649d25f6e6813730ac88cf040a08a844"},
+    {file = "PyICU-2.12.tar.gz", hash = "sha256:bd7ab5efa93ad692e6daa29cd249364e521218329221726a113ca3cb281c8611"},
 ]
 
 [[package]]
