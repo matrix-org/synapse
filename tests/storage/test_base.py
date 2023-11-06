@@ -389,7 +389,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         )
 
         self.mock_txn.execute.assert_called_with(
-            "INSERT INTO tablename (columnname, othercol) VALUES (?, ?) ON CONFLICT (columnname)  DO UPDATE SET othercol=EXCLUDED.othercol",
+            "INSERT INTO tablename (columnname, othercol) VALUES (?, ?) ON CONFLICT (columnname) DO UPDATE SET othercol=EXCLUDED.othercol",
             ["oldvalue", "newvalue"],
         )
         self.assertTrue(result)
@@ -410,7 +410,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         )
 
         self.mock_txn.execute.assert_called_with(
-            "INSERT INTO tablename (columnname, thirdcol, othercol) VALUES (?, ?, ?) ON CONFLICT (columnname)  DO UPDATE SET othercol=EXCLUDED.othercol",
+            "INSERT INTO tablename (columnname, thirdcol, othercol) VALUES (?, ?, ?) ON CONFLICT (columnname) DO UPDATE SET othercol=EXCLUDED.othercol",
             ["oldvalue", "insertionval", "newvalue"],
         )
         self.assertTrue(result)
