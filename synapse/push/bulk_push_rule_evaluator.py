@@ -350,40 +350,32 @@ class BulkPushRuleEvaluator:
         actions_by_user: Dict[str, Collection[Union[Mapping, str]]] = {}
 
         # Gather a bunch of info in parallel.
-        #
-        # This has a lot of ignored types and casting due to the use of @cached
-        # decorated functions passed into run_in_background.
-        #
-        # See https://github.com/matrix-org/synapse/issues/16606
         (
             room_member_count,
             (power_levels, sender_power_level),
             related_events,
             profiles,
         ) = await make_deferred_yieldable(
-            cast(
-                "Deferred[Tuple[int, Tuple[dict, Optional[int]], Dict[str, Dict[str, JsonValue]], Mapping[str, ProfileInfo]]]",
-                gather_results(
-                    (
-                        run_in_background(  # type: ignore[call-arg]
-                            self.store.get_number_joined_users_in_room, event.room_id  # type: ignore[arg-type]
-                        ),
-                        run_in_background(
-                            self._get_power_levels_and_sender_level,
-                            event,
-                            context,
-                            event_id_to_event,
-                        ),
-                        run_in_background(self._related_events, event),
-                        run_in_background(  # type: ignore[call-arg]
-                            self.store.get_subset_users_in_room_with_profiles,
-                            event.room_id,  # type: ignore[arg-type]
-                            rules_by_user.keys(),  # type: ignore[arg-type]
-                        ),
+            gather_results(
+                (
+                    run_in_background(
+                        self.store.get_number_joined_users_in_room, event.room_id
                     ),
-                    consumeErrors=True,
-                ).addErrback(unwrapFirstError),
-            )
+                    run_in_background(
+                        self._get_power_levels_and_sender_level,
+                        event,
+                        context,
+                        event_id_to_event,
+                    ),
+                    run_in_background(self._related_events, event),
+                    run_in_background(
+                        self.store.get_subset_users_in_room_with_profiles,
+                        event.room_id,
+                        rules_by_user.keys(),
+                    ),
+                ),
+                consumeErrors=True,
+            ).addErrback(unwrapFirstError)
         )
 
         # Find the event's thread ID.

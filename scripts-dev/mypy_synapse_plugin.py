@@ -67,12 +67,7 @@ class SynapsePlugin(Plugin):
     ) -> Optional[Callable[[AttributeContext], mypy.types.Type]]:
         # Anything in synapse could be wrapped with the cached decorator, but
         # we know that anything else is *not*.
-        if fullname.startswith(
-            (
-                "synapse.util.caches.descriptors.CachedFunction",
-                "synapse.util.caches.descriptors._LruCachedFunction",
-            )
-        ):
+        if fullname == "synapse.util.caches.descriptors.CachedFunction.__call__":
             return cached_function_method_attribute
         return None
 
