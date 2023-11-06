@@ -24,7 +24,7 @@ from synapse.storage.engines import create_engine
 
 from tests import unittest
 from tests.server import TestHomeServer
-from tests.utils import default_config, USE_POSTGRES_FOR_TESTS
+from tests.utils import USE_POSTGRES_FOR_TESTS, default_config
 
 
 class SQLBaseStoreTestCase(unittest.TestCase):
@@ -83,10 +83,10 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         hs = TestHomeServer("test", config=config)
 
         if USE_POSTGRES_FOR_TESTS:
-            config = {"name": "psycopg2", "args": {}}
+            db_config = {"name": "psycopg2", "args": {}}
         else:
-            config = {"name": "sqlite3"}
-        engine = create_engine(config)
+            db_config = {"name": "sqlite3"}
+        engine = create_engine(db_config)
 
         fake_engine = Mock(wraps=engine)
         fake_engine.in_transaction.return_value = False
@@ -96,9 +96,9 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         # Don't convert param style to make assertions easier.
         fake_engine.convert_param_style = lambda sql: sql
         # To fix isinstance(...) checks.
-        fake_engine.__class__ = engine.__class__
+        fake_engine.__class__ = engine.__class__  # type: ignore[assignment]
 
-        db = DatabasePool(Mock(), Mock(config=config), fake_engine)
+        db = DatabasePool(Mock(), Mock(config=db_config), fake_engine)
         db._db_pool = conn_pool
 
         self.datastore = SQLBaseStore(db, None, hs)  # type: ignore[arg-type]
