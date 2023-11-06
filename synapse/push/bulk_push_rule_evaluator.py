@@ -30,7 +30,6 @@ from typing import (
 
 from prometheus_client import Counter
 
-from twisted.internet import defer
 from twisted.internet.defer import Deferred
 
 from synapse.api.constants import (
@@ -47,9 +46,8 @@ from synapse.events.snapshot import EventContext
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.state import POWER_KEY
 from synapse.storage.databases.main.roommember import EventIdMembership
-from synapse.synapse_rust.push import FilteredPushRules, PushRuleEvaluator
-
 from synapse.storage.roommember import ProfileInfo
+from synapse.synapse_rust.push import FilteredPushRules, PushRuleEvaluator
 from synapse.types import JsonValue
 from synapse.types.state import StateFilter
 from synapse.util import unwrapFirstError
@@ -384,7 +382,7 @@ class BulkPushRuleEvaluator:
                         ),
                     ),
                     consumeErrors=True,
-                ),  # .addErrback(unwrapFirstError)
+                ).addErrback(unwrapFirstError),
             )
         )
 
