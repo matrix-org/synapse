@@ -58,6 +58,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         fake_engine.in_transaction.return_value = False
         fake_engine.module.OperationalError = engine.module.OperationalError
         fake_engine.module.DatabaseError = engine.module.DatabaseError
+        fake_engine.module.IntegrityError = engine.module.IntegrityError
 
         db = DatabasePool(Mock(), Mock(config=sqlite_config), fake_engine)
         db._db_pool = conn_pool
@@ -396,7 +397,28 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         self.assertTrue(result)
 
     @defer.inlineCallbacks
-    def test_upsert_with_insert(
+    def test_upsert_no_values(
+        self,
+    ) -> Generator["defer.Deferred[object]", object, None]:
+        self.mock_txn.rowcount = 1
+
+        result = yield defer.ensureDeferred(
+            self.datastore.db_pool.simple_upsert(
+                table="tablename",
+                keyvalues={"columnname": "value"},
+                values={},
+                insertion_values={"columnname": "value"},
+            )
+        )
+
+        self.mock_txn.execute.assert_called_with(
+            "INSERT INTO tablename (columnname) VALUES (?) ON CONFLICT (columnname) DO NOTHING",
+            ["value"],
+        )
+        self.assertTrue(result)
+
+    @defer.inlineCallbacks
+    def test_upsert_with_insertion(
         self,
     ) -> Generator["defer.Deferred[object]", object, None]:
         self.mock_txn.rowcount = 1
@@ -478,3 +500,154 @@ class SQLBaseStoreTestCase(unittest.TestCase):
             "INSERT INTO tablename (columnname) VALUES (?) ON CONFLICT (columnname) DO NOTHING",
             [("oldvalue",)],
         )
+
+    @defer.inlineCallbacks
+    def test_upsert_emulated_no_values_exists(
+        self,
+    ) -> Generator["defer.Deferred[object]", object, None]:
+        self.datastore.db_pool._unsafe_to_upsert_tables.add("tablename")
+
+        self.mock_txn.fetchall.return_value = [(1,)]
+
+        result = yield defer.ensureDeferred(
+            self.datastore.db_pool.simple_upsert(
+                table="tablename",
+                keyvalues={"columnname": "value"},
+                values={},
+                insertion_values={"columnname": "value"},
+            )
+        )
+
+        self.mock_txn.execute.assert_called_with(
+            "SELECT 1 FROM tablename WHERE columnname = ?", ["value"]
+        )
+        self.assertFalse(result)
+
+    @defer.inlineCallbacks
+    def test_upsert_emulated_no_values_not_exists(
+        self,
+    ) -> Generator["defer.Deferred[object]", object, None]:
+        self.datastore.db_pool._unsafe_to_upsert_tables.add("tablename")
+
+        self.mock_txn.fetchall.return_value = []
+        self.mock_txn.rowcount = 1
+
+        result = yield defer.ensureDeferred(
+            self.datastore.db_pool.simple_upsert(
+                table="tablename",
+                keyvalues={"columnname": "value"},
+                values={},
+                insertion_values={"columnname": "value"},
+            )
+        )
+
+        self.mock_txn.execute.assert_has_calls(
+            [
+                call(
+                    "SELECT 1 FROM tablename WHERE columnname = ?",
+                    ["value"],
+                ),
+                call("INSERT INTO tablename (columnname) VALUES (?)", ["value"]),
+            ],
+        )
+        self.assertTrue(result)
+
+    @defer.inlineCallbacks
+    def test_upsert_emulated_with_insertion_exists(
+        self,
+    ) -> Generator["defer.Deferred[object]", object, None]:
+        self.datastore.db_pool._unsafe_to_upsert_tables.add("tablename")
+
+        self.mock_txn.rowcount = 1
+
+        result = yield defer.ensureDeferred(
+            self.datastore.db_pool.simple_upsert(
+                table="tablename",
+                keyvalues={"columnname": "oldvalue"},
+                values={"othercol": "newvalue"},
+                insertion_values={"thirdcol": "insertionval"},
+            )
+        )
+
+        self.mock_txn.execute.assert_called_with(
+            "UPDATE tablename SET othercol = ? WHERE columnname = ?",
+            ["newvalue", "oldvalue"],
+        )
+        self.assertTrue(result)
+
+    @defer.inlineCallbacks
+    def test_upsert_emulated_with_insertion_not_exists(
+        self,
+    ) -> Generator["defer.Deferred[object]", object, None]:
+        self.datastore.db_pool._unsafe_to_upsert_tables.add("tablename")
+
+        self.mock_txn.rowcount = 0
+
+        result = yield defer.ensureDeferred(
+            self.datastore.db_pool.simple_upsert(
+                table="tablename",
+                keyvalues={"columnname": "oldvalue"},
+                values={"othercol": "newvalue"},
+                insertion_values={"thirdcol": "insertionval"},
+            )
+        )
+
+        self.mock_txn.execute.assert_has_calls(
+            [
+                call(
+                    "UPDATE tablename SET othercol = ? WHERE columnname = ?",
+                    ["newvalue", "oldvalue"],
+                ),
+                call(
+                    "INSERT INTO tablename (columnname, othercol, thirdcol) VALUES (?, ?, ?)",
+                    ["oldvalue", "newvalue", "insertionval"],
+                ),
+            ]
+        )
+        self.assertTrue(result)
+
+    @defer.inlineCallbacks
+    def test_upsert_emulated_with_where(
+        self,
+    ) -> Generator["defer.Deferred[object]", object, None]:
+        self.datastore.db_pool._unsafe_to_upsert_tables.add("tablename")
+
+        self.mock_txn.rowcount = 1
+
+        result = yield defer.ensureDeferred(
+            self.datastore.db_pool.simple_upsert(
+                table="tablename",
+                keyvalues={"columnname": "oldvalue"},
+                values={"othercol": "newvalue"},
+                where_clause="thirdcol IS NULL",
+            )
+        )
+
+        self.mock_txn.execute.assert_called_with(
+            "UPDATE tablename SET othercol = ? WHERE columnname = ? AND thirdcol IS NULL",
+            ["newvalue", "oldvalue"],
+        )
+        self.assertTrue(result)
+
+    @defer.inlineCallbacks
+    def test_upsert_emulated_with_where_no_values(
+        self,
+    ) -> Generator["defer.Deferred[object]", object, None]:
+        self.datastore.db_pool._unsafe_to_upsert_tables.add("tablename")
+
+        self.mock_txn.rowcount = 1
+
+        result = yield defer.ensureDeferred(
+            self.datastore.db_pool.simple_upsert(
+                table="tablename",
+                keyvalues={"columnname": "oldvalue"},
+                values={},
+                where_clause="thirdcol IS NULL",
+            )
+        )
+
+        self.mock_txn.execute.assert_called_with(
+            "SELECT 1 FROM tablename WHERE columnname = ? AND thirdcol IS NULL",
+            ["oldvalue"],
+        )
+        self.assertFalse(result)
