@@ -31,7 +31,8 @@ class SQLBaseStoreTestCase(unittest.TestCase):
     """Test the "simple" SQL generating methods in SQLBaseStore."""
 
     def setUp(self) -> None:
-        self.db_pool = Mock(spec=["runInteraction"])
+        # This is the Twisted connection pool.
+        conn_pool = Mock(spec=["runInteraction", "runWithConnection"])
         self.mock_txn = Mock()
         self.mock_conn = Mock(spec_set=["cursor", "rollback", "commit"])
         self.mock_conn.cursor.return_value = self.mock_txn
@@ -41,12 +42,12 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         def runInteraction(func, *args, **kwargs) -> defer.Deferred:  # type: ignore[no-untyped-def]
             return defer.succeed(func(self.mock_txn, *args, **kwargs))
 
-        self.db_pool.runInteraction = runInteraction
+        conn_pool.runInteraction = runInteraction
 
         def runWithConnection(func, *args, **kwargs):  # type: ignore[no-untyped-def]
             return defer.succeed(func(self.mock_conn, *args, **kwargs))
 
-        self.db_pool.runWithConnection = runWithConnection
+        conn_pool.runWithConnection = runWithConnection
 
         config = default_config(name="test", parse=True)
         hs = TestHomeServer("test", config=config)
@@ -59,7 +60,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         fake_engine.module.DatabaseError = engine.module.DatabaseError
 
         db = DatabasePool(Mock(), Mock(config=sqlite_config), fake_engine)
-        db._db_pool = self.db_pool
+        db._db_pool = conn_pool
 
         self.datastore = SQLBaseStore(db, None, hs)  # type: ignore[arg-type]
 
