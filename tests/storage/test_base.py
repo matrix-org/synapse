@@ -14,7 +14,7 @@
 
 from collections import OrderedDict
 from typing import Generator
-from unittest.mock import Mock, call
+from unittest.mock import Mock, call, patch
 
 from twisted.internet import defer
 
@@ -24,7 +24,7 @@ from synapse.storage.engines import create_engine
 
 from tests import unittest
 from tests.server import TestHomeServer
-from tests.utils import default_config
+from tests.utils import default_config, USE_POSTGRES_FOR_TESTS
 
 
 class SQLBaseStoreTestCase(unittest.TestCase):
@@ -34,8 +34,38 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         # This is the Twisted connection pool.
         conn_pool = Mock(spec=["runInteraction", "runWithConnection"])
         self.mock_txn = Mock()
-        self.mock_conn = Mock(spec_set=["cursor", "rollback", "commit"])
+        if USE_POSTGRES_FOR_TESTS:
+            # To avoid testing psycopg2 itself, patch execute_batch/execute_values
+            # to assert how it is called.
+            from psycopg2 import extras
+
+            self.mock_execute_batch = Mock()
+            self.execute_batch_patcher = patch.object(
+                extras, "execute_batch", new=self.mock_execute_batch
+            )
+            self.execute_batch_patcher.start()
+            self.mock_execute_values = Mock()
+            self.execute_values_patcher = patch.object(
+                extras, "execute_values", new=self.mock_execute_values
+            )
+            self.execute_values_patcher.start()
+
+            self.mock_conn = Mock(
+                spec_set=[
+                    "cursor",
+                    "rollback",
+                    "commit",
+                    "closed",
+                    "reconnect",
+                    "set_session",
+                    "encoding",
+                ]
+            )
+            self.mock_conn.encoding = "UNICODE"
+        else:
+            self.mock_conn = Mock(spec_set=["cursor", "rollback", "commit"])
         self.mock_conn.cursor.return_value = self.mock_txn
+        self.mock_txn.connection = self.mock_conn
         self.mock_conn.rollback.return_value = None
         # Our fake runInteraction just runs synchronously inline
 
@@ -52,18 +82,31 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         config = default_config(name="test", parse=True)
         hs = TestHomeServer("test", config=config)
 
-        sqlite_config = {"name": "sqlite3"}
-        engine = create_engine(sqlite_config)
+        if USE_POSTGRES_FOR_TESTS:
+            config = {"name": "psycopg2", "args": {}}
+        else:
+            config = {"name": "sqlite3"}
+        engine = create_engine(config)
+
         fake_engine = Mock(wraps=engine)
         fake_engine.in_transaction.return_value = False
         fake_engine.module.OperationalError = engine.module.OperationalError
         fake_engine.module.DatabaseError = engine.module.DatabaseError
         fake_engine.module.IntegrityError = engine.module.IntegrityError
+        # Don't convert param style to make assertions easier.
+        fake_engine.convert_param_style = lambda sql: sql
+        # To fix isinstance(...) checks.
+        fake_engine.__class__ = engine.__class__
 
-        db = DatabasePool(Mock(), Mock(config=sqlite_config), fake_engine)
+        db = DatabasePool(Mock(), Mock(config=config), fake_engine)
         db._db_pool = conn_pool
 
         self.datastore = SQLBaseStore(db, None, hs)  # type: ignore[arg-type]
+
+    def tearDown(self) -> None:
+        if USE_POSTGRES_FOR_TESTS:
+            self.execute_batch_patcher.stop()
+            self.execute_values_patcher.stop()
 
     @defer.inlineCallbacks
     def test_insert_1col(self) -> Generator["defer.Deferred[object]", object, None]:
@@ -115,12 +158,19 @@ class SQLBaseStoreTestCase(unittest.TestCase):
             )
         )
 
-        # TODO Test postgres variant.
-
-        self.mock_txn.executemany.assert_called_with(
-            "INSERT INTO tablename (col1, col2) VALUES(?, ?)",
-            [("val1", "val2"), ("val3", "val4")],
-        )
+        if USE_POSTGRES_FOR_TESTS:
+            self.mock_execute_values.assert_called_with(
+                self.mock_txn,
+                "INSERT INTO tablename (col1, col2) VALUES ?",
+                [("val1", "val2"), ("val3", "val4")],
+                template=None,
+                fetch=False,
+            )
+        else:
+            self.mock_txn.executemany.assert_called_with(
+                "INSERT INTO tablename (col1, col2) VALUES(?, ?)",
+                [("val1", "val2"), ("val3", "val4")],
+            )
 
     @defer.inlineCallbacks
     def test_select_one_1col(self) -> Generator["defer.Deferred[object]", object, None]:
@@ -288,10 +338,17 @@ class SQLBaseStoreTestCase(unittest.TestCase):
             )
         )
 
-        self.mock_txn.executemany.assert_called_with(
-            "UPDATE tablename SET col3 = ? WHERE col1 = ? AND col2 = ?",
-            [("val3", "val1", "val2"), ("val3", "val1", "val2")],
-        )
+        if USE_POSTGRES_FOR_TESTS:
+            self.mock_execute_batch.assert_called_with(
+                self.mock_txn,
+                "UPDATE tablename SET col3 = ? WHERE col1 = ? AND col2 = ?",
+                [("val3", "val1", "val2"), ("val3", "val1", "val2")],
+            )
+        else:
+            self.mock_txn.executemany.assert_called_with(
+                "UPDATE tablename SET col3 = ? WHERE col1 = ? AND col2 = ?",
+                [("val3", "val1", "val2"), ("val3", "val1", "val2")],
+            )
 
         # key_values and value_values must be the same length.
         with self.assertRaises(ValueError):
@@ -472,12 +529,19 @@ class SQLBaseStoreTestCase(unittest.TestCase):
             )
         )
 
-        # TODO Test postgres variant.
-
-        self.mock_txn.executemany.assert_called_with(
-            "INSERT INTO tablename (keycol1, keycol2, valuecol3) VALUES (?, ?, ?) ON CONFLICT (keycol1, keycol2) DO UPDATE SET valuecol3=EXCLUDED.valuecol3",
-            [("keyval1", "keyval2", "val5"), ("keyval3", "keyval4", "val6")],
-        )
+        if USE_POSTGRES_FOR_TESTS:
+            self.mock_execute_values.assert_called_with(
+                self.mock_txn,
+                "INSERT INTO tablename (keycol1, keycol2, valuecol3) VALUES ? ON CONFLICT (keycol1, keycol2) DO UPDATE SET valuecol3=EXCLUDED.valuecol3",
+                [("keyval1", "keyval2", "val5"), ("keyval3", "keyval4", "val6")],
+                template=None,
+                fetch=False,
+            )
+        else:
+            self.mock_txn.executemany.assert_called_with(
+                "INSERT INTO tablename (keycol1, keycol2, valuecol3) VALUES (?, ?, ?) ON CONFLICT (keycol1, keycol2) DO UPDATE SET valuecol3=EXCLUDED.valuecol3",
+                [("keyval1", "keyval2", "val5"), ("keyval3", "keyval4", "val6")],
+            )
 
     @defer.inlineCallbacks
     def test_upsert_many_no_values(
@@ -494,12 +558,19 @@ class SQLBaseStoreTestCase(unittest.TestCase):
             )
         )
 
-        # TODO Test postgres variant.
-
-        self.mock_txn.executemany.assert_called_with(
-            "INSERT INTO tablename (columnname) VALUES (?) ON CONFLICT (columnname) DO NOTHING",
-            [("oldvalue",)],
-        )
+        if USE_POSTGRES_FOR_TESTS:
+            self.mock_execute_values.assert_called_with(
+                self.mock_txn,
+                "INSERT INTO tablename (columnname) VALUES ? ON CONFLICT (columnname) DO NOTHING",
+                [("oldvalue",)],
+                template=None,
+                fetch=False,
+            )
+        else:
+            self.mock_txn.executemany.assert_called_with(
+                "INSERT INTO tablename (columnname) VALUES (?) ON CONFLICT (columnname) DO NOTHING",
+                [("oldvalue",)],
+            )
 
     @defer.inlineCallbacks
     def test_upsert_emulated_no_values_exists(
