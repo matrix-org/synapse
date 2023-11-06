@@ -441,10 +441,10 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         yield defer.ensureDeferred(
             self.datastore.db_pool.simple_upsert_many(
                 table="tablename",
-                key_names=["columnname"],
-                key_values=[["oldvalue"]],
-                value_names=["othercol"],
-                value_values=[["newvalue"]],
+                key_names=["keycol1", "keycol2"],
+                key_values=[["keyval1", "keyval2"], ["keyval3", "keyval4"]],
+                value_names=["valuecol3"],
+                value_values=[["val5"], ["val6"]],
                 desc="",
             )
         )
@@ -452,8 +452,8 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         # TODO Test postgres variant.
 
         self.mock_txn.executemany.assert_called_with(
-            "INSERT INTO tablename (columnname, othercol) VALUES (?, ?) ON CONFLICT (columnname) DO UPDATE SET othercol=EXCLUDED.othercol",
-            [("oldvalue", "newvalue")],
+            "INSERT INTO tablename (keycol1, keycol2, valuecol3) VALUES (?, ?, ?) ON CONFLICT (keycol1, keycol2) DO UPDATE SET valuecol3=EXCLUDED.valuecol3",
+            [("keyval1", "keyval2", "val5"), ("keyval3", "keyval4", "val6")],
         )
 
     @defer.inlineCallbacks
