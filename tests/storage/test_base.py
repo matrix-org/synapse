@@ -173,6 +173,35 @@ class SQLBaseStoreTestCase(unittest.TestCase):
             )
 
     @defer.inlineCallbacks
+    def test_insert_many_no_iterable(
+        self,
+    ) -> Generator["defer.Deferred[object]", object, None]:
+        yield defer.ensureDeferred(
+            self.datastore.db_pool.simple_insert_many(
+                table="tablename",
+                keys=(
+                    "col1",
+                    "col2",
+                ),
+                values=[],
+                desc="",
+            )
+        )
+
+        if USE_POSTGRES_FOR_TESTS:
+            self.mock_execute_values.assert_called_once_with(
+                self.mock_txn,
+                "INSERT INTO tablename (col1, col2) VALUES ?",
+                [],
+                template=None,
+                fetch=False,
+            )
+        else:
+            self.mock_txn.executemany.assert_called_once_with(
+                "INSERT INTO tablename (col1, col2) VALUES(?, ?)", []
+            )
+
+    @defer.inlineCallbacks
     def test_select_one_1col(self) -> Generator["defer.Deferred[object]", object, None]:
         self.mock_txn.rowcount = 1
         self.mock_txn.__iter__ = Mock(return_value=iter([("Value",)]))
@@ -361,6 +390,33 @@ class SQLBaseStoreTestCase(unittest.TestCase):
                     value_values=[],
                     desc="",
                 )
+            )
+
+    @defer.inlineCallbacks
+    def test_update_many_no_values(
+        self,
+    ) -> Generator["defer.Deferred[object]", object, None]:
+        yield defer.ensureDeferred(
+            self.datastore.db_pool.simple_update_many(
+                table="tablename",
+                key_names=("col1", "col2"),
+                key_values=[],
+                value_names=("col3",),
+                value_values=[],
+                desc="",
+            )
+        )
+
+        if USE_POSTGRES_FOR_TESTS:
+            self.mock_execute_batch.assert_called_once_with(
+                self.mock_txn,
+                "UPDATE tablename SET col3 = ? WHERE col1 = ? AND col2 = ?",
+                [],
+            )
+        else:
+            self.mock_txn.executemany.assert_called_once_with(
+                "UPDATE tablename SET col3 = ? WHERE col1 = ? AND col2 = ?",
+                [],
             )
 
     @defer.inlineCallbacks
