@@ -2047,10 +2047,7 @@ class DatabasePool:
 
         # List of tuples of (value values, then key values)
         # (This matches the order needed for the query)
-        args = [tuple(x) + tuple(y) for x, y in zip(value_values, key_values)]
-
-        for ks, vs in zip(key_values, value_values):
-            args.append(tuple(vs) + tuple(ks))
+        args = [tuple(vv) + tuple(kv) for vv, kv in zip(value_values, key_values)]
 
         # 'col1 = ?, col2 = ?, ...'
         set_clause = ", ".join(f"{n} = ?" for n in value_names)

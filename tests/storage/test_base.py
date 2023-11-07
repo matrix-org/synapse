@@ -371,12 +371,12 @@ class SQLBaseStoreTestCase(unittest.TestCase):
             self.mock_execute_batch.assert_called_once_with(
                 self.mock_txn,
                 "UPDATE tablename SET col3 = ? WHERE col1 = ? AND col2 = ?",
-                [("val3", "val1", "val2"), ("val3", "val1", "val2")],
+                [("val3", "val1", "val2")],
             )
         else:
             self.mock_txn.executemany.assert_called_once_with(
                 "UPDATE tablename SET col3 = ? WHERE col1 = ? AND col2 = ?",
-                [("val3", "val1", "val2"), ("val3", "val1", "val2")],
+                [("val3", "val1", "val2")],
             )
 
         # key_values and value_values must be the same length.
