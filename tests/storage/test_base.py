@@ -189,17 +189,9 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         )
 
         if USE_POSTGRES_FOR_TESTS:
-            self.mock_execute_values.assert_called_once_with(
-                self.mock_txn,
-                "INSERT INTO tablename (col1, col2) VALUES ?",
-                [],
-                template=None,
-                fetch=False,
-            )
+            self.mock_execute_values.assert_not_called()
         else:
-            self.mock_txn.executemany.assert_called_once_with(
-                "INSERT INTO tablename (col1, col2) VALUES(?, ?)", []
-            )
+            self.mock_txn.executemany.assert_not_called()
 
     @defer.inlineCallbacks
     def test_select_one_1col(self) -> Generator["defer.Deferred[object]", object, None]:
@@ -393,7 +385,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
             )
 
     @defer.inlineCallbacks
-    def test_update_many_no_values(
+    def test_update_many_no_iterable(
         self,
     ) -> Generator["defer.Deferred[object]", object, None]:
         yield defer.ensureDeferred(
@@ -408,16 +400,9 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         )
 
         if USE_POSTGRES_FOR_TESTS:
-            self.mock_execute_batch.assert_called_once_with(
-                self.mock_txn,
-                "UPDATE tablename SET col3 = ? WHERE col1 = ? AND col2 = ?",
-                [],
-            )
+            self.mock_execute_batch.assert_not_called()
         else:
-            self.mock_txn.executemany.assert_called_once_with(
-                "UPDATE tablename SET col3 = ? WHERE col1 = ? AND col2 = ?",
-                [],
-            )
+            self.mock_txn.executemany.assert_not_called()
 
     @defer.inlineCallbacks
     def test_delete_one(self) -> Generator["defer.Deferred[object]", object, None]:
