@@ -118,7 +118,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
             )
         )
 
-        self.mock_txn.execute.assert_called_with(
+        self.mock_txn.execute.assert_called_once_with(
             "INSERT INTO tablename (columname) VALUES(?)", ("Value",)
         )
 
@@ -134,7 +134,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
             )
         )
 
-        self.mock_txn.execute.assert_called_with(
+        self.mock_txn.execute.assert_called_once_with(
             "INSERT INTO tablename (colA, colB, colC) VALUES(?, ?, ?)", (1, 2, 3)
         )
 
@@ -159,7 +159,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         )
 
         if USE_POSTGRES_FOR_TESTS:
-            self.mock_execute_values.assert_called_with(
+            self.mock_execute_values.assert_called_once_with(
                 self.mock_txn,
                 "INSERT INTO tablename (col1, col2) VALUES ?",
                 [("val1", "val2"), ("val3", "val4")],
@@ -167,7 +167,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
                 fetch=False,
             )
         else:
-            self.mock_txn.executemany.assert_called_with(
+            self.mock_txn.executemany.assert_called_once_with(
                 "INSERT INTO tablename (col1, col2) VALUES(?, ?)",
                 [("val1", "val2"), ("val3", "val4")],
             )
@@ -184,7 +184,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         )
 
         self.assertEqual("Value", value)
-        self.mock_txn.execute.assert_called_with(
+        self.mock_txn.execute.assert_called_once_with(
             "SELECT retcol FROM tablename WHERE keycol = ?", ["TheKey"]
         )
 
@@ -202,7 +202,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         )
 
         self.assertEqual({"colA": 1, "colB": 2, "colC": 3}, ret)
-        self.mock_txn.execute.assert_called_with(
+        self.mock_txn.execute.assert_called_once_with(
             "SELECT colA, colB, colC FROM tablename WHERE keycol = ?", ["TheKey"]
         )
 
@@ -237,7 +237,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         )
 
         self.assertEqual([(1,), (2,), (3,)], ret)
-        self.mock_txn.execute.assert_called_with(
+        self.mock_txn.execute.assert_called_once_with(
             "SELECT colA FROM tablename WHERE keycol = ?", ["A set"]
         )
 
@@ -301,7 +301,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
             )
         )
 
-        self.mock_txn.execute.assert_called_with(
+        self.mock_txn.execute.assert_called_once_with(
             "UPDATE tablename SET columnname = ? WHERE keycol = ?",
             ["New Value", "TheKey"],
         )
@@ -320,7 +320,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
             )
         )
 
-        self.mock_txn.execute.assert_called_with(
+        self.mock_txn.execute.assert_called_once_with(
             "UPDATE tablename SET colC = ?, colD = ? WHERE" " colA = ? AND colB = ?",
             [3, 4, 1, 2],
         )
@@ -339,13 +339,13 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         )
 
         if USE_POSTGRES_FOR_TESTS:
-            self.mock_execute_batch.assert_called_with(
+            self.mock_execute_batch.assert_called_once_with(
                 self.mock_txn,
                 "UPDATE tablename SET col3 = ? WHERE col1 = ? AND col2 = ?",
                 [("val3", "val1", "val2"), ("val3", "val1", "val2")],
             )
         else:
-            self.mock_txn.executemany.assert_called_with(
+            self.mock_txn.executemany.assert_called_once_with(
                 "UPDATE tablename SET col3 = ? WHERE col1 = ? AND col2 = ?",
                 [("val3", "val1", "val2"), ("val3", "val1", "val2")],
             )
@@ -373,7 +373,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
             )
         )
 
-        self.mock_txn.execute.assert_called_with(
+        self.mock_txn.execute.assert_called_once_with(
             "DELETE FROM tablename WHERE keycol = ?", ["Go away"]
         )
 
@@ -391,7 +391,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
             )
         )
 
-        self.mock_txn.execute.assert_called_with(
+        self.mock_txn.execute.assert_called_once_with(
             "DELETE FROM tablename WHERE col1 = ANY(?) AND col2 = ?",
             [["val1", "val2"], "val3"],
         )
@@ -430,7 +430,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
             )
         )
 
-        self.mock_txn.execute.assert_called_with(
+        self.mock_txn.execute.assert_called_once_with(
             "DELETE FROM tablename WHERE col1 = ANY(?)", [["val1", "val2"]]
         )
         self.assertEqual(result, 2)
@@ -447,7 +447,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
             )
         )
 
-        self.mock_txn.execute.assert_called_with(
+        self.mock_txn.execute.assert_called_once_with(
             "INSERT INTO tablename (columnname, othercol) VALUES (?, ?) ON CONFLICT (columnname) DO UPDATE SET othercol=EXCLUDED.othercol",
             ["oldvalue", "newvalue"],
         )
@@ -468,7 +468,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
             )
         )
 
-        self.mock_txn.execute.assert_called_with(
+        self.mock_txn.execute.assert_called_once_with(
             "INSERT INTO tablename (columnname) VALUES (?) ON CONFLICT (columnname) DO NOTHING",
             ["value"],
         )
@@ -489,7 +489,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
             )
         )
 
-        self.mock_txn.execute.assert_called_with(
+        self.mock_txn.execute.assert_called_once_with(
             "INSERT INTO tablename (columnname, thirdcol, othercol) VALUES (?, ?, ?) ON CONFLICT (columnname) DO UPDATE SET othercol=EXCLUDED.othercol",
             ["oldvalue", "insertionval", "newvalue"],
         )
@@ -510,7 +510,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
             )
         )
 
-        self.mock_txn.execute.assert_called_with(
+        self.mock_txn.execute.assert_called_once_with(
             "INSERT INTO tablename (columnname, othercol) VALUES (?, ?) ON CONFLICT (columnname) WHERE thirdcol IS NULL DO UPDATE SET othercol=EXCLUDED.othercol",
             ["oldvalue", "newvalue"],
         )
@@ -530,7 +530,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         )
 
         if USE_POSTGRES_FOR_TESTS:
-            self.mock_execute_values.assert_called_with(
+            self.mock_execute_values.assert_called_once_with(
                 self.mock_txn,
                 "INSERT INTO tablename (keycol1, keycol2, valuecol3) VALUES ? ON CONFLICT (keycol1, keycol2) DO UPDATE SET valuecol3=EXCLUDED.valuecol3",
                 [("keyval1", "keyval2", "val5"), ("keyval3", "keyval4", "val6")],
@@ -538,7 +538,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
                 fetch=False,
             )
         else:
-            self.mock_txn.executemany.assert_called_with(
+            self.mock_txn.executemany.assert_called_once_with(
                 "INSERT INTO tablename (keycol1, keycol2, valuecol3) VALUES (?, ?, ?) ON CONFLICT (keycol1, keycol2) DO UPDATE SET valuecol3=EXCLUDED.valuecol3",
                 [("keyval1", "keyval2", "val5"), ("keyval3", "keyval4", "val6")],
             )
@@ -559,7 +559,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         )
 
         if USE_POSTGRES_FOR_TESTS:
-            self.mock_execute_values.assert_called_with(
+            self.mock_execute_values.assert_called_once_with(
                 self.mock_txn,
                 "INSERT INTO tablename (columnname) VALUES ? ON CONFLICT (columnname) DO NOTHING",
                 [("oldvalue",)],
@@ -567,7 +567,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
                 fetch=False,
             )
         else:
-            self.mock_txn.executemany.assert_called_with(
+            self.mock_txn.executemany.assert_called_once_with(
                 "INSERT INTO tablename (columnname) VALUES (?) ON CONFLICT (columnname) DO NOTHING",
                 [("oldvalue",)],
             )
@@ -589,9 +589,17 @@ class SQLBaseStoreTestCase(unittest.TestCase):
             )
         )
 
-        self.mock_txn.execute.assert_called_with(
-            "SELECT 1 FROM tablename WHERE columnname = ?", ["value"]
-        )
+        if USE_POSTGRES_FOR_TESTS:
+            self.mock_txn.execute.assert_has_calls(
+                [
+                    call("LOCK TABLE tablename in EXCLUSIVE MODE", ()),
+                    call("SELECT 1 FROM tablename WHERE columnname = ?", ["value"]),
+                ]
+            )
+        else:
+            self.mock_txn.execute.assert_called_once_with(
+                "SELECT 1 FROM tablename WHERE columnname = ?", ["value"]
+            )
         self.assertFalse(result)
 
     @defer.inlineCallbacks
@@ -640,10 +648,21 @@ class SQLBaseStoreTestCase(unittest.TestCase):
             )
         )
 
-        self.mock_txn.execute.assert_called_with(
-            "UPDATE tablename SET othercol = ? WHERE columnname = ?",
-            ["newvalue", "oldvalue"],
-        )
+        if USE_POSTGRES_FOR_TESTS:
+            self.mock_txn.execute.assert_has_calls(
+                [
+                    call("LOCK TABLE tablename in EXCLUSIVE MODE", ()),
+                    call(
+                        "UPDATE tablename SET othercol = ? WHERE columnname = ?",
+                        ["newvalue", "oldvalue"],
+                    ),
+                ]
+            )
+        else:
+            self.mock_txn.execute.assert_called_once_with(
+                "UPDATE tablename SET othercol = ? WHERE columnname = ?",
+                ["newvalue", "oldvalue"],
+            )
         self.assertTrue(result)
 
     @defer.inlineCallbacks
@@ -694,10 +713,21 @@ class SQLBaseStoreTestCase(unittest.TestCase):
             )
         )
 
-        self.mock_txn.execute.assert_called_with(
-            "UPDATE tablename SET othercol = ? WHERE columnname = ? AND thirdcol IS NULL",
-            ["newvalue", "oldvalue"],
-        )
+        if USE_POSTGRES_FOR_TESTS:
+            self.mock_txn.execute.assert_has_calls(
+                [
+                    call("LOCK TABLE tablename in EXCLUSIVE MODE", ()),
+                    call(
+                        "UPDATE tablename SET othercol = ? WHERE columnname = ? AND thirdcol IS NULL",
+                        ["newvalue", "oldvalue"],
+                    ),
+                ]
+            )
+        else:
+            self.mock_txn.execute.assert_called_once_with(
+                "UPDATE tablename SET othercol = ? WHERE columnname = ? AND thirdcol IS NULL",
+                ["newvalue", "oldvalue"],
+            )
         self.assertTrue(result)
 
     @defer.inlineCallbacks
@@ -717,8 +747,19 @@ class SQLBaseStoreTestCase(unittest.TestCase):
             )
         )
 
-        self.mock_txn.execute.assert_called_with(
-            "SELECT 1 FROM tablename WHERE columnname = ? AND thirdcol IS NULL",
-            ["oldvalue"],
-        )
+        if USE_POSTGRES_FOR_TESTS:
+            self.mock_txn.execute.assert_has_calls(
+                [
+                    call("LOCK TABLE tablename in EXCLUSIVE MODE", ()),
+                    call(
+                        "SELECT 1 FROM tablename WHERE columnname = ? AND thirdcol IS NULL",
+                        ["oldvalue"],
+                    ),
+                ]
+            )
+        else:
+            self.mock_txn.execute.assert_called_once_with(
+                "SELECT 1 FROM tablename WHERE columnname = ? AND thirdcol IS NULL",
+                ["oldvalue"],
+            )
         self.assertFalse(result)
