@@ -1130,7 +1130,7 @@ class DatabasePool:
             keys: list of column names
             values: for each row, a list of values in the same order as `keys`
         """
-        # IF there's nothing to insert, don't send the query.
+        # If there's nothing to insert, then skip executing the query.
         if not values:
             return
 
@@ -1916,6 +1916,7 @@ class DatabasePool:
         Returns:
             The results as a list of tuples.
         """
+        # If there's nothing to select, then skip executing the query.
         if not iterable:
             return []
 
@@ -2050,6 +2051,7 @@ class DatabasePool:
             raise ValueError(
                 f"{len(key_values)} key rows and {len(value_values)} value rows: should be the same number."
             )
+        # If there is nothing to update, then skip executing the query.
         if not key_values:
             return
 
@@ -2286,6 +2288,7 @@ class DatabasePool:
         Returns:
             Number rows deleted
         """
+        # If there's nothing to delete, then skip executing the query.
         if not values:
             return 0
 
