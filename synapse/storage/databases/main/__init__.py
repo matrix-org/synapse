@@ -17,6 +17,8 @@
 import logging
 from typing import TYPE_CHECKING, List, Optional, Tuple, Union, cast
 
+import attr
+
 from synapse.api.constants import Direction
 from synapse.config.homeserver import HomeServerConfig
 from synapse.storage._base import make_in_list_sql_clause
@@ -28,7 +30,7 @@ from synapse.storage.database import (
 from synapse.storage.databases.main.stats import UserSortOrder
 from synapse.storage.engines import BaseDatabaseEngine
 from synapse.storage.types import Cursor
-from synapse.types import JsonDict, get_domain_from_id
+from synapse.types import get_domain_from_id
 
 from .account_data import AccountDataStore
 from .appservice import ApplicationServiceStore, ApplicationServiceTransactionStore
@@ -80,6 +82,25 @@ if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
+
+
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class UserPaginateResponse:
+    """This is very similar to UserInfo, but not quite the same."""
+
+    name: str
+    user_type: Optional[str]
+    is_guest: bool
+    admin: bool
+    deactivated: bool
+    shadow_banned: bool
+    displayname: Optional[str]
+    avatar_url: Optional[str]
+    creation_ts: Optional[int]
+    approved: bool
+    erased: bool
+    last_seen_ts: int
+    locked: bool
 
 
 class DataStore(
@@ -156,7 +177,7 @@ class DataStore(
         approved: bool = True,
         not_user_types: Optional[List[str]] = None,
         locked: bool = False,
-    ) -> Tuple[List[JsonDict], int]:
+    ) -> Tuple[List[UserPaginateResponse], int]:
         """Function to retrieve a paginated list of users from
         users list. This will return a json list of users and the
         total number of users matching the filter criteria.
@@ -182,7 +203,7 @@ class DataStore(
 
         def get_users_paginate_txn(
             txn: LoggingTransaction,
-        ) -> Tuple[List[JsonDict], int]:
+        ) -> Tuple[List[UserPaginateResponse], int]:
             filters = []
             args: list = []
 
@@ -282,13 +303,24 @@ class DataStore(
             """
             args += [limit, start]
             txn.execute(sql, args)
-            users = self.db_pool.cursor_to_dict(txn)
-
-            # some of those boolean values are returned as integers when we're on SQLite
-            columns_to_boolify = ["erased"]
-            for user in users:
-                for column in columns_to_boolify:
-                    user[column] = bool(user[column])
+            users = [
+                UserPaginateResponse(
+                    name=row[0],
+                    user_type=row[1],
+                    is_guest=bool(row[2]),
+                    admin=bool(row[3]),
+                    deactivated=bool(row[4]),
+                    shadow_banned=bool(row[5]),
+                    displayname=row[6],
+                    avatar_url=row[7],
+                    creation_ts=row[8],
+                    approved=bool(row[9]),
+                    erased=bool(row[10]),
+                    last_seen_ts=row[11],
+                    locked=bool(row[12]),
+                )
+                for row in txn
+            ]
 
             return users, count
 

@@ -18,7 +18,6 @@ import logging
 import time
 import types
 from collections import defaultdict
-from sys import intern
 from time import monotonic as monotonic_time
 from typing import (
     TYPE_CHECKING,
@@ -1042,20 +1041,6 @@ class DatabasePool:
             self._db_pool.runWithConnection(inner_func, *args, **kwargs)
         )
 
-    @staticmethod
-    def cursor_to_dict(cursor: Cursor) -> List[Dict[str, Any]]:
-        """Converts a SQL cursor into an list of dicts.
-
-        Args:
-            cursor: The DBAPI cursor which has executed a query.
-        Returns:
-            A list of dicts where the key is the column header.
-        """
-        assert cursor.description is not None, "cursor.description was None"
-        col_headers = [intern(str(column[0])) for column in cursor.description]
-        results = [dict(zip(col_headers, row)) for row in cursor]
-        return results
-
     async def execute(self, desc: str, query: str, *args: Any) -> List[Tuple[Any, ...]]:
         """Runs a single query for a result set.
 
@@ -1419,12 +1404,12 @@ class DatabasePool:
             allvalues.update(values)
             latter = "UPDATE SET " + ", ".join(k + "=EXCLUDED." + k for k in values)
 
-        sql = "INSERT INTO %s (%s) VALUES (%s) ON CONFLICT (%s) %s DO %s" % (
+        sql = "INSERT INTO %s (%s) VALUES (%s) ON CONFLICT (%s) %sDO %s" % (
             table,
             ", ".join(k for k in allvalues),
             ", ".join("?" for _ in allvalues),
             ", ".join(k for k in keyvalues),
-            f"WHERE {where_clause}" if where_clause else "",
+            f"WHERE {where_clause} " if where_clause else "",
             latter,
         )
         txn.execute(sql, list(allvalues.values()))
@@ -2085,9 +2070,7 @@ class DatabasePool:
             where_clause = ""
 
         # UPDATE mytable SET col1 = ?, col2 = ? WHERE col3 = ? AND col4 = ?
-        sql = f"""
-            UPDATE {table} SET {set_clause} {where_clause}
-        """
+        sql = f"UPDATE {table} SET {set_clause} {where_clause}"
 
         txn.execute_batch(sql, args)
 
@@ -2306,8 +2289,6 @@ class DatabasePool:
         if not values:
             return 0
 
-        sql = "DELETE FROM %s" % table
-
         clause, values = make_in_list_sql_clause(txn.database_engine, column, values)
         clauses = [clause]
 
@@ -2315,8 +2296,7 @@ class DatabasePool:
             clauses.append("%s = ?" % (key,))
             values.append(value)
 
-        if clauses:
-            sql = "%s WHERE %s" % (sql, " AND ".join(clauses))
+        sql = "DELETE FROM %s WHERE %s" % (table, " AND ".join(clauses))
         txn.execute(sql, values)
 
         return txn.rowcount

@@ -77,7 +77,18 @@ class ListRegistrationTokensRestServlet(RestServlet):
         await assert_requester_is_admin(self.auth, request)
         valid = parse_boolean(request, "valid")
         token_list = await self.store.get_registration_tokens(valid)
-        return HTTPStatus.OK, {"registration_tokens": token_list}
+        return HTTPStatus.OK, {
+            "registration_tokens": [
+                {
+                    "token": t[0],
+                    "uses_allowed": t[1],
+                    "pending": t[2],
+                    "completed": t[3],
+                    "expiry_time": t[4],
+                }
+                for t in token_list
+            ]
+        }
 
 
 class NewRegistrationTokenRestServlet(RestServlet):
