@@ -487,24 +487,24 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
         self,
         txn: LoggingTransaction,
         cache_func: CachedFunction,
-        keys_collection: Collection[Tuple[Any, ...]],
+        key_tuples: Collection[Tuple[Any, ...]],
     ) -> None:
         """A bulk version of _invalidate_cache_and_stream.
 
-        Locally invalidate every key-tuple in `keys_collection`, then emit invalidations
+        Locally invalidate every key-tuple in `key_tuples`, then emit invalidations
         for each key-tuple over replication.
 
         This implementation is more efficient than a loop which repeatedly calls the
         non-bulk version.
         """
-        if not keys_collection:
+        if not key_tuples:
             return
 
-        for keys in keys_collection:
+        for keys in key_tuples:
             txn.call_after(cache_func.invalidate, keys)
 
         self._send_invalidation_to_replication_bulk(
-            txn, cache_func.__name__, keys_collection
+            txn, cache_func.__name__, key_tuples
         )
 
     def _invalidate_all_cache_and_stream(
@@ -610,7 +610,7 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
         self,
         txn: LoggingTransaction,
         cache_name: str,
-        keys_collection: Collection[Iterable[Any]],
+        key_tuple: Collection[Tuple[Any, ...]],
     ) -> None:
         """Announce the invalidation of multiple (but not all) cache entries.
 
@@ -623,12 +623,12 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
         Args:
             txn
             cache_name
-            keys_collection: Key-tuples to invalidate. Assumed to be non-empty.
+            key_tuple: Key-tuples to invalidate. Assumed to be non-empty.
         """
         if isinstance(self.database_engine, PostgresEngine):
             assert self._cache_id_gen is not None
 
-            stream_ids = self._cache_id_gen.get_next_mult_txn(txn, len(keys_collection))
+            stream_ids = self._cache_id_gen.get_next_mult_txn(txn, len(key_tuple))
             ts = self._clock.time_msec()
             txn.call_after(self.hs.get_notifier().on_new_replication_data)
             self.db_pool.simple_insert_many_txn(
@@ -649,7 +649,7 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
                     #     https://www.psycopg.org/docs/usage.html#adapt-list
                     #     https://www.psycopg.org/docs/usage.html#adapt-tuple
                     (stream_id, self._instance_name, cache_name, list(key_tuple), ts)
-                    for stream_id, key_tuple in zip(stream_ids, keys_collection)
+                    for stream_id, key_tuple in zip(stream_ids, key_tuple)
                 ],
             )
 

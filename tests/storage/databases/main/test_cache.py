@@ -42,7 +42,7 @@ class CacheInvalidationTestCase(HomeserverTestCase):
                 # because it takes more than one argument. We'll use this later to
                 # check that the invalidation was actioned over replication.
                 cache_func=self.store._get_cached_user_device,
-                keys_collection=keys_to_invalidate,
+                key_tuples=keys_to_invalidate,
             )
 
         assert self.store._cache_id_gen is not None
@@ -91,7 +91,7 @@ class CacheInvalidationOverReplicationTestCase(BaseMultiWorkerStreamTestCase):
                 # because it takes more than one argument. We'll use this later to
                 # check that the invalidation was actioned over replication.
                 cache_func=self.store._get_cached_user_device,
-                keys_collection=keys_to_invalidate,
+                key_tuples=keys_to_invalidate,
             )
 
         assert self.store._cache_id_gen is not None
