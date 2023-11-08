@@ -610,7 +610,7 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
         self,
         txn: LoggingTransaction,
         cache_name: str,
-        key_tuple: Collection[Tuple[Any, ...]],
+        key_tuples: Collection[Tuple[Any, ...]],
     ) -> None:
         """Announce the invalidation of multiple (but not all) cache entries.
 
@@ -623,12 +623,12 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
         Args:
             txn
             cache_name
-            key_tuple: Key-tuples to invalidate. Assumed to be non-empty.
+            key_tuples: Key-tuples to invalidate. Assumed to be non-empty.
         """
         if isinstance(self.database_engine, PostgresEngine):
             assert self._cache_id_gen is not None
 
-            stream_ids = self._cache_id_gen.get_next_mult_txn(txn, len(key_tuple))
+            stream_ids = self._cache_id_gen.get_next_mult_txn(txn, len(key_tuples))
             ts = self._clock.time_msec()
             txn.call_after(self.hs.get_notifier().on_new_replication_data)
             self.db_pool.simple_insert_many_txn(
@@ -642,14 +642,14 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
                     "invalidation_ts",
                 ),
                 values=[
-                    # We convert key_tuple to a list here because psycopg2 serialises
+                    # We convert key_tuples to a list here because psycopg2 serialises
                     # lists as pq arrrays, but serialises tuples as "composite types".
                     # (We need an array because the `keys` column has type `[]text`.)
                     # See:
                     #     https://www.psycopg.org/docs/usage.html#adapt-list
                     #     https://www.psycopg.org/docs/usage.html#adapt-tuple
                     (stream_id, self._instance_name, cache_name, list(key_tuple), ts)
-                    for stream_id, key_tuple in zip(stream_ids, key_tuple)
+                    for stream_id, key_tuple in zip(stream_ids, key_tuples)
                 ],
             )
 
