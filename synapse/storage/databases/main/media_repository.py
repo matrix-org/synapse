@@ -54,9 +54,23 @@ class LocalMedia:
     media_length: int
     upload_name: str
     created_ts: int
+    url_cache: Optional[str]
     last_access_ts: int
     quarantined_by: Optional[str]
     safe_from_quarantine: bool
+
+
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class RemoteMedia:
+    media_origin: str
+    media_id: str
+    media_type: str
+    media_length: int
+    upload_name: Optional[str]
+    filesystem_id: str
+    created_ts: int
+    last_access_ts: int
+    quarantined_by: Optional[str]
 
 
 class MediaSortOrder(Enum):
@@ -165,13 +179,13 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
         super().__init__(database, db_conn, hs)
         self.server_name: str = hs.hostname
 
-    async def get_local_media(self, media_id: str) -> Optional[Dict[str, Any]]:
+    async def get_local_media(self, media_id: str) -> Optional[LocalMedia]:
         """Get the metadata for a local piece of media
 
         Returns:
             None if the media_id doesn't exist.
         """
-        return await self.db_pool.simple_select_one(
+        row = await self.db_pool.simple_select_one(
             "local_media_repository",
             {"media_id": media_id},
             (
@@ -181,11 +195,15 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
                 "created_ts",
                 "quarantined_by",
                 "url_cache",
+                "last_access_ts",
                 "safe_from_quarantine",
             ),
             allow_none=True,
             desc="get_local_media",
         )
+        if row is None:
+            return None
+        return LocalMedia(media_id=media_id, **row)
 
     async def get_local_media_by_user_paginate(
         self,
@@ -236,6 +254,7 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
                     media_length,
                     upload_name,
                     created_ts,
+                    url_cache,
                     last_access_ts,
                     quarantined_by,
                     safe_from_quarantine
@@ -257,9 +276,10 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
                     media_length=row[2],
                     upload_name=row[3],
                     created_ts=row[4],
-                    last_access_ts=row[5],
-                    quarantined_by=row[6],
-                    safe_from_quarantine=bool(row[7]),
+                    url_cache=row[5],
+                    last_access_ts=row[6],
+                    quarantined_by=row[7],
+                    safe_from_quarantine=bool(row[8]),
                 )
                 for row in txn
             ]
@@ -510,8 +530,8 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
 
     async def get_cached_remote_media(
         self, origin: str, media_id: str
-    ) -> Optional[Dict[str, Any]]:
-        return await self.db_pool.simple_select_one(
+    ) -> Optional[RemoteMedia]:
+        row = await self.db_pool.simple_select_one(
             "remote_media_cache",
             {"media_origin": origin, "media_id": media_id},
             (
@@ -520,11 +540,15 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
                 "upload_name",
                 "created_ts",
                 "filesystem_id",
+                "last_access_ts",
                 "quarantined_by",
             ),
             allow_none=True,
             desc="get_cached_remote_media",
         )
+        if row is None:
+            return row
+        return RemoteMedia(media_origin=origin, media_id=media_id, **row)
 
     async def store_cached_remote_media(
         self,
