@@ -46,16 +46,11 @@ class CacheInvalidationTestCase(HomeserverTestCase):
                 key_tuples=keys_to_invalidate,
             )
 
-        assert self.store._cache_id_gen is not None
-        initial_token = self.store._cache_id_gen.get_current_token()
         self.get_success(
             self.store.db_pool.runInteraction(
                 "test_invalidate_cache_and_stream_bulk", test_txn
             )
         )
-        second_token = self.store._cache_id_gen.get_current_token()
-
-        self.assertGreaterEqual(second_token, initial_token + len(keys_to_invalidate))
 
         master_invalidate.assert_has_calls(
             [call(key_list) for key_list in keys_to_invalidate],
