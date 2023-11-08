@@ -714,8 +714,7 @@ class MultiWriterIdGenerator(AbstractStreamIdGenerator):
 
         with self._lock:
             self._unfinished_ids.difference_update(next_ids)
-            for next_id in next_ids:
-                self._finished_ids.add(next_id)
+            self._finished_ids.update(next_ids)
 
             new_cur: Optional[int] = None
 
