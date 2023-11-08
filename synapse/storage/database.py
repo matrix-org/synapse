@@ -1116,7 +1116,7 @@ class DatabasePool:
     def simple_insert_many_txn(
         txn: LoggingTransaction,
         table: str,
-        keys: Collection[str],
+        keys: Sequence[str],
         values: Collection[Iterable[Any]],
     ) -> None:
         """Executes an INSERT query on the named table.
