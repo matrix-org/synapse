@@ -671,6 +671,43 @@ class MultiWriterIdGenerator(AbstractStreamIdGenerator):
 
         return self._return_factor * next_id
 
+    def get_next_mult_txn(self, txn: LoggingTransaction, n: int) -> List[int]:
+        """
+        Usage:
+
+            stream_id = stream_id_gen.get_next_txn(txn)
+            # ... persist event ...
+        """
+
+        # If we have a list of instances that are allowed to write to this
+        # stream, make sure we're in it.
+        if self._writers and self._instance_name not in self._writers:
+            raise Exception("Tried to allocate stream ID on non-writer")
+
+        next_ids = self._load_next_mult_id_txn(txn, n)
+
+        for next_id in next_ids:
+            txn.call_after(self._mark_id_as_finished, next_id)
+            txn.call_on_exception(self._mark_id_as_finished, next_id)
+        txn.call_after(self._notifier.notify_replication)
+
+        # Update the `stream_positions` table with newly updated stream
+        # ID (unless self._writers is not set in which case we don't
+        # bother, as nothing will read it).
+        #
+        # We only do this on the success path so that the persisted current
+        # position points to a persisted row with the correct instance name.
+        if self._writers:
+            txn.call_after(
+                run_as_background_process,
+                "MultiWriterIdGenerator._update_table",
+                self._db.runInteraction,
+                "MultiWriterIdGenerator._update_table",
+                self._update_stream_positions_table_txn,
+            )
+
+        return [self._return_factor * next_id for next_id in next_ids]
+
     def _mark_id_as_finished(self, next_id: int) -> None:
         """The ID has finished being processed so we should advance the
         current position if possible.
