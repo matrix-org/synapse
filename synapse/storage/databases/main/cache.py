@@ -642,7 +642,13 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
                     "invalidation_ts",
                 ),
                 values=[
-                    (stream_id, self._instance_name, cache_name, key_tuple, ts)
+                    # We convert key_tuple to a list here because psycopg2 serialises
+                    # lists as pq arrrays, but serialises tuples as "composite types".
+                    # (We need an array because the `keys` column has type `[]text`.)
+                    # See:
+                    #     https://www.psycopg.org/docs/usage.html#adapt-list
+                    #     https://www.psycopg.org/docs/usage.html#adapt-tuple
+                    (stream_id, self._instance_name, cache_name, list(key_tuple), ts)
                     for stream_id, key_tuple in zip(stream_ids, keys_collection)
                 ],
             )
