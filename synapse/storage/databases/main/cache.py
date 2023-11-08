@@ -483,6 +483,30 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
         txn.call_after(cache_func.invalidate, keys)
         self._send_invalidation_to_replication(txn, cache_func.__name__, keys)
 
+    def _invalidate_cache_and_stream_bulk(
+        self,
+        txn: LoggingTransaction,
+        cache_func: CachedFunction,
+        keys_collection: Collection[Tuple[Any, ...]],
+    ) -> None:
+        """A bulk version of _invalidate_cache_and_stream.
+
+        Locally invalidate every key-tuple in `keys_collection`, then emit invalidations
+        for each key-tuple over replication.
+
+        This implementation is more efficient than a loop which repeatedly calls the
+        non-bulk version.
+        """
+        if not keys_collection:
+            return
+
+        for keys in keys_collection:
+            txn.call_after(cache_func.invalidate, keys)
+
+        self._send_invalidation_to_replication_bulk(
+            txn, cache_func.__name__, keys_collection
+        )
+
     def _invalidate_all_cache_and_stream(
         self, txn: LoggingTransaction, cache_func: CachedFunction
     ) -> None:
@@ -580,6 +604,47 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
                     "keys": keys,
                     "invalidation_ts": self._clock.time_msec(),
                 },
+            )
+
+    def _send_invalidation_to_replication_bulk(
+        self,
+        txn: LoggingTransaction,
+        cache_name: str,
+        keys_collection: Collection[Iterable[Any]],
+    ) -> None:
+        """Announce the invalidation of multiple (but not all) cache entries.
+
+        This is more efficient than repeated calls to the non-bulk version. It should
+        NOT be used to invalidating the entire cache: use
+        `_send_invalidation_to_replication` with keys=None.
+
+        Note that this does *not* invalidate the cache locally.
+
+        Args:
+            txn
+            cache_name
+            keys_collection: Key-tuples to invalidate. Assumed to be non-empty.
+        """
+        if isinstance(self.database_engine, PostgresEngine):
+            assert self._cache_id_gen is not None
+
+            stream_ids = self._cache_id_gen.get_next_mult_txn(txn, len(keys_collection))
+            ts = self._clock.time_msec()
+            txn.call_after(self.hs.get_notifier().on_new_replication_data)
+            self.db_pool.simple_insert_many_txn(
+                txn,
+                table="cache_invalidation_stream_by_instance",
+                keys=(
+                    "stream_id",
+                    "instance_name",
+                    "cache_func",
+                    "keys",
+                    "invalidation_ts",
+                ),
+                values=[
+                    (stream_id, self._instance_name, cache_name, key_tuple, ts)
+                    for stream_id, key_tuple in zip(stream_ids, keys_collection)
+                ],
             )
 
     def get_cache_stream_token_for_writer(self, instance_name: str) -> int:
