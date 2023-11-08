@@ -1266,9 +1266,7 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
             if row is None:
                 continue
 
-            key_id = row["key_id"]
-            key_json = row["key_json"]
-            used = row["used"]
+            key_id, key_json, used = row
 
             # Mark fallback key as used if not already.
             if not used and mark_as_used:

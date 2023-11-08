@@ -270,15 +270,15 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         self.assertLessEqual(det_data.items(), channel.json_body.items())
 
         # Check the `completed` counter has been incremented and pending is 0
-        res = self.get_success(
+        pending, completed = self.get_success(
             store.db_pool.simple_select_one(
                 "registration_tokens",
                 keyvalues={"token": token},
                 retcols=["pending", "completed"],
             )
         )
-        self.assertEqual(res["completed"], 1)
-        self.assertEqual(res["pending"], 0)
+        self.assertEqual(completed, 1)
+        self.assertEqual(pending, 0)
 
     @override_config({"registration_requires_token": True})
     def test_POST_registration_token_invalid(self) -> None:
@@ -372,15 +372,15 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         params1["auth"]["type"] = LoginType.DUMMY
         self.make_request(b"POST", self.url, params1)
         # Check pending=0 and completed=1
-        res = self.get_success(
+        pending, completed = self.get_success(
             store.db_pool.simple_select_one(
                 "registration_tokens",
                 keyvalues={"token": token},
                 retcols=["pending", "completed"],
             )
         )
-        self.assertEqual(res["pending"], 0)
-        self.assertEqual(res["completed"], 1)
+        self.assertEqual(pending, 0)
+        self.assertEqual(completed, 1)
 
         # Check auth still fails when using token with session2
         channel = self.make_request(b"POST", self.url, params2)

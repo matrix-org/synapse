@@ -13,7 +13,6 @@
 # limitations under the License.
 from typing import TYPE_CHECKING, Optional
 
-from synapse.api.errors import StoreError
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import (
     DatabasePool,
@@ -138,23 +137,18 @@ class ProfileWorkerStore(SQLBaseStore):
         return 50
 
     async def get_profileinfo(self, user_id: UserID) -> ProfileInfo:
-        try:
-            profile = await self.db_pool.simple_select_one(
-                table="profiles",
-                keyvalues={"full_user_id": user_id.to_string()},
-                retcols=("displayname", "avatar_url"),
-                desc="get_profileinfo",
-            )
-        except StoreError as e:
-            if e.code == 404:
-                # no match
-                return ProfileInfo(None, None)
-            else:
-                raise
-
-        return ProfileInfo(
-            avatar_url=profile["avatar_url"], display_name=profile["displayname"]
+        profile = await self.db_pool.simple_select_one(
+            table="profiles",
+            keyvalues={"full_user_id": user_id.to_string()},
+            retcols=("displayname", "avatar_url"),
+            desc="get_profileinfo",
+            allow_none=True,
         )
+        if profile is None:
+            # no match
+            return ProfileInfo(None, None)
+
+        return ProfileInfo(avatar_url=profile[1], display_name=profile[0])
 
     async def get_profile_displayname(self, user_id: UserID) -> Optional[str]:
         return await self.db_pool.simple_select_one_onecol(

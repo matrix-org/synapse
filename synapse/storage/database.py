@@ -1597,7 +1597,7 @@ class DatabasePool:
         retcols: Collection[str],
         allow_none: Literal[False] = False,
         desc: str = "simple_select_one",
-    ) -> Dict[str, Any]:
+    ) -> Tuple[Any, ...]:
         ...
 
     @overload
@@ -1608,7 +1608,7 @@ class DatabasePool:
         retcols: Collection[str],
         allow_none: Literal[True] = True,
         desc: str = "simple_select_one",
-    ) -> Optional[Dict[str, Any]]:
+    ) -> Optional[Tuple[Any, ...]]:
         ...
 
     async def simple_select_one(
@@ -1618,7 +1618,7 @@ class DatabasePool:
         retcols: Collection[str],
         allow_none: bool = False,
         desc: str = "simple_select_one",
-    ) -> Optional[Dict[str, Any]]:
+    ) -> Optional[Tuple[Any, ...]]:
         """Executes a SELECT query on the named table, which is expected to
         return a single row, returning multiple columns from it.
 
@@ -1630,7 +1630,7 @@ class DatabasePool:
                 statement returns no rows
             desc: description of the transaction, for logging and metrics
         """
-        row = await self.runInteraction(
+        return await self.runInteraction(
             desc,
             self.simple_select_one_txn,
             table,
@@ -1639,7 +1639,6 @@ class DatabasePool:
             allow_none,
             db_autocommit=True,
         )
-        return dict(zip(retcols, row)) if row is not None else row
 
     @overload
     async def simple_select_one_onecol(

@@ -20,7 +20,6 @@ from typing import (
     Collection,
     Iterable,
     List,
-    Mapping,
     Optional,
     Sequence,
     Set,
@@ -833,13 +832,25 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             "delete_all_from_user_dir", _delete_all_from_user_dir_txn
         )
 
-    async def _get_user_in_directory(self, user_id: str) -> Optional[Mapping[str, str]]:
-        return await self.db_pool.simple_select_one(
-            table="user_directory",
-            keyvalues={"user_id": user_id},
-            retcols=("display_name", "avatar_url"),
-            allow_none=True,
-            desc="get_user_in_directory",
+    async def _get_user_in_directory(
+        self, user_id: str
+    ) -> Optional[Tuple[Optional[str], Optional[str]]]:
+        """
+        Fetch the user information in the user directory.
+
+        Returns:
+            None if the user is unknown, otherwise a tuple of display name and
+            avatar URL (both of which may be None).
+        """
+        return cast(
+            Optional[Tuple[Optional[str], Optional[str]]],
+            await self.db_pool.simple_select_one(
+                table="user_directory",
+                keyvalues={"user_id": user_id},
+                retcols=("display_name", "avatar_url"),
+                allow_none=True,
+                desc="get_user_in_directory",
+            ),
         )
 
     async def update_user_directory_stream_pos(self, stream_id: Optional[int]) -> None:

@@ -122,9 +122,13 @@ class UIAuthWorkerStore(SQLBaseStore):
             desc="get_ui_auth_session",
         )
 
-        result["clientdict"] = db_to_json(result["clientdict"])
-
-        return UIAuthSessionData(session_id, **result)
+        return UIAuthSessionData(
+            session_id,
+            clientdict=db_to_json(result[0]),
+            uri=result[1],
+            method=result[2],
+            description=result[3],
+        )
 
     async def mark_ui_auth_stage_complete(
         self,
@@ -262,14 +266,14 @@ class UIAuthWorkerStore(SQLBaseStore):
         Raises:
             StoreError if the session cannot be found.
         """
-        result = await self.db_pool.simple_select_one(
+        result = await self.db_pool.simple_select_one_onecol(
             table="ui_auth_sessions",
             keyvalues={"session_id": session_id},
-            retcols=("serverdict",),
+            retcol="serverdict",
             desc="get_ui_auth_session_data",
         )
 
-        serverdict = db_to_json(result["serverdict"])
+        serverdict = db_to_json(result)
 
         return serverdict.get(key, default)
 
