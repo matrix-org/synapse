@@ -298,7 +298,10 @@ class MediaRepository:
             user_id=auth_user,
         )
 
-        await self._generate_thumbnails(None, media_id, media_id, media_type)
+        try:
+            await self._generate_thumbnails(None, media_id, media_id, media_type)
+        except Exception as e:
+            logger.info("Failed to generate thumbnails: %s", e)
 
     @trace
     async def create_content(
