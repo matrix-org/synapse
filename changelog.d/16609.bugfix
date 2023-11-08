@@ -1,0 +1,1 @@
+Fix a long-standing bug where some queries updated the same row twice. Introduced in Synapse 1.57.0.

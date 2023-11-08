@@ -705,7 +705,7 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
             key_names=("destination", "user_id"),
             key_values=[(destination, user_id) for user_id, _ in rows],
             value_names=("stream_id",),
-            value_values=((stream_id,) for _, stream_id in rows),
+            value_values=[(stream_id,) for _, stream_id in rows],
         )
 
         # Delete all sent outbound pokes
