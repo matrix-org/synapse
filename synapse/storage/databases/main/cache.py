@@ -564,10 +564,6 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
         if isinstance(self.database_engine, PostgresEngine):
             assert self._cache_id_gen is not None
 
-            # get_next() returns a context manager which is designed to wrap
-            # the transaction. However, we want to only get an ID when we want
-            # to use it, here, so we need to call __enter__ manually, and have
-            # __exit__ called after the transaction finishes.
             stream_id = self._cache_id_gen.get_next_txn(txn)
             txn.call_after(self.hs.get_notifier().on_new_replication_data)
 
