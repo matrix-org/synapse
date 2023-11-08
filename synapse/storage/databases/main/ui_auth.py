@@ -231,18 +231,15 @@ class UIAuthWorkerStore(SQLBaseStore):
         self, txn: LoggingTransaction, session_id: str, key: str, value: Any
     ) -> None:
         # Get the current value.
-        result = cast(
-            Dict[str, Any],
-            self.db_pool.simple_select_one_txn(
-                txn,
-                table="ui_auth_sessions",
-                keyvalues={"session_id": session_id},
-                retcols=("serverdict",),
-            ),
+        result = self.db_pool.simple_select_one_onecol_txn(
+            txn,
+            table="ui_auth_sessions",
+            keyvalues={"session_id": session_id},
+            retcol="serverdict",
         )
 
         # Update it and add it back to the database.
-        serverdict = db_to_json(result["serverdict"])
+        serverdict = db_to_json(result)
         serverdict[key] = value
 
         self.db_pool.simple_update_one_txn(

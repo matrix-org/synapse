@@ -1630,7 +1630,7 @@ class DatabasePool:
                 statement returns no rows
             desc: description of the transaction, for logging and metrics
         """
-        return await self.runInteraction(
+        row = await self.runInteraction(
             desc,
             self.simple_select_one_txn,
             table,
@@ -1639,6 +1639,7 @@ class DatabasePool:
             allow_none,
             db_autocommit=True,
         )
+        return dict(zip(retcols, row)) if row is not None else row
 
     @overload
     async def simple_select_one_onecol(
@@ -2127,7 +2128,7 @@ class DatabasePool:
         keyvalues: Dict[str, Any],
         retcols: Collection[str],
         allow_none: bool = False,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> Optional[Tuple[Any, ...]]:
         select_sql = "SELECT %s FROM %s" % (", ".join(retcols), table)
 
         if keyvalues:
@@ -2145,7 +2146,7 @@ class DatabasePool:
         if txn.rowcount > 1:
             raise StoreError(500, "More than one row matched (%s)" % (table,))
 
-        return dict(zip(retcols, row))
+        return row
 
     async def simple_delete_one(
         self, table: str, keyvalues: Dict[str, Any], desc: str = "simple_delete_one"

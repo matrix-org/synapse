@@ -1180,26 +1180,24 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             dict
         """
 
-        results = self.db_pool.simple_select_one_txn(
-            txn,
-            "events",
-            keyvalues={"event_id": event_id, "room_id": room_id},
-            retcols=["stream_ordering", "topological_ordering"],
+        stream_ordering, topological_ordering = cast(
+            Tuple[int, int],
+            self.db_pool.simple_select_one_txn(
+                txn,
+                "events",
+                keyvalues={"event_id": event_id, "room_id": room_id},
+                retcols=["stream_ordering", "topological_ordering"],
+            ),
         )
-
-        # This cannot happen as `allow_none=False`.
-        assert results is not None
 
         # Paginating backwards includes the event at the token, but paginating
         # forward doesn't.
         before_token = RoomStreamToken(
-            topological=results["topological_ordering"] - 1,
-            stream=results["stream_ordering"],
+            topological=topological_ordering - 1, stream=stream_ordering
         )
 
         after_token = RoomStreamToken(
-            topological=results["topological_ordering"],
-            stream=results["stream_ordering"],
+            topological=topological_ordering, stream=stream_ordering
         )
 
         rows, start_token = self._paginate_room_events_txn(
