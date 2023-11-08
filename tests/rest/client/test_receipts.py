@@ -30,6 +30,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
     servlets = [
         login.register_servlets,
         receipts.register_servlets,
+        room.register_servlets,
         synapse.rest.admin.register_servlets,
         room.register_servlets,
         sync.register_servlets,
