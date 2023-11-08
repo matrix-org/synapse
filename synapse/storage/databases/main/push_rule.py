@@ -514,6 +514,7 @@ class PushRuleStore(PushRulesWorkerStore):
                 WHERE user_name = ? and priority_class = ?
                 FOR UPDATE
             """
+            txn.execute(sql, (user_id, priority_class))
         else:
             # Annoyingly SQLite doesn't support row level locking, so lock the whole table
             self.database_engine.lock_table(txn, "push_rules")
