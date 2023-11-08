@@ -650,8 +650,8 @@ class MultiWriterIdGenerator(AbstractStreamIdGenerator):
 
         next_id = self._load_next_id_txn(txn)
 
-        txn.call_after(self._mark_id_as_finished, next_id)
-        txn.call_on_exception(self._mark_id_as_finished, next_id)
+        txn.call_after(self._mark_id_as_finished, [next_id])
+        txn.call_on_exception(self._mark_id_as_finished, [next_id])
         txn.call_after(self._notifier.notify_replication)
 
         # Update the `stream_positions` table with newly updated stream
@@ -686,9 +686,8 @@ class MultiWriterIdGenerator(AbstractStreamIdGenerator):
 
         next_ids = self._load_next_mult_id_txn(txn, n)
 
-        for next_id in next_ids:
-            txn.call_after(self._mark_id_as_finished, next_id)
-            txn.call_on_exception(self._mark_id_as_finished, next_id)
+        txn.call_after(self._mark_ids_as_finished, next_ids)
+        txn.call_on_exception(self._mark_ids_as_finished, next_ids)
         txn.call_after(self._notifier.notify_replication)
 
         # Update the `stream_positions` table with newly updated stream
@@ -708,14 +707,15 @@ class MultiWriterIdGenerator(AbstractStreamIdGenerator):
 
         return [self._return_factor * next_id for next_id in next_ids]
 
-    def _mark_id_as_finished(self, next_id: int) -> None:
+    def _mark_ids_as_finished(self, next_ids: List[int]) -> None:
         """The ID has finished being processed so we should advance the
         current position if possible.
         """
 
         with self._lock:
-            self._unfinished_ids.discard(next_id)
-            self._finished_ids.add(next_id)
+            self._unfinished_ids.difference_update(next_ids)
+            for next_id in next_ids:
+                self._finished_ids.add(next_id)
 
             new_cur: Optional[int] = None
 
@@ -764,7 +764,10 @@ class MultiWriterIdGenerator(AbstractStreamIdGenerator):
                     curr, new_cur, self._max_position_of_local_instance
                 )
 
-            self._add_persisted_position(next_id)
+            # TODO Can we call this for just the last position or somehow batch
+            # _add_persisted_position.
+            for next_id in next_ids:
+                self._add_persisted_position(next_id)
 
     def get_current_token(self) -> int:
         return self.get_persisted_upto_position()
@@ -970,8 +973,7 @@ class _MultiWriterCtxManager:
         exc: Optional[BaseException],
         tb: Optional[TracebackType],
     ) -> bool:
-        for i in self.stream_ids:
-            self.id_gen._mark_id_as_finished(i)
+        self.id_gen._mark_ids_as_finished(self.stream_ids)
 
         self.notifier.notify_replication()
 
