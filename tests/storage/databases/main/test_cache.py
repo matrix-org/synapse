@@ -14,6 +14,7 @@
 from unittest.mock import Mock, call
 
 from synapse.storage.database import LoggingTransaction
+
 from tests.replication._base import BaseMultiWorkerStreamTestCase
 from tests.unittest import HomeserverTestCase
 
