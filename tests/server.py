@@ -88,7 +88,7 @@ from synapse.module_api.callbacks.third_party_event_rules_callbacks import (
 from synapse.server import HomeServer
 from synapse.storage import DataStore
 from synapse.storage.database import LoggingDatabaseConnection
-from synapse.storage.engines import PostgresEngine, create_engine, BaseDatabaseEngine
+from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine, create_engine
 from synapse.storage.prepare_database import prepare_database
 from synapse.types import ISynapseReactor, JsonDict
 from synapse.util import Clock
