@@ -241,7 +241,7 @@ class UrlPreviewer:
         if (
             cache_result
             and cache_result.expires_ts > ts
-            and cache_result.response_code / 100 == 2
+            and cache_result.response_code // 100 == 2
         ):
             # It may be stored as text in the database, not as bytes (such as
             # PostgreSQL). If so, encode it back before handing it on.
