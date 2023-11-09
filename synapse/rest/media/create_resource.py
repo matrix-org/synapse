@@ -59,9 +59,7 @@ class CreateResource(RestServlet):
         (
             reached_pending_limit,
             first_expiration_ts,
-        ) = await self.media_repo.reached_pending_media_limit(
-            requester.user, self.max_pending_media_uploads
-        )
+        ) = await self.media_repo.reached_pending_media_limit(requester.user)
         if reached_pending_limit:
             raise LimitExceededError(
                 limiter_name="max_pending_media_uploads",

@@ -84,6 +84,7 @@ class MediaRepository:
         self.max_upload_size = hs.config.media.max_upload_size
         self.max_image_pixels = hs.config.media.max_image_pixels
         self.unused_expiration_time = hs.config.media.unused_expiration_time
+        self.max_pending_media_uploads = hs.config.media.max_pending_media_uploads
 
         Thumbnailer.set_limits(self.max_image_pixels)
 
@@ -211,14 +212,11 @@ class MediaRepository:
         return f"mxc://{self.server_name}/{media_id}", now + self.unused_expiration_time
 
     @trace
-    async def reached_pending_media_limit(
-        self, auth_user: UserID, limit: int
-    ) -> Tuple[bool, int]:
+    async def reached_pending_media_limit(self, auth_user: UserID) -> Tuple[bool, int]:
         """Check if the user is over the limit for pending media uploads.
 
         Args:
             auth_user: The user_id of the uploader
-            limit: The maximum number of pending media uploads a user is allowed to have
 
         Returns:
             A tuple with a boolean and an integer indicating whether the user has too
@@ -228,7 +226,7 @@ class MediaRepository:
         pending, first_expiration_ts = await self.store.count_pending_media(
             user_id=auth_user
         )
-        return pending >= limit, first_expiration_ts
+        return pending >= self.max_pending_media_uploads, first_expiration_ts
 
     @trace
     async def verify_can_upload(self, media_id: str, auth_user: UserID) -> None:
