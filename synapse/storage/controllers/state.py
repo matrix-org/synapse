@@ -16,7 +16,6 @@ from itertools import chain
 from typing import (
     TYPE_CHECKING,
     AbstractSet,
-    Any,
     Callable,
     Collection,
     Dict,
@@ -32,6 +31,7 @@ from typing import (
 from synapse.api.constants import EventTypes, Membership
 from synapse.events import EventBase
 from synapse.logging.opentracing import tag_args, trace
+from synapse.storage.databases.main.state_deltas import StateDelta
 from synapse.storage.roommember import ProfileInfo
 from synapse.storage.util.partial_state_events_tracker import (
     PartialCurrentStateTracker,
@@ -531,18 +531,8 @@ class StateStorageController:
     @tag_args
     async def get_current_state_deltas(
         self, prev_stream_id: int, max_stream_id: int
-    ) -> Tuple[int, List[Dict[str, Any]]]:
+    ) -> Tuple[int, List[StateDelta]]:
         """Fetch a list of room state changes since the given stream id
-
-        Each entry in the result contains the following fields:
-            - stream_id (int)
-            - room_id (str)
-            - type (str): event type
-            - state_key (str):
-            - event_id (str|None): new event_id for this state key. None if the
-                state has been deleted.
-            - prev_event_id (str|None): previous event_id for this state key. None
-                if it's new state.
 
         Args:
             prev_stream_id: point to get changes since (exclusive)

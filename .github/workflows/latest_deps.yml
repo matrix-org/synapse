@@ -197,10 +197,13 @@ jobs:
         with:
           path: synapse
 
-      - uses: actions/setup-go@v4
-
       - name: Prepare Complement's Prerequisites
         run: synapse/.ci/scripts/setup_complement_prerequisites.sh
+
+      - uses: actions/setup-go@v4
+        with:
+          cache-dependency-path: complement/go.sum
+          go-version-file: complement/go.mod
 
       - run: |
           set -o pipefail

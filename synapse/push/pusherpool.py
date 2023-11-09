@@ -292,20 +292,12 @@ class PusherPool:
         except Exception:
             logger.exception("Exception in pusher on_new_notifications")
 
-    async def on_new_receipts(
-        self, min_stream_id: int, max_stream_id: int, affected_room_ids: Iterable[str]
-    ) -> None:
+    async def on_new_receipts(self, users_affected: StrCollection) -> None:
         if not self.pushers:
             # nothing to do here.
             return
 
         try:
-            # Need to subtract 1 from the minimum because the lower bound here
-            # is not inclusive
-            users_affected = await self.store.get_users_sent_receipts_between(
-                min_stream_id - 1, max_stream_id
-            )
-
             for u in users_affected:
                 # Don't push if the user account has expired
                 expired = await self._account_validity_handler.is_user_expired(u)
@@ -314,7 +306,7 @@ class PusherPool:
 
                 if u in self.pushers:
                     for p in self.pushers[u].values():
-                        p.on_new_receipts(min_stream_id, max_stream_id)
+                        p.on_new_receipts()
 
         except Exception:
             logger.exception("Exception in pusher on_new_receipts")

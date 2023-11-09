@@ -39,11 +39,11 @@ class DataStoreTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(1, total)
-        self.assertEqual(self.displayname, users.pop()["displayname"])
+        self.assertEqual(self.displayname, users.pop().displayname)
 
         users, total = self.get_success(
             self.store.get_users_paginate(0, 10, name="BC", guests=False)
         )
 
         self.assertEqual(1, total)
-        self.assertEqual(self.displayname, users.pop()["displayname"])
+        self.assertEqual(self.displayname, users.pop().displayname)

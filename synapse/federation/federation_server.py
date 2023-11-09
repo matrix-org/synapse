@@ -84,7 +84,7 @@ from synapse.replication.http.federation import (
 from synapse.storage.databases.main.lock import Lock
 from synapse.storage.databases.main.roommember import extract_heroes_from_room_summary
 from synapse.storage.roommember import MemberSummary
-from synapse.types import JsonDict, StateMap, get_domain_from_id
+from synapse.types import JsonDict, StateMap, UserID, get_domain_from_id
 from synapse.util import unwrapFirstError
 from synapse.util.async_helpers import Linearizer, concurrently_execute, gather_results
 from synapse.util.caches.response_cache import ResponseCache
@@ -850,14 +850,7 @@ class FederationServer(FederationBase):
                 context, self._room_prejoin_state_types
             )
         )
-        return {
-            "knock_room_state": stripped_room_state,
-            # Since v1.37, Synapse incorrectly used "knock_state_events" for this field.
-            # Thus, we also populate a 'knock_state_events' with the same content to
-            # support old instances.
-            # See https://github.com/matrix-org/synapse/issues/14088.
-            "knock_state_events": stripped_room_state,
-        }
+        return {"knock_room_state": stripped_room_state}
 
     async def _on_send_membership_event(
         self, origin: str, content: JsonDict, membership_type: str, room_id: str
@@ -1006,6 +999,12 @@ class FederationServer(FederationBase):
     async def on_claim_client_keys(
         self, query: List[Tuple[str, str, str, int]], always_include_fallback_keys: bool
     ) -> Dict[str, Any]:
+        if any(
+            not self.hs.is_mine(UserID.from_string(user_id))
+            for user_id, _, _, _ in query
+        ):
+            raise SynapseError(400, "User is not hosted on this homeserver")
+
         log_kv({"message": "Claiming one time keys.", "user, device pairs": query})
         results = await self._e2e_keys_handler.claim_local_one_time_keys(
             query, always_include_fallback_keys=always_include_fallback_keys
@@ -1402,7 +1401,7 @@ class FederationHandlerRegistry:
         self._edu_type_to_instance[edu_type] = instance_names
 
     async def on_edu(self, edu_type: str, origin: str, content: dict) -> None:
-        if not self.config.server.use_presence and edu_type == EduTypes.PRESENCE:
+        if not self.config.server.track_presence and edu_type == EduTypes.PRESENCE:
             return
 
         # Check if we have a handler on this instance

@@ -16,7 +16,7 @@ import abc
 import logging
 import random
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Set, Tuple
+from typing import TYPE_CHECKING, Iterable, List, Optional, Set, Tuple
 
 from synapse import types
 from synapse.api.constants import (
@@ -44,6 +44,7 @@ from synapse.handlers.worker_lock import NEW_EVENT_DURING_PURGE_LOCK_NAME
 from synapse.logging import opentracing
 from synapse.metrics import event_processing_positions
 from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.storage.databases.main.state_deltas import StateDelta
 from synapse.types import (
     JsonDict,
     Requester,
@@ -382,8 +383,10 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         and persist a new event for the new membership change.
 
         Args:
-            requester:
-            target:
+            requester: User requesting the membership change, i.e. the sender of the
+                desired membership event.
+            target: Use whose membership should change, i.e. the state_key of the
+                desired membership event.
             room_id:
             membership:
 
@@ -415,7 +418,6 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         Returns:
             Tuple of event ID and stream ordering position
         """
-
         user_id = target.to_string()
 
         if content is None:
@@ -475,21 +477,6 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                     (EventTypes.Member, user_id), None
                 )
 
-                if event.membership == Membership.JOIN:
-                    newly_joined = True
-                    if prev_member_event_id:
-                        prev_member_event = await self.store.get_event(
-                            prev_member_event_id
-                        )
-                        newly_joined = prev_member_event.membership != Membership.JOIN
-
-                    # Only rate-limit if the user actually joined the room, otherwise we'll end
-                    # up blocking profile updates.
-                    if newly_joined and ratelimit:
-                        await self._join_rate_limiter_local.ratelimit(requester)
-                        await self._join_rate_per_room_limiter.ratelimit(
-                            requester, key=room_id, update=False
-                        )
                 with opentracing.start_active_span("handle_new_client_event"):
                     result_event = (
                         await self.event_creation_handler.handle_new_client_event(
@@ -514,7 +501,6 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 # in the meantime and context needs to be recomputed, so let's do so.
                 if i == max_retries - 1:
                     raise e
-                pass
 
         # we know it was persisted, so should have a stream ordering
         assert result_event.internal_metadata.stream_ordering
@@ -618,6 +604,25 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         Raises:
             ShadowBanError if a shadow-banned requester attempts to send an invite.
         """
+        if ratelimit:
+            if action == Membership.JOIN:
+                # Only rate-limit if the user isn't already joined to the room, otherwise
+                # we'll end up blocking profile updates.
+                (
+                    current_membership,
+                    _,
+                ) = await self.store.get_local_current_membership_for_user_in_room(
+                    requester.user.to_string(),
+                    room_id,
+                )
+                if current_membership != Membership.JOIN:
+                    await self._join_rate_limiter_local.ratelimit(requester)
+                    await self._join_rate_per_room_limiter.ratelimit(
+                        requester, key=room_id, update=False
+                    )
+            elif action == Membership.INVITE:
+                await self.ratelimit_invite(requester, room_id, target.to_string())
+
         if action == Membership.INVITE and requester.shadow_banned:
             # We randomly sleep a bit just to annoy the requester.
             await self.clock.sleep(random.randint(1, 10))
@@ -794,8 +799,6 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
         if effective_membership_state == Membership.INVITE:
             target_id = target.to_string()
-            if ratelimit:
-                await self.ratelimit_invite(requester, room_id, target_id)
 
             # block any attempts to invite the server notices mxid
             if target_id == self._server_notices_mxid:
@@ -2002,7 +2005,6 @@ class RoomMemberMasterHandler(RoomMemberHandler):
                 # in the meantime and context needs to be recomputed, so let's do so.
                 if i == max_retries - 1:
                     raise e
-                pass
 
         # we know it was persisted, so must have a stream ordering
         assert result_event.internal_metadata.stream_ordering
@@ -2145,24 +2147,18 @@ class RoomForgetterHandler(StateDeltasHandler):
 
             await self._store.update_room_forgetter_stream_pos(max_pos)
 
-    async def _handle_deltas(self, deltas: List[Dict[str, Any]]) -> None:
+    async def _handle_deltas(self, deltas: List[StateDelta]) -> None:
         """Called with the state deltas to process"""
         for delta in deltas:
-            typ = delta["type"]
-            state_key = delta["state_key"]
-            room_id = delta["room_id"]
-            event_id = delta["event_id"]
-            prev_event_id = delta["prev_event_id"]
-
-            if typ != EventTypes.Member:
+            if delta.event_type != EventTypes.Member:
                 continue
 
-            if not self._hs.is_mine_id(state_key):
+            if not self._hs.is_mine_id(delta.state_key):
                 continue
 
             change = await self._get_key_change(
-                prev_event_id,
-                event_id,
+                delta.prev_event_id,
+                delta.event_id,
                 key_name="membership",
                 public_value=Membership.JOIN,
             )
@@ -2171,7 +2167,7 @@ class RoomForgetterHandler(StateDeltasHandler):
             if is_leave:
                 try:
                     await self._room_member_handler.forget(
-                        UserID.from_string(state_key), room_id
+                        UserID.from_string(delta.state_key), delta.room_id
                     )
                 except SynapseError as e:
                     if e.code == 400:

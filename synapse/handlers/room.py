@@ -261,7 +261,6 @@ class RoomCreationHandler:
                 # in the meantime and context needs to be recomputed, so let's do so.
                 if i == max_retries - 1:
                     raise e
-                pass
 
         # This is to satisfy mypy and should never happen
         raise PartialStateConflictError()
@@ -1708,7 +1707,7 @@ class RoomEventSource(EventSource[RoomStreamToken, EventBase]):
 
         if from_key.topological:
             logger.warning("Stream has topological part!!!! %r", from_key)
-            from_key = RoomStreamToken(None, from_key.stream)
+            from_key = RoomStreamToken(stream=from_key.stream)
 
         app_service = self.store.get_app_service_by_user_id(user.to_string())
         if app_service:
@@ -1940,9 +1939,10 @@ class RoomShutdownHandler:
         else:
             logger.info("Shutting down room %r", room_id)
 
-        users = await self.store.get_users_in_room(room_id)
-        for user_id in users:
-            if not self.hs.is_mine_id(user_id):
+        users = await self.store.get_local_users_related_to_room(room_id)
+        for user_id, membership in users:
+            # If the user is not in the room (or is banned), nothing to do.
+            if membership not in (Membership.JOIN, Membership.INVITE, Membership.KNOCK):
                 continue
 
             logger.info("Kicking %r from %r...", user_id, room_id)

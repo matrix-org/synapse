@@ -12,7 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from typing import TYPE_CHECKING, Dict, FrozenSet
+from typing import TYPE_CHECKING, Dict, FrozenSet, List, Tuple, cast
 
 from synapse.storage.database import DatabasePool, LoggingDatabaseConnection
 from synapse.storage.databases.main import CacheInvalidationWorkerStore
@@ -42,13 +42,16 @@ class ExperimentalFeaturesStore(CacheInvalidationWorkerStore):
         Returns:
             the features currently enabled for the user
         """
-        enabled = await self.db_pool.simple_select_list(
-            "per_user_experimental_features",
-            {"user_id": user_id, "enabled": True},
-            ["feature"],
+        enabled = cast(
+            List[Tuple[str]],
+            await self.db_pool.simple_select_list(
+                table="per_user_experimental_features",
+                keyvalues={"user_id": user_id, "enabled": True},
+                retcols=("feature",),
+            ),
         )
 
-        return frozenset(feature["feature"] for feature in enabled)
+        return frozenset(feature[0] for feature in enabled)
 
     async def set_features_for_user(
         self,

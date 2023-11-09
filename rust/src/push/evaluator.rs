@@ -105,6 +105,17 @@ impl PushRuleEvaluator {
     /// Create a new `PushRuleEvaluator`. See struct docstring for details.
     #[allow(clippy::too_many_arguments)]
     #[new]
+    #[pyo3(signature = (
+        flattened_keys,
+        has_mentions,
+        room_member_count,
+        sender_power_level,
+        notification_power_levels,
+        related_events_flattened,
+        related_event_match_enabled,
+        room_version_feature_flags,
+        msc3931_enabled,
+    ))]
     pub fn py_new(
         flattened_keys: BTreeMap<String, JsonValue>,
         has_mentions: bool,

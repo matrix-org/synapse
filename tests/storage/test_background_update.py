@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+from typing import List, Tuple, cast
 from unittest.mock import AsyncMock, Mock
 
 import yaml
@@ -456,8 +457,8 @@ class BackgroundUpdateValidateConstraintTestCase(unittest.HomeserverTestCase):
             );
         """
         self.get_success(
-            self.store.db_pool.execute(
-                "test_not_null_constraint", lambda _: None, table_sql
+            self.store.db_pool.runInteraction(
+                "test_not_null_constraint", lambda txn: txn.execute(table_sql)
             )
         )
 
@@ -465,8 +466,8 @@ class BackgroundUpdateValidateConstraintTestCase(unittest.HomeserverTestCase):
         # using SQLite.
         index_sql = "CREATE INDEX test_index ON test_constraint(a)"
         self.get_success(
-            self.store.db_pool.execute(
-                "test_not_null_constraint", lambda _: None, index_sql
+            self.store.db_pool.runInteraction(
+                "test_not_null_constraint", lambda txn: txn.execute(index_sql)
             )
         )
 
@@ -526,15 +527,18 @@ class BackgroundUpdateValidateConstraintTestCase(unittest.HomeserverTestCase):
             self.wait_for_background_updates()
 
         # Check the correct values are in the new table.
-        rows = self.get_success(
-            self.store.db_pool.simple_select_list(
-                table="test_constraint",
-                keyvalues={},
-                retcols=("a", "b"),
-            )
+        rows = cast(
+            List[Tuple[int, int]],
+            self.get_success(
+                self.store.db_pool.simple_select_list(
+                    table="test_constraint",
+                    keyvalues={},
+                    retcols=("a", "b"),
+                )
+            ),
         )
 
-        self.assertCountEqual(rows, [{"a": 1, "b": 1}, {"a": 3, "b": 3}])
+        self.assertCountEqual(rows, [(1, 1), (3, 3)])
 
         # And check that invalid rows get correctly rejected.
         self.get_failure(
@@ -570,13 +574,13 @@ class BackgroundUpdateValidateConstraintTestCase(unittest.HomeserverTestCase):
             );
         """
         self.get_success(
-            self.store.db_pool.execute(
-                "test_foreign_key_constraint", lambda _: None, base_sql
+            self.store.db_pool.runInteraction(
+                "test_foreign_key_constraint", lambda txn: txn.execute(base_sql)
             )
         )
         self.get_success(
-            self.store.db_pool.execute(
-                "test_foreign_key_constraint", lambda _: None, table_sql
+            self.store.db_pool.runInteraction(
+                "test_foreign_key_constraint", lambda txn: txn.execute(table_sql)
             )
         )
 
@@ -640,14 +644,17 @@ class BackgroundUpdateValidateConstraintTestCase(unittest.HomeserverTestCase):
             self.wait_for_background_updates()
 
         # Check the correct values are in the new table.
-        rows = self.get_success(
-            self.store.db_pool.simple_select_list(
-                table="test_constraint",
-                keyvalues={},
-                retcols=("a", "b"),
-            )
+        rows = cast(
+            List[Tuple[int, int]],
+            self.get_success(
+                self.store.db_pool.simple_select_list(
+                    table="test_constraint",
+                    keyvalues={},
+                    retcols=("a", "b"),
+                )
+            ),
         )
-        self.assertCountEqual(rows, [{"a": 1, "b": 1}, {"a": 3, "b": 3}])
+        self.assertCountEqual(rows, [(1, 1), (3, 3)])
 
         # And check that invalid rows get correctly rejected.
         self.get_failure(

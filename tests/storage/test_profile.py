@@ -120,7 +120,7 @@ class ProfileStoreTestCase(unittest.HomeserverTestCase):
 
         res = self.get_success(
             self.store.db_pool.execute(
-                "", None, "SELECT full_user_id from profiles ORDER BY full_user_id"
+                "", "SELECT full_user_id from profiles ORDER BY full_user_id"
             )
         )
         self.assertEqual(len(res), len(expected_values))

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple, cast
 
 from twisted.test.proto_helpers import MemoryReactor
 
@@ -68,10 +68,14 @@ class StatsRoomTests(unittest.HomeserverTestCase):
             )
         )
 
-    async def get_all_room_state(self) -> List[Dict[str, Any]]:
-        return await self.store.db_pool.simple_select_list(
-            "room_stats_state", None, retcols=("name", "topic", "canonical_alias")
+    async def get_all_room_state(self) -> List[Optional[str]]:
+        rows = cast(
+            List[Tuple[Optional[str]]],
+            await self.store.db_pool.simple_select_list(
+                "room_stats_state", None, retcols=("topic",)
+            ),
         )
+        return [r[0] for r in rows]
 
     def _get_current_stats(
         self, stats_type: str, stat_id: str
@@ -130,7 +134,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         r = self.get_success(self.get_all_room_state())
 
         self.assertEqual(len(r), 1)
-        self.assertEqual(r[0]["topic"], "foo")
+        self.assertEqual(r[0], "foo")
 
     def test_create_user(self) -> None:
         """

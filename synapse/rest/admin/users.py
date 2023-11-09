@@ -18,6 +18,8 @@ import secrets
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
+import attr
+
 from synapse.api.constants import Direction, UserTypes
 from synapse.api.errors import Codes, NotFoundError, SynapseError
 from synapse.http.servlet import (
@@ -161,11 +163,13 @@ class UsersRestServletV2(RestServlet):
         )
 
         # If support for MSC3866 is not enabled, don't show the approval flag.
+        filter = None
         if not self._msc3866_enabled:
-            for user in users:
-                del user["approved"]
 
-        ret = {"users": users, "total": total}
+            def _filter(a: attr.Attribute) -> bool:
+                return a.name != "approved"
+
+        ret = {"users": [attr.asdict(u, filter=filter) for u in users], "total": total}
         if (start + limit) < total:
             ret["next_token"] = str(start + len(users))
 
@@ -329,9 +333,8 @@ class UserRestServletV2(RestServlet):
 
             if threepids is not None:
                 # get changed threepids (added and removed)
-                # convert List[Dict[str, Any]] into Set[Tuple[str, str]]
                 cur_threepids = {
-                    (threepid["medium"], threepid["address"])
+                    (threepid.medium, threepid.address)
                     for threepid in await self.store.user_get_threepids(user_id)
                 }
                 add_threepids = new_threepids - cur_threepids
@@ -842,7 +845,18 @@ class SearchUsersRestServlet(RestServlet):
         logger.info("term: %s ", term)
 
         ret = await self.store.search_users(term)
-        return HTTPStatus.OK, ret
+        results = [
+            {
+                "name": name,
+                "password_hash": password_hash,
+                "is_guest": bool(is_guest),
+                "admin": bool(admin),
+                "user_type": user_type,
+            }
+            for name, password_hash, is_guest, admin, user_type in ret
+        ]
+
+        return HTTPStatus.OK, results
 
 
 class UserAdminServlet(RestServlet):

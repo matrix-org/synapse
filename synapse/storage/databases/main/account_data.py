@@ -94,13 +94,23 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
                 hs.get_replication_notifier(),
                 "room_account_data",
                 "stream_id",
-                extra_tables=[("room_tags_revisions", "stream_id")],
+                extra_tables=[
+                    ("account_data", "stream_id"),
+                    ("room_tags_revisions", "stream_id"),
+                ],
                 is_writer=self._instance_name in hs.config.worker.writers.account_data,
             )
 
         account_max = self.get_max_account_data_stream_id()
         self._account_data_stream_cache = StreamChangeCache(
             "AccountDataAndTagsChangeCache", account_max
+        )
+
+        self.db_pool.updates.register_background_index_update(
+            update_name="room_account_data_index_room_id",
+            index_name="room_account_data_room_id",
+            table="room_account_data",
+            columns=("room_id",),
         )
 
         self.db_pool.updates.register_background_update_handler(
@@ -151,10 +161,10 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
                 sql += " AND content != '{}'"
 
             txn.execute(sql, (user_id,))
-            rows = self.db_pool.cursor_to_dict(txn)
 
             return {
-                row["account_data_type"]: db_to_json(row["content"]) for row in rows
+                account_data_type: db_to_json(content)
+                for account_data_type, content in txn
             }
 
         return await self.db_pool.runInteraction(
@@ -196,13 +206,12 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
                 sql += " AND content != '{}'"
 
             txn.execute(sql, (user_id,))
-            rows = self.db_pool.cursor_to_dict(txn)
 
             by_room: Dict[str, Dict[str, JsonDict]] = {}
-            for row in rows:
-                room_data = by_room.setdefault(row["room_id"], {})
+            for room_id, account_data_type, content in txn:
+                room_data = by_room.setdefault(room_id, {})
 
-                room_data[row["account_data_type"]] = db_to_json(row["content"])
+                room_data[account_data_type] = db_to_json(content)
 
             return by_room
 
@@ -277,16 +286,20 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
 
         def get_account_data_for_room_txn(
             txn: LoggingTransaction,
-        ) -> Dict[str, JsonDict]:
-            rows = self.db_pool.simple_select_list_txn(
-                txn,
-                "room_account_data",
-                {"user_id": user_id, "room_id": room_id},
-                ["account_data_type", "content"],
+        ) -> Dict[str, JsonMapping]:
+            rows = cast(
+                List[Tuple[str, str]],
+                self.db_pool.simple_select_list_txn(
+                    txn,
+                    table="room_account_data",
+                    keyvalues={"user_id": user_id, "room_id": room_id},
+                    retcols=["account_data_type", "content"],
+                ),
             )
 
             return {
-                row["account_data_type"]: db_to_json(row["content"]) for row in rows
+                account_data_type: db_to_json(content)
+                for account_data_type, content in rows
             }
 
         return await self.db_pool.runInteraction(

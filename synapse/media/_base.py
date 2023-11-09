@@ -26,11 +26,11 @@ from twisted.internet.interfaces import IConsumer
 from twisted.protocols.basic import FileSender
 from twisted.web.server import Request
 
-from synapse.api.errors import Codes, SynapseError, cs_error
+from synapse.api.errors import Codes, cs_error
 from synapse.http.server import finish_request, respond_with_json
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import make_deferred_yieldable
-from synapse.util.stringutils import is_ascii, parse_and_validate_server_name
+from synapse.util.stringutils import is_ascii
 
 logger = logging.getLogger(__name__)
 
@@ -50,53 +50,46 @@ TEXT_CONTENT_TYPES = [
     "text/xml",
 ]
 
-
-def parse_media_id(request: Request) -> Tuple[str, str, Optional[str]]:
-    """Parses the server name, media ID and optional file name from the request URI
-
-    Also performs some rough validation on the server name.
-
-    Args:
-        request: The `Request`.
-
-    Returns:
-        A tuple containing the parsed server name, media ID and optional file name.
-
-    Raises:
-        SynapseError(404): if parsing or validation fail for any reason
-    """
-    try:
-        # The type on postpath seems incorrect in Twisted 21.2.0.
-        postpath: List[bytes] = request.postpath  # type: ignore
-        assert postpath
-
-        # This allows users to append e.g. /test.png to the URL. Useful for
-        # clients that parse the URL to see content type.
-        server_name_bytes, media_id_bytes = postpath[:2]
-        server_name = server_name_bytes.decode("utf-8")
-        media_id = media_id_bytes.decode("utf8")
-
-        # Validate the server name, raising if invalid
-        parse_and_validate_server_name(server_name)
-
-        file_name = None
-        if len(postpath) > 2:
-            try:
-                file_name = urllib.parse.unquote(postpath[-1].decode("utf-8"))
-            except UnicodeDecodeError:
-                pass
-        return server_name, media_id, file_name
-    except Exception:
-        raise SynapseError(
-            404, "Invalid media id token %r" % (request.postpath,), Codes.UNKNOWN
-        )
+# A list of all content types that are "safe" to be rendered inline in a browser.
+INLINE_CONTENT_TYPES = [
+    "text/css",
+    "text/plain",
+    "text/csv",
+    "application/json",
+    "application/ld+json",
+    # We allow some media files deemed as safe, which comes from the matrix-react-sdk.
+    # https://github.com/matrix-org/matrix-react-sdk/blob/a70fcfd0bcf7f8c85986da18001ea11597989a7c/src/utils/blobs.ts#L51
+    # SVGs are *intentionally* omitted.
+    "image/jpeg",
+    "image/gif",
+    "image/png",
+    "image/apng",
+    "image/webp",
+    "image/avif",
+    "video/mp4",
+    "video/webm",
+    "video/ogg",
+    "video/quicktime",
+    "audio/mp4",
+    "audio/webm",
+    "audio/aac",
+    "audio/mpeg",
+    "audio/ogg",
+    "audio/wave",
+    "audio/wav",
+    "audio/x-wav",
+    "audio/x-pn-wav",
+    "audio/flac",
+    "audio/x-flac",
+]
 
 
 def respond_404(request: SynapseRequest) -> None:
+    assert request.path is not None
     respond_with_json(
         request,
         404,
-        cs_error("Not found %r" % (request.postpath,), code=Codes.NOT_FOUND),
+        cs_error("Not found '%s'" % (request.path.decode(),), code=Codes.NOT_FOUND),
         send_cors=True,
     )
 
@@ -153,8 +146,15 @@ def add_file_headers(
 
     request.setHeader(b"Content-Type", content_type.encode("UTF-8"))
 
-    # Use a Content-Disposition of attachment to force download of media.
-    disposition = "attachment"
+    # A strict subset of content types is allowed to be inlined  so that they may
+    # be viewed directly in a browser. Other file types are forced to be downloads.
+    #
+    # Only the type & subtype are important, parameters can be ignored.
+    if media_type.lower().split(";", 1)[0] in INLINE_CONTENT_TYPES:
+        disposition = "inline"
+    else:
+        disposition = "attachment"
+
     if upload_name:
         # RFC6266 section 4.1 [1] defines both `filename` and `filename*`.
         #
@@ -334,7 +334,7 @@ class ThumbnailInfo:
     # Content type of thumbnail, e.g. image/png
     type: str
     # The size of the media file, in bytes.
-    length: Optional[int] = None
+    length: int
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)

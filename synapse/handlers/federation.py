@@ -868,19 +868,10 @@ class FederationHandler:
         # This is a bit of a hack and is cribbing off of invites. Basically we
         # store the room state here and retrieve it again when this event appears
         # in the invitee's sync stream. It is stripped out for all other local users.
-        stripped_room_state = (
-            knock_response.get("knock_room_state")
-            # Since v1.37, Synapse incorrectly used "knock_state_events" for this field.
-            # Thus, we also check for a 'knock_state_events' to support old instances.
-            # See https://github.com/matrix-org/synapse/issues/14088.
-            or knock_response.get("knock_state_events")
-        )
+        stripped_room_state = knock_response.get("knock_room_state")
 
         if stripped_room_state is None:
-            raise KeyError(
-                "Missing 'knock_room_state' (or legacy 'knock_state_events') field in "
-                "send_knock response"
-            )
+            raise KeyError("Missing 'knock_room_state' field in send_knock response")
 
         event.unsigned["knock_room_state"] = stripped_room_state
 
@@ -1506,7 +1497,6 @@ class FederationHandler:
                     # in the meantime and context needs to be recomputed, so let's do so.
                     if i == max_retries - 1:
                         raise e
-                    pass
         else:
             destinations = {x.split(":", 1)[-1] for x in (sender_user_id, room_id)}
 
@@ -1582,7 +1572,6 @@ class FederationHandler:
                 # in the meantime and context needs to be recomputed, so let's do so.
                 if i == max_retries - 1:
                     raise e
-                pass
 
     async def add_display_name_to_third_party_invite(
         self,

@@ -359,7 +359,6 @@ class StateBackgroundUpdateStore(StateGroupBackgroundUpdateStore):
         if max_group is None:
             rows = await self.db_pool.execute(
                 "_background_deduplicate_state",
-                None,
                 "SELECT coalesce(max(id), 0) FROM state_groups",
             )
             max_group = rows[0][0]

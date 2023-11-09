@@ -506,25 +506,28 @@ class StatsStore(StateDeltasStore):
         ) -> Tuple[List[str], Dict[str, int], int, List[str], int]:
             pos = self.get_room_max_stream_ordering()  # type: ignore[attr-defined]
 
-            rows = self.db_pool.simple_select_many_txn(
-                txn,
-                table="current_state_events",
-                column="type",
-                iterable=[
-                    EventTypes.Create,
-                    EventTypes.JoinRules,
-                    EventTypes.RoomHistoryVisibility,
-                    EventTypes.RoomEncryption,
-                    EventTypes.Name,
-                    EventTypes.Topic,
-                    EventTypes.RoomAvatar,
-                    EventTypes.CanonicalAlias,
-                ],
-                keyvalues={"room_id": room_id, "state_key": ""},
-                retcols=["event_id"],
+            rows = cast(
+                List[Tuple[str]],
+                self.db_pool.simple_select_many_txn(
+                    txn,
+                    table="current_state_events",
+                    column="type",
+                    iterable=[
+                        EventTypes.Create,
+                        EventTypes.JoinRules,
+                        EventTypes.RoomHistoryVisibility,
+                        EventTypes.RoomEncryption,
+                        EventTypes.Name,
+                        EventTypes.Topic,
+                        EventTypes.RoomAvatar,
+                        EventTypes.CanonicalAlias,
+                    ],
+                    keyvalues={"room_id": room_id, "state_key": ""},
+                    retcols=["event_id"],
+                ),
             )
 
-            event_ids = cast(List[str], [row["event_id"] for row in rows])
+            event_ids = [row[0] for row in rows]
 
             txn.execute(
                 """
@@ -676,7 +679,7 @@ class StatsStore(StateDeltasStore):
         order_by: Optional[str] = UserSortOrder.USER_ID.value,
         direction: Direction = Direction.FORWARDS,
         search_term: Optional[str] = None,
-    ) -> Tuple[List[JsonDict], int]:
+    ) -> Tuple[List[Tuple[str, Optional[str], int, int]], int]:
         """Function to retrieve a paginated list of users and their uploaded local media
         (size and number). This will return a json list of users and the
         total number of users matching the filter criteria.
@@ -689,14 +692,19 @@ class StatsStore(StateDeltasStore):
             order_by: the sort order of the returned list
             direction: sort ascending or descending
             search_term: a string to filter user names by
+
         Returns:
-            A list of user dicts and an integer representing the total number of
-            users that exist given this query
+            A tuple of:
+                A list of tuples of user information (the user ID, displayname,
+                total number of media, total length of media) and
+
+                An integer representing the total number of users that exist
+                given this query
         """
 
         def get_users_media_usage_paginate_txn(
             txn: LoggingTransaction,
-        ) -> Tuple[List[JsonDict], int]:
+        ) -> Tuple[List[Tuple[str, Optional[str], int, int]], int]:
             filters = []
             args: list = []
 
@@ -770,7 +778,7 @@ class StatsStore(StateDeltasStore):
 
             args += [limit, start]
             txn.execute(sql, args)
-            users = self.db_pool.cursor_to_dict(txn)
+            users = cast(List[Tuple[str, Optional[str], int, int]], txn.fetchall())
 
             return users, count
 

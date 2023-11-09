@@ -1402,7 +1402,7 @@ class FederationClient(FederationBase):
             The remote homeserver return some state from the room. The response
             dictionary is in the form:
 
-            {"knock_state_events": [<state event dict>, ...]}
+            {"knock_room_state": [<state event dict>, ...]}
 
             The list of state events may be empty.
 
@@ -1429,7 +1429,7 @@ class FederationClient(FederationBase):
             The remote homeserver can optionally return some state from the room. The response
             dictionary is in the form:
 
-            {"knock_state_events": [<state event dict>, ...]}
+            {"knock_room_state": [<state event dict>, ...]}
 
             The list of state events may be empty.
         """

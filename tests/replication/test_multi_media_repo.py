@@ -13,11 +13,9 @@
 # limitations under the License.
 import logging
 import os
-from typing import Optional, Tuple
+from typing import Any, Optional, Tuple
 
-from twisted.internet.interfaces import IOpenSSLServerConnectionCreator
 from twisted.internet.protocol import Factory
-from twisted.protocols.tls import TLSMemoryBIOFactory, TLSMemoryBIOProtocol
 from twisted.test.proto_helpers import MemoryReactor
 from twisted.web.http import HTTPChannel
 from twisted.web.server import Request
@@ -27,9 +25,13 @@ from synapse.rest.client import login
 from synapse.server import HomeServer
 from synapse.util import Clock
 
-from tests.http import TestServerTLSConnectionFactory, get_test_ca_cert_file
+from tests.http import (
+    TestServerTLSConnectionFactory,
+    get_test_ca_cert_file,
+    wrap_server_factory_for_tls,
+)
 from tests.replication._base import BaseMultiWorkerStreamTestCase
-from tests.server import FakeChannel, FakeSite, FakeTransport, make_request
+from tests.server import FakeChannel, FakeTransport, make_request
 from tests.test_utils import SMALL_PNG
 
 logger = logging.getLogger(__name__)
@@ -56,6 +58,16 @@ class MediaRepoShardTestCase(BaseMultiWorkerStreamTestCase):
         conf["federation_custom_ca_list"] = [get_test_ca_cert_file()]
         return conf
 
+    def make_worker_hs(
+        self, worker_app: str, extra_config: Optional[dict] = None, **kwargs: Any
+    ) -> HomeServer:
+        worker_hs = super().make_worker_hs(worker_app, extra_config, **kwargs)
+        # Force the media paths onto the replication resource.
+        worker_hs.get_media_repository_resource().register_servlets(
+            self._hs_to_site[worker_hs].resource, worker_hs
+        )
+        return worker_hs
+
     def _get_media_req(
         self, hs: HomeServer, target: str, media_id: str
     ) -> Tuple[FakeChannel, Request]:
@@ -68,12 +80,11 @@ class MediaRepoShardTestCase(BaseMultiWorkerStreamTestCase):
             The channel for the *client* request and the *outbound* request for
             the media which the caller should respond to.
         """
-        resource = hs.get_media_repository_resource().children[b"download"]
         channel = make_request(
             self.reactor,
-            FakeSite(resource, self.reactor),
+            self._hs_to_site[hs],
             "GET",
-            f"/{target}/{media_id}",
+            f"/_matrix/media/r0/download/{target}/{media_id}",
             shorthand=False,
             access_token=self.access_token,
             await_result=False,
@@ -85,7 +96,13 @@ class MediaRepoShardTestCase(BaseMultiWorkerStreamTestCase):
         (host, port, client_factory, _timeout, _bindAddress) = clients.pop()
 
         # build the test server
-        server_tls_protocol = _build_test_server(get_connection_factory())
+        server_factory = Factory.forProtocol(HTTPChannel)
+        # Request.finish expects the factory to have a 'log' method.
+        server_factory.log = _log_request
+
+        server_tls_protocol = wrap_server_factory_for_tls(
+            server_factory, self.reactor, sanlist=[b"DNS:example.com"]
+        ).buildProtocol(None)
 
         # now, tell the client protocol factory to build the client protocol (it will be a
         # _WrappingProtocol, around a TLSMemoryBIOProtocol, around an
@@ -105,7 +122,7 @@ class MediaRepoShardTestCase(BaseMultiWorkerStreamTestCase):
         )
 
         # fish the test server back out of the server-side TLS protocol.
-        http_server: HTTPChannel = server_tls_protocol.wrappedProtocol  # type: ignore[assignment]
+        http_server: HTTPChannel = server_tls_protocol.wrappedProtocol
 
         # give the reactor a pump to get the TLS juices flowing.
         self.reactor.pump((0.1,))
@@ -229,40 +246,6 @@ class MediaRepoShardTestCase(BaseMultiWorkerStreamTestCase):
             self.hs.get_media_repository().primary_base_path, "remote_thumbnail"
         )
         return sum(len(files) for _, _, files in os.walk(path))
-
-
-def get_connection_factory() -> TestServerTLSConnectionFactory:
-    # this needs to happen once, but not until we are ready to run the first test
-    global test_server_connection_factory
-    if test_server_connection_factory is None:
-        test_server_connection_factory = TestServerTLSConnectionFactory(
-            sanlist=[b"DNS:example.com"]
-        )
-    return test_server_connection_factory
-
-
-def _build_test_server(
-    connection_creator: IOpenSSLServerConnectionCreator,
-) -> TLSMemoryBIOProtocol:
-    """Construct a test server
-
-    This builds an HTTP channel, wrapped with a TLSMemoryBIOProtocol
-
-    Args:
-        connection_creator: thing to build SSL connections
-
-    Returns:
-        TLSMemoryBIOProtocol
-    """
-    server_factory = Factory.forProtocol(HTTPChannel)
-    # Request.finish expects the factory to have a 'log' method.
-    server_factory.log = _log_request
-
-    server_tls_factory = TLSMemoryBIOFactory(
-        connection_creator, isClient=False, wrappedFactory=server_factory
-    )
-
-    return server_tls_factory.buildProtocol(None)
 
 
 def _log_request(request: Request) -> None:
