@@ -189,16 +189,6 @@ class PostgresEngine(
         """Do we support the `RETURNING` clause in insert/update/delete?"""
         return True
 
-    @property
-    def supports_select_distinct_on(self) -> bool:
-        """Do we support the `DISTINCT ON` clause in SELECT?"""
-        return True
-
-    @property
-    def supports_sequences(self) -> bool:
-        """Do we support the `CREATE SEQUENCE` clause?"""
-        return True
-
     def is_connection_closed(self, conn: ConnectionType) -> bool:
         return bool(conn.closed)
 

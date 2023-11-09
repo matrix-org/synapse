@@ -58,18 +58,6 @@ class BaseDatabaseEngine(Generic[ConnectionType, CursorType], metaclass=abc.ABCM
         """Do we support the `RETURNING` clause in insert/update/delete?"""
         ...
 
-    @property
-    @abc.abstractmethod
-    def supports_select_distinct_on(self) -> bool:
-        """Do we support the `DISTINCT ON` clause in SELECT?"""
-        ...
-
-    @property
-    @abc.abstractmethod
-    def supports_sequences(self) -> bool:
-        """Do we support the `CREATE SEQUENCE` clause?"""
-        ...
-
     @abc.abstractmethod
     def check_database(
         self, db_conn: ConnectionType, allow_outdated_version: bool = False

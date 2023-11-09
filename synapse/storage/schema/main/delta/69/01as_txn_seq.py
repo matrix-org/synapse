@@ -18,11 +18,11 @@ Adds a postgres SEQUENCE for generating application service transaction IDs.
 """
 
 from synapse.storage.database import LoggingTransaction
-from synapse.storage.engines import BaseDatabaseEngine, PsycopgEngine
+from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine, PsycopgEngine
 
 
 def run_create(cur: LoggingTransaction, database_engine: BaseDatabaseEngine) -> None:
-    if database_engine.supports_sequences:
+    if isinstance(database_engine, PostgresEngine):
         # If we already have some AS TXNs we want to start from the current
         # maximum value. There are two potential places this is stored - the
         # actual TXNs themselves *and* the AS state table. At time of migration

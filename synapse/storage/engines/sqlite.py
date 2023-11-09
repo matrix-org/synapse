@@ -65,16 +65,6 @@ class Sqlite3Engine(BaseDatabaseEngine[sqlite3.Connection, sqlite3.Cursor]):
         """Do we support the `RETURNING` clause in insert/update/delete?"""
         return sqlite3.sqlite_version_info >= (3, 35, 0)
 
-    @property
-    def supports_select_distinct_on(self) -> bool:
-        """Do we support the `DISTINCT ON` clause in SELECT?"""
-        return False
-
-    @property
-    def supports_sequences(self) -> bool:
-        """Do we support the `CREATE SEQUENCE` clause?"""
-        return False
-
     def check_database(
         self, db_conn: sqlite3.Connection, allow_outdated_version: bool = False
     ) -> None:
