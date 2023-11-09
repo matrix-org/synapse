@@ -20,7 +20,6 @@ import psycopg2.extensions
 from synapse.storage.engines import PostgresEngine
 from synapse.storage.engines._base import IsolationLevel
 
-
 logger = logging.getLogger(__name__)
 
 

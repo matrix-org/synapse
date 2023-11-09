@@ -16,7 +16,6 @@ from typing import Any, Mapping, NoReturn
 from ._base import BaseDatabaseEngine, IncorrectDatabaseSetup
 from .postgres import PostgresEngine
 
-
 # The classes `PostgresEngine` and `Sqlite3Engine` must always be importable, because
 # we use `isinstance(engine, PostgresEngine)` to write different queries for postgres
 # and sqlite. But the database driver modules are both optional: they may not be

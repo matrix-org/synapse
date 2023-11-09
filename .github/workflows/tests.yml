@@ -346,7 +346,9 @@ jobs:
         run: until pg_isready -h localhost; do sleep 1; done
       - run: poetry run trial --jobs=6 tests
         env:
-          SYNAPSE_POSTGRES: ${{ matrix.job.database == 'postgres' || '' }}
+          # If matrix.job.database is 'psycopg' set SYNAPSE_POSTGRES to that string;
+          # otherwise if it is 'postgres' set it to true. Otherwise, empty.
+          SYNAPSE_POSTGRES: ${{ matrix.job.database == 'psycopg' && 'psycopg' || matrix.job.database == 'postgres' || '' }}
           SYNAPSE_POSTGRES_HOST: /var/run/postgresql
           SYNAPSE_POSTGRES_USER: postgres
           SYNAPSE_POSTGRES_PASSWORD: postgres
