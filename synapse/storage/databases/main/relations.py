@@ -47,8 +47,6 @@ from synapse.storage.databases.main.stream import (
     generate_pagination_where_clause,
 )
 from synapse.storage.engines import PostgresEngine, Psycopg2Engine
-from synapse.types import JsonDict, StreamKeyType, StreamToken
-from synapse.storage.engines import PostgresEngine
 from synapse.types import JsonDict, MultiWriterStreamToken, StreamKeyType, StreamToken
 from synapse.util.caches.descriptors import cached, cachedList
 

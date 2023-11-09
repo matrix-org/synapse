@@ -59,10 +59,10 @@ from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.background_updates import BackgroundUpdater
 from synapse.storage.engines import (
     BaseDatabaseEngine,
+    PostgresEngine,
     Psycopg2Engine,
     PsycopgEngine,
     Sqlite3Engine,
-    PostgresEngine,
 )
 from synapse.storage.types import Connection, Cursor, SQLQueryParameters
 from synapse.util.async_helpers import delay_cancellation
