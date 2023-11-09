@@ -44,7 +44,6 @@ class RoomStoreTestCase(HomeserverTestCase):
     def test_get_room(self) -> None:
         room = self.get_success(self.store.get_room(self.room.to_string()))
         assert room is not None
-        self.assertEqual(room[1], self.u_creator.to_string())
         self.assertTrue(room[0])
 
     def test_get_room_unknown_room(self) -> None:

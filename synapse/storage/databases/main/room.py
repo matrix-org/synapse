@@ -213,7 +213,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             logger.error("store_room with room_id=%s failed: %s", room_id, e)
             raise StoreError(500, "Problem creating room.")
 
-    async def get_room(self, room_id: str) -> Optional[Tuple[bool, str, bool]]:
+    async def get_room(self, room_id: str) -> Optional[Tuple[bool, bool]]:
         """Retrieve a room.
 
         Args:
@@ -221,21 +221,23 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         Returns:
             A tuple containing the room information:
                 * True if the room is public
-                * The room creator
                 * True if the room has an auth chain index
 
             or None if the room is unknown.
         """
-        return cast(
-            Optional[Tuple[bool, str, bool]],
+        row = cast(
+            Optional[Tuple[Optional[Union[int, bool]], Optional[Union[int, bool]]]],
             await self.db_pool.simple_select_one(
                 table="rooms",
                 keyvalues={"room_id": room_id},
-                retcols=("is_public", "creator", "has_auth_chain_index"),
+                retcols=("is_public", "has_auth_chain_index"),
                 desc="get_room",
                 allow_none=True,
             ),
         )
+        if row is None:
+            return row
+        return bool(row[0]), bool(row[1])
 
     async def get_room_with_stats(self, room_id: str) -> Optional[RoomStats]:
         """Retrieve room with statistics.

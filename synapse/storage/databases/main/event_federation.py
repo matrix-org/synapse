@@ -194,7 +194,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         # algorithm.
         room = await self.get_room(room_id)  # type: ignore[attr-defined]
         # If the room has an auth chain index.
-        if room[2]:
+        if room[1]:
             try:
                 return await self.db_pool.runInteraction(
                     "get_auth_chain_ids_chains",
@@ -413,7 +413,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         # algorithm.
         room = await self.get_room(room_id)  # type: ignore[attr-defined]
         # If the room has an auth chain index.
-        if room[2]:
+        if room[1]:
             try:
                 return await self.db_pool.runInteraction(
                     "get_auth_chain_difference_chains",
