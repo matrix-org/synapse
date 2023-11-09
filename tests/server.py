@@ -974,7 +974,7 @@ def setup_test_homeserver(
         database_config = {
             "name": "psycopg2",
             "args": {
-                "database": test_db,
+                "dbname": test_db,
                 "host": POSTGRES_HOST,
                 "password": POSTGRES_PASSWORD,
                 "user": POSTGRES_USER,
@@ -1033,7 +1033,7 @@ def setup_test_homeserver(
         import psycopg2.extensions
 
         db_conn = db_engine.module.connect(
-            database=POSTGRES_BASE_DB,
+            dbname=POSTGRES_BASE_DB,
             user=POSTGRES_USER,
             host=POSTGRES_HOST,
             port=POSTGRES_PORT,
@@ -1080,7 +1080,7 @@ def setup_test_homeserver(
 
             # Drop the test database
             db_conn = db_engine.module.connect(
-                database=POSTGRES_BASE_DB,
+                dbname=POSTGRES_BASE_DB,
                 user=POSTGRES_USER,
                 host=POSTGRES_HOST,
                 port=POSTGRES_PORT,
