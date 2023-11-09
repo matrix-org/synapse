@@ -13,7 +13,7 @@
 # limitations under the License.
 import logging
 import random
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, Union
 
 from synapse.api.errors import (
     AuthError,
@@ -23,6 +23,7 @@ from synapse.api.errors import (
     StoreError,
     SynapseError,
 )
+from synapse.storage.databases.main.media_repository import LocalMedia, RemoteMedia
 from synapse.types import JsonDict, Requester, UserID, create_requester
 from synapse.util.caches.descriptors import cached
 from synapse.util.stringutils import parse_and_validate_mxc_uri
@@ -306,7 +307,9 @@ class ProfileHandler:
             server_name = host
 
         if self._is_mine_server_name(server_name):
-            media_info = await self.store.get_local_media(media_id)
+            media_info: Optional[
+                Union[LocalMedia, RemoteMedia]
+            ] = await self.store.get_local_media(media_id)
         else:
             media_info = await self.store.get_cached_remote_media(server_name, media_id)
 
@@ -322,12 +325,12 @@ class ProfileHandler:
 
         if self.max_avatar_size:
             # Ensure avatar does not exceed max allowed avatar size
-            if media_info["media_length"] > self.max_avatar_size:
+            if media_info.media_length > self.max_avatar_size:
                 logger.warning(
                     "Forbidding avatar change to %s: %d bytes is above the allowed size "
                     "limit",
                     mxc,
-                    media_info["media_length"],
+                    media_info.media_length,
                 )
                 return False
 
@@ -335,12 +338,12 @@ class ProfileHandler:
             # Ensure the avatar's file type is allowed
             if (
                 self.allowed_avatar_mimetypes
-                and media_info["media_type"] not in self.allowed_avatar_mimetypes
+                and media_info.media_type not in self.allowed_avatar_mimetypes
             ):
                 logger.warning(
                     "Forbidding avatar change to %s: mimetype %s not allowed",
                     mxc,
-                    media_info["media_type"],
+                    media_info.media_type,
                 )
                 return False
 
