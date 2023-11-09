@@ -19,12 +19,7 @@ This migration adds triggers to the partial_state_events tables to enforce uniqu
 Triggers cannot be expressed in .sql files, so we have to use a separate file.
 """
 from synapse.storage.database import LoggingTransaction
-from synapse.storage.engines import (
-    BaseDatabaseEngine,
-    PostgresEngine,
-    PsycopgEngine,
-    Sqlite3Engine,
-)
+from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine, Sqlite3Engine
 
 
 def run_create(cur: LoggingTransaction, database_engine: BaseDatabaseEngine) -> None:
@@ -48,7 +43,7 @@ def run_create(cur: LoggingTransaction, database_engine: BaseDatabaseEngine) -> 
             END;
             """
         )
-    elif isinstance(database_engine, (PostgresEngine, PsycopgEngine)):
+    elif isinstance(database_engine, PostgresEngine):
         cur.execute(
             """
             CREATE OR REPLACE FUNCTION check_partial_state_events() RETURNS trigger AS $BODY$
