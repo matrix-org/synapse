@@ -14,6 +14,8 @@
 from typing import Any, Mapping, NoReturn
 
 from ._base import BaseDatabaseEngine, IncorrectDatabaseSetup
+from .postgres import PostgresEngine
+
 
 # The classes `PostgresEngine` and `Sqlite3Engine` must always be importable, because
 # we use `isinstance(engine, PostgresEngine)` to write different queries for postgres
@@ -21,13 +23,24 @@ from ._base import BaseDatabaseEngine, IncorrectDatabaseSetup
 # installed. To account for this, create dummy classes on import failure so we can
 # still run `isinstance()` checks.
 try:
-    from .postgres import PostgresEngine
+    from .psycopg2 import Psycopg2Engine
 except ImportError:
 
-    class PostgresEngine(BaseDatabaseEngine):  # type: ignore[no-redef]
+    class Psycopg2Engine(BaseDatabaseEngine):  # type: ignore[no-redef]
         def __new__(cls, *args: object, **kwargs: object) -> NoReturn:
             raise RuntimeError(
                 f"Cannot create {cls.__name__} -- psycopg2 module is not installed"
+            )
+
+
+try:
+    from .psycopg import PsycopgEngine
+except ImportError:
+
+    class PsycopgEngine(BaseDatabaseEngine):  # type: ignore[no-redef]
+        def __new__(cls, *args: object, **kwargs: object) -> NoReturn:
+            raise RuntimeError(
+                f"Cannot create {cls.__name__} -- psycopg module is not installed"
             )
 
 
@@ -49,7 +62,10 @@ def create_engine(database_config: Mapping[str, Any]) -> BaseDatabaseEngine:
         return Sqlite3Engine(database_config)
 
     if name == "psycopg2":
-        return PostgresEngine(database_config)
+        return Psycopg2Engine(database_config)
+
+    if name == "psycopg":
+        return PsycopgEngine(database_config)
 
     raise RuntimeError("Unsupported database engine '%s'" % (name,))
 

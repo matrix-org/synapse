@@ -50,7 +50,7 @@ class DatabaseConnectionConfig:
     def __init__(self, name: str, db_config: dict):
         db_engine = db_config.get("name", "sqlite3")
 
-        if db_engine not in ("sqlite3", "psycopg2"):
+        if db_engine not in ("sqlite3", "psycopg2", "psycopg"):
             raise ConfigError("Unsupported database type %r" % (db_engine,))
 
         if db_engine == "sqlite3":

@@ -190,14 +190,7 @@ class DBAPI2Module(Protocol):
     def NotSupportedError(self) -> Type[Exception]:
         ...
 
-    # We originally wrote
-    # def connect(self, *args, **kwargs) -> Connection: ...
-    # But mypy doesn't seem to like that because sqlite3.connect takes a mandatory
-    # positional argument. We can't make that part of the signature though, because
-    # psycopg2.connect doesn't have a mandatory positional argument. Instead, we use
-    # the following slightly unusual workaround.
-    @property
-    def connect(self) -> Callable[..., Connection]:
+    def connect(self, *args: Any, **kwargs: Any) -> Connection:
         ...
 
 

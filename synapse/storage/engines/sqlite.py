@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     from synapse.storage.database import LoggingDatabaseConnection
 
 
-class Sqlite3Engine(BaseDatabaseEngine[sqlite3.Connection, sqlite3.Cursor]):
+class Sqlite3Engine(BaseDatabaseEngine[sqlite3.Connection, sqlite3.Cursor, int]):
     def __init__(self, database_config: Mapping[str, Any]):
         super().__init__(sqlite3, database_config)
 
