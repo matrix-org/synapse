@@ -1391,7 +1391,7 @@ def main() -> None:
     if "name" not in postgres_config:
         sys.stderr.write("Malformed database config: no 'name'\n")
         sys.exit(2)
-    if postgres_config["name"] != "psycopg2":
+    if postgres_config["name"] not in ("psycopg", "psycopg2"):
         sys.stderr.write("Database must use the 'psycopg2' connector.\n")
         sys.exit(3)
 
