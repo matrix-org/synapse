@@ -208,7 +208,17 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
         )
         if row is None:
             return None
-        return LocalMedia(media_id=media_id, **row)
+        return LocalMedia(
+            media_id=media_id,
+            media_type=row[0],
+            media_length=row[1],
+            upload_name=row[2],
+            created_ts=row[3],
+            quarantined_by=row[4],
+            url_cache=row[5],
+            last_access_ts=row[6],
+            safe_from_quarantine=row[7],
+        )
 
     async def get_local_media_by_user_paginate(
         self,
@@ -541,7 +551,17 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
         )
         if row is None:
             return row
-        return RemoteMedia(media_origin=origin, media_id=media_id, **row)
+        return RemoteMedia(
+            media_origin=origin,
+            media_id=media_id,
+            media_type=row[0],
+            media_length=row[1],
+            upload_name=row[2],
+            created_ts=row[3],
+            filesystem_id=row[4],
+            last_access_ts=row[5],
+            quarantined_by=row[6],
+        )
 
     async def store_cached_remote_media(
         self,
@@ -665,11 +685,7 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
         if row is None:
             return None
         return ThumbnailInfo(
-            width=row["thumbnail_width"],
-            height=row["thumbnail_height"],
-            method=row["thumbnail_method"],
-            type=row["thumbnail_type"],
-            length=row["thumbnail_length"],
+            width=row[0], height=row[1], method=row[2], type=row[3], length=row[4]
         )
 
     @trace

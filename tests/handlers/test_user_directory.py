@@ -366,7 +366,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         )
         profile = self.get_success(self.store._get_user_in_directory(regular_user_id))
         assert profile is not None
-        self.assertTrue(profile["display_name"] == display_name)
+        self.assertTrue(profile[0] == display_name)
 
     def test_handle_local_profile_change_with_deactivated_user(self) -> None:
         # create user
@@ -385,7 +385,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         # profile is in directory
         profile = self.get_success(self.store._get_user_in_directory(r_user_id))
         assert profile is not None
-        self.assertTrue(profile["display_name"] == display_name)
+        self.assertEqual(profile[0], display_name)
 
         # deactivate user
         self.get_success(self.store.set_user_deactivated_status(r_user_id, True))

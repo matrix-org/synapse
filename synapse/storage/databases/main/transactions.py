@@ -118,19 +118,13 @@ class TransactionWorkerStore(CacheInvalidationWorkerStore):
             txn,
             table="received_transactions",
             keyvalues={"transaction_id": transaction_id, "origin": origin},
-            retcols=(
-                "transaction_id",
-                "origin",
-                "ts",
-                "response_code",
-                "response_json",
-                "has_been_referenced",
-            ),
+            retcols=("response_code", "response_json"),
             allow_none=True,
         )
 
-        if result and result["response_code"]:
-            return result["response_code"], db_to_json(result["response_json"])
+        # If the result exists and the response code is non-0.
+        if result and result[0]:
+            return result[0], db_to_json(result[1])
 
         else:
             return None
@@ -200,8 +194,10 @@ class TransactionWorkerStore(CacheInvalidationWorkerStore):
 
         # check we have a row and retry_last_ts is not null or zero
         # (retry_last_ts can't be negative)
-        if result and result["retry_last_ts"]:
-            return DestinationRetryTimings(**result)
+        if result and result[1]:
+            return DestinationRetryTimings(
+                failure_ts=result[0], retry_last_ts=result[1], retry_interval=result[2]
+            )
         else:
             return None
 

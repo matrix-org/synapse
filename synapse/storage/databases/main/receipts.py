@@ -701,8 +701,8 @@ class ReceiptsWorkerStore(SQLBaseStore):
             allow_none=True,
         )
 
-        stream_ordering = int(res["stream_ordering"]) if res else None
-        rx_ts = res["received_ts"] if res else 0
+        stream_ordering = int(res[0]) if res else None
+        rx_ts = res[1] if res else 0
 
         # We don't want to clobber receipts for more recent events, so we
         # have to compare orderings of existing receipts

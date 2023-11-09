@@ -413,8 +413,8 @@ class RoomMembersRestServlet(RestServlet):
     ) -> Tuple[int, JsonDict]:
         await assert_requester_is_admin(self.auth, request)
 
-        ret = await self.store.get_room(room_id)
-        if not ret:
+        room = await self.store.get_room(room_id)
+        if not room:
             raise NotFoundError("Room not found")
 
         members = await self.store.get_users_in_room(room_id)
@@ -442,8 +442,8 @@ class RoomStateRestServlet(RestServlet):
     ) -> Tuple[int, JsonDict]:
         await assert_requester_is_admin(self.auth, request)
 
-        ret = await self.store.get_room(room_id)
-        if not ret:
+        room = await self.store.get_room(room_id)
+        if not room:
             raise NotFoundError("Room not found")
 
         event_ids = await self._storage_controllers.state.get_current_state_ids(room_id)

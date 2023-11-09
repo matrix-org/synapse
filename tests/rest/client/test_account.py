@@ -139,12 +139,12 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
         #
         # Note that we don't have the UI Auth session ID, so just pull out the single
         # row.
-        ui_auth_data = self.get_success(
-            self.store.db_pool.simple_select_one(
-                "ui_auth_sessions", keyvalues={}, retcols=("clientdict",)
+        result = self.get_success(
+            self.store.db_pool.simple_select_one_onecol(
+                "ui_auth_sessions", keyvalues={}, retcol="clientdict"
             )
         )
-        client_dict = db_to_json(ui_auth_data["clientdict"])
+        client_dict = db_to_json(result)
         self.assertNotIn("new_password", client_dict)
 
     @override_config({"rc_3pid_validation": {"burst_count": 3}})

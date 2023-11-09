@@ -348,8 +348,7 @@ class Porter:
                     backward_chunk = 0
                     already_ported = 0
             else:
-                forward_chunk = row["forward_rowid"]
-                backward_chunk = row["backward_rowid"]
+                forward_chunk, backward_chunk = row
 
             if total_to_port is None:
                 already_ported, total_to_port = await self._get_total_count_to_port(

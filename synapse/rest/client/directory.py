@@ -147,7 +147,7 @@ class ClientDirectoryListServer(RestServlet):
         if room is None:
             raise NotFoundError("Unknown room")
 
-        return 200, {"visibility": "public" if room["is_public"] else "private"}
+        return 200, {"visibility": "public" if room[0] else "private"}
 
     class PutBody(RequestBodyModel):
         visibility: Literal["public", "private"] = "public"
