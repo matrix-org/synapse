@@ -193,7 +193,8 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         # Check if we have indexed the room so we can use the chain cover
         # algorithm.
         room = await self.get_room(room_id)  # type: ignore[attr-defined]
-        if room["has_auth_chain_index"]:
+        # If the room has an auth chain index.
+        if room[1]:
             try:
                 return await self.db_pool.runInteraction(
                     "get_auth_chain_ids_chains",
@@ -410,7 +411,8 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         # Check if we have indexed the room so we can use the chain cover
         # algorithm.
         room = await self.get_room(room_id)  # type: ignore[attr-defined]
-        if room["has_auth_chain_index"]:
+        # If the room has an auth chain index.
+        if room[1]:
             try:
                 return await self.db_pool.runInteraction(
                     "get_auth_chain_difference_chains",
@@ -1436,24 +1438,18 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
             )
 
             if event_lookup_result is not None:
+                event_type, depth, stream_ordering = event_lookup_result
                 logger.debug(
                     "_get_backfill_events(room_id=%s): seed_event_id=%s depth=%s stream_ordering=%s type=%s",
                     room_id,
                     seed_event_id,
-                    event_lookup_result["depth"],
-                    event_lookup_result["stream_ordering"],
-                    event_lookup_result["type"],
+                    depth,
+                    stream_ordering,
+                    event_type,
                 )
 
-                if event_lookup_result["depth"]:
-                    queue.put(
-                        (
-                            -event_lookup_result["depth"],
-                            -event_lookup_result["stream_ordering"],
-                            seed_event_id,
-                            event_lookup_result["type"],
-                        )
-                    )
+                if depth:
+                    queue.put((-depth, -stream_ordering, seed_event_id, event_type))
 
         while not queue.empty() and len(event_id_results) < limit:
             try:

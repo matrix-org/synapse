@@ -747,8 +747,16 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
         )
 
         # Invalidate the cache for any ignored users which were added or removed.
-        for ignored_user_id in previously_ignored_users ^ currently_ignored_users:
-            self._invalidate_cache_and_stream(txn, self.ignored_by, (ignored_user_id,))
+        self._invalidate_cache_and_stream_bulk(
+            txn,
+            self.ignored_by,
+            [
+                (ignored_user_id,)
+                for ignored_user_id in (
+                    previously_ignored_users ^ currently_ignored_users
+                )
+            ],
+        )
         self._invalidate_cache_and_stream(txn, self.ignored_users, (user_id,))
 
     async def remove_account_data_for_user(
@@ -824,10 +832,14 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
                 )
 
                 # Invalidate the cache for ignored users which were removed.
-                for ignored_user_id in previously_ignored_users:
-                    self._invalidate_cache_and_stream(
-                        txn, self.ignored_by, (ignored_user_id,)
-                    )
+                self._invalidate_cache_and_stream_bulk(
+                    txn,
+                    self.ignored_by,
+                    [
+                        (ignored_user_id,)
+                        for ignored_user_id in previously_ignored_users
+                    ],
+                )
 
                 # Invalidate for this user the cache tracking ignored users.
                 self._invalidate_cache_and_stream(txn, self.ignored_users, (user_id,))

@@ -255,33 +255,16 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
             A dict containing the device information, or `None` if the device does not
             exist.
         """
-        return await self.db_pool.simple_select_one(
+        row = await self.db_pool.simple_select_one(
             table="devices",
             keyvalues={"user_id": user_id, "device_id": device_id, "hidden": False},
             retcols=("user_id", "device_id", "display_name"),
             desc="get_device",
             allow_none=True,
         )
-
-    async def get_device_opt(
-        self, user_id: str, device_id: str
-    ) -> Optional[Dict[str, Any]]:
-        """Retrieve a device. Only returns devices that are not marked as
-        hidden.
-
-        Args:
-            user_id: The ID of the user which owns the device
-            device_id: The ID of the device to retrieve
-        Returns:
-            A dict containing the device information, or None if the device does not exist.
-        """
-        return await self.db_pool.simple_select_one(
-            table="devices",
-            keyvalues={"user_id": user_id, "device_id": device_id, "hidden": False},
-            retcols=("user_id", "device_id", "display_name"),
-            desc="get_device",
-            allow_none=True,
-        )
+        if row is None:
+            return None
+        return {"user_id": row[0], "device_id": row[1], "display_name": row[2]}
 
     async def get_devices_by_user(
         self, user_id: str
@@ -1221,9 +1204,7 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
             retcols=["device_id", "device_data"],
             allow_none=True,
         )
-        return (
-            (row["device_id"], json_decoder.decode(row["device_data"])) if row else None
-        )
+        return (row[0], json_decoder.decode(row[1])) if row else None
 
     def _store_dehydrated_device_txn(
         self,
@@ -2326,13 +2307,15 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
         `FALSE` have not been converted.
         """
 
-        row = await self.db_pool.simple_select_one(
-            table="device_lists_changes_converted_stream_position",
-            keyvalues={},
-            retcols=["stream_id", "room_id"],
-            desc="get_device_change_last_converted_pos",
+        return cast(
+            Tuple[int, str],
+            await self.db_pool.simple_select_one(
+                table="device_lists_changes_converted_stream_position",
+                keyvalues={},
+                retcols=["stream_id", "room_id"],
+                desc="get_device_change_last_converted_pos",
+            ),
         )
-        return row["stream_id"], row["room_id"]
 
     async def set_device_change_last_converted_pos(
         self,

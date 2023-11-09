@@ -83,11 +83,11 @@ def setupdb() -> None:
 
         # Set up in the db
         db_conn = db_engine.module.connect(
+            dbname=POSTGRES_BASE_DB,
             user=POSTGRES_USER,
             host=POSTGRES_HOST,
             port=POSTGRES_PORT,
             password=POSTGRES_PASSWORD,
-            dbname=POSTGRES_BASE_DB,
         )
         logging_conn = LoggingDatabaseConnection(db_conn, db_engine, "tests")
         prepare_database(logging_conn, db_engine, None)

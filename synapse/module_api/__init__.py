@@ -1860,7 +1860,8 @@ class PublicRoomListManager:
         if not room:
             return False
 
-        return room.get("is_public", False)
+        # The first item is whether the room is public.
+        return room[0]
 
     async def add_room_to_public_room_list(self, room_id: str) -> None:
         """Publishes a room to the public room list.

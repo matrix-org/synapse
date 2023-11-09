@@ -1447,7 +1447,7 @@ database:
   args:
     user: synapse_user
     password: secretpassword
-    database: synapse
+    dbname: synapse
     host: localhost
     port: 5432
     cp_min: 5
@@ -1526,7 +1526,7 @@ databases:
     args:
       user: synapse_user
       password: secretpassword
-      database: synapse_main
+      dbname: synapse_main
       host: localhost
       port: 5432
       cp_min: 5
@@ -1539,7 +1539,7 @@ databases:
     args:
       user: synapse_user
       password: secretpassword
-      database: synapse_state
+      dbname: synapse_state
       host: localhost
       port: 5432
       cp_min: 5

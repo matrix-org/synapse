@@ -119,7 +119,7 @@ class ThumbnailResource(RestServlet):
         if not media_info:
             respond_404(request)
             return
-        if media_info["quarantined_by"]:
+        if media_info.quarantined_by:
             logger.info("Media is quarantined")
             respond_404(request)
             return
@@ -134,7 +134,7 @@ class ThumbnailResource(RestServlet):
             thumbnail_infos,
             media_id,
             media_id,
-            url_cache=bool(media_info["url_cache"]),
+            url_cache=bool(media_info.url_cache),
             server_name=None,
         )
 
@@ -152,7 +152,7 @@ class ThumbnailResource(RestServlet):
         if not media_info:
             respond_404(request)
             return
-        if media_info["quarantined_by"]:
+        if media_info.quarantined_by:
             logger.info("Media is quarantined")
             respond_404(request)
             return
@@ -168,7 +168,7 @@ class ThumbnailResource(RestServlet):
                 file_info = FileInfo(
                     server_name=None,
                     file_id=media_id,
-                    url_cache=media_info["url_cache"],
+                    url_cache=bool(media_info.url_cache),
                     thumbnail=info,
                 )
 
@@ -188,7 +188,7 @@ class ThumbnailResource(RestServlet):
             desired_height,
             desired_method,
             desired_type,
-            url_cache=bool(media_info["url_cache"]),
+            url_cache=bool(media_info.url_cache),
         )
 
         if file_path:
@@ -213,7 +213,7 @@ class ThumbnailResource(RestServlet):
             server_name, media_id
         )
 
-        file_id = media_info["filesystem_id"]
+        file_id = media_info.filesystem_id
 
         for info in thumbnail_infos:
             t_w = info.width == desired_width
@@ -224,7 +224,7 @@ class ThumbnailResource(RestServlet):
             if t_w and t_h and t_method and t_type:
                 file_info = FileInfo(
                     server_name=server_name,
-                    file_id=media_info["filesystem_id"],
+                    file_id=file_id,
                     thumbnail=info,
                 )
 
@@ -280,7 +280,7 @@ class ThumbnailResource(RestServlet):
             m_type,
             thumbnail_infos,
             media_id,
-            media_info["filesystem_id"],
+            media_info.filesystem_id,
             url_cache=False,
             server_name=server_name,
         )
