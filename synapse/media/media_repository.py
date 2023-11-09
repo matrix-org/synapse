@@ -17,7 +17,7 @@ import logging
 import os
 import shutil
 from io import BytesIO
-from typing import IO, TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple
+from typing import IO, TYPE_CHECKING, Dict, List, Optional, Set, Tuple
 
 import attr
 from matrix_common.types.mxc_uri import MXCUri
@@ -54,7 +54,7 @@ from synapse.media.storage_provider import StorageProviderWrapper
 from synapse.media.thumbnailer import Thumbnailer, ThumbnailError
 from synapse.media.url_previewer import UrlPreviewer
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.storage.databases.main.media_repository import RemoteMedia
+from synapse.storage.databases.main.media_repository import LocalMedia, RemoteMedia
 from synapse.types import UserID
 from synapse.util.async_helpers import Linearizer
 from synapse.util.retryutils import NotRetryingDestination
@@ -357,7 +357,7 @@ class MediaRepository:
 
     async def get_local_media_info(
         self, request: SynapseRequest, media_id: str, max_timeout_ms: int
-    ) -> Optional[Dict[str, Any]]:
+    ) -> Optional[LocalMedia]:
         """Gets the info dictionary for given local media ID. If the media has
         not been uploaded yet, this function will wait up to ``max_timeout_ms``
         milliseconds for the media to be uploaded.
@@ -382,18 +382,19 @@ class MediaRepository:
                 respond_404(request)
                 return None
 
-            if media_info["quarantined_by"]:
+            if media_info.quarantined_by:
                 logger.info("Media is quarantined")
                 respond_404(request)
                 return None
 
             # The file has been uploaded, so stop looping
-            if media_info.get("media_length") is not None:
+            if media_info.media_length is not None:
                 return media_info
 
             # Check if the media ID has expired and still hasn't been uploaded to.
             now = self.clock.time_msec()
-            if media_info.get("created_ts", now) + self.unused_expiration_time < now:
+            expired_time_ms = now - self.unused_expiration_time
+            if media_info.created_ts < expired_time_ms:
                 respond_404(request)
                 return None
 
