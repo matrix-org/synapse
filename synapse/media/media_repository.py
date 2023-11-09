@@ -505,10 +505,6 @@ class MediaRepository:
                 media_info.media_length,
                 upload_name,
             )
-        elif media_info:
-            # The media exists (but the responder doesn't) meaning that this file hasn't
-            # been uploaded yet.
-            self.respond_not_yet_uploaded(request)
         else:
             respond_404(request)
 
