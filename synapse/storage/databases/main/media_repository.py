@@ -499,7 +499,7 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
             )
             row = txn.fetchone()
             if not row:
-                raise StoreError(404, "Failed to count pending media for user")
+                return 0, 0
             return row[0], (row[1] + self.unused_expiration_time if row[1] else 0)
 
         return await self.db_pool.runInteraction("get_url_cache", get_pending_media_txn)
