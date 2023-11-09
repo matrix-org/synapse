@@ -497,8 +497,6 @@ class MediaRepository:
 
         # We deliberately stream the file outside the lock
         if responder and media_info:
-            media_type = media_info.media_type
-            media_length = media_info.media_length
             upload_name = name if name else media_info.upload_name
             await respond_with_responder(
                 request,
