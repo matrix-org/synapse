@@ -363,10 +363,11 @@ class PresenceStore(PresenceBackgroundUpdateStore, CacheInvalidationWorkerStore)
                 # for their user ID.
                 value_values=[(presence_stream_id,) for _ in user_ids],
             )
-            for user_id in user_ids:
-                self._invalidate_cache_and_stream(
-                    txn, self._get_full_presence_stream_token_for_user, (user_id,)
-                )
+            self._invalidate_cache_and_stream_bulk(
+                txn,
+                self._get_full_presence_stream_token_for_user,
+                [(user_id,) for user_id in user_ids],
+            )
 
         return await self.db_pool.runInteraction(
             "add_users_to_send_full_presence_to", _add_users_to_send_full_presence_to
