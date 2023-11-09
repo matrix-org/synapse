@@ -222,7 +222,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
             )
         )
 
-        self.assertEqual({"colA": 1, "colB": 2, "colC": 3}, ret)
+        self.assertEqual((1, 2, 3), ret)
         self.mock_txn.execute.assert_called_once_with(
             "SELECT colA, colB, colC FROM tablename WHERE keycol = ?", ["TheKey"]
         )
@@ -243,7 +243,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
             )
         )
 
-        self.assertFalse(ret)
+        self.assertIsNone(ret)
 
     @defer.inlineCallbacks
     def test_select_list(self) -> Generator["defer.Deferred[object]", object, None]:

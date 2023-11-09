@@ -468,8 +468,7 @@ class PushRuleStore(PushRulesWorkerStore):
                 "before/after rule not found: %s" % (relative_to_rule,)
             )
 
-        base_priority_class = res["priority_class"]
-        base_rule_priority = res["priority"]
+        base_priority_class, base_rule_priority = res
 
         if base_priority_class != priority_class:
             raise InconsistentRuleException(

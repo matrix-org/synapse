@@ -642,7 +642,7 @@ class QuarantineMediaByIDTestCase(_AdminMediaTests):
 
         media_info = self.get_success(self.store.get_local_media(self.media_id))
         assert media_info is not None
-        self.assertFalse(media_info["quarantined_by"])
+        self.assertFalse(media_info.quarantined_by)
 
         # quarantining
         channel = self.make_request(
@@ -656,7 +656,7 @@ class QuarantineMediaByIDTestCase(_AdminMediaTests):
 
         media_info = self.get_success(self.store.get_local_media(self.media_id))
         assert media_info is not None
-        self.assertTrue(media_info["quarantined_by"])
+        self.assertTrue(media_info.quarantined_by)
 
         # remove from quarantine
         channel = self.make_request(
@@ -670,7 +670,7 @@ class QuarantineMediaByIDTestCase(_AdminMediaTests):
 
         media_info = self.get_success(self.store.get_local_media(self.media_id))
         assert media_info is not None
-        self.assertFalse(media_info["quarantined_by"])
+        self.assertFalse(media_info.quarantined_by)
 
     def test_quarantine_protected_media(self) -> None:
         """
@@ -683,7 +683,7 @@ class QuarantineMediaByIDTestCase(_AdminMediaTests):
         # verify protection
         media_info = self.get_success(self.store.get_local_media(self.media_id))
         assert media_info is not None
-        self.assertTrue(media_info["safe_from_quarantine"])
+        self.assertTrue(media_info.safe_from_quarantine)
 
         # quarantining
         channel = self.make_request(
@@ -698,7 +698,7 @@ class QuarantineMediaByIDTestCase(_AdminMediaTests):
         # verify that is not in quarantine
         media_info = self.get_success(self.store.get_local_media(self.media_id))
         assert media_info is not None
-        self.assertFalse(media_info["quarantined_by"])
+        self.assertFalse(media_info.quarantined_by)
 
 
 class ProtectMediaByIDTestCase(_AdminMediaTests):
@@ -756,7 +756,7 @@ class ProtectMediaByIDTestCase(_AdminMediaTests):
 
         media_info = self.get_success(self.store.get_local_media(self.media_id))
         assert media_info is not None
-        self.assertFalse(media_info["safe_from_quarantine"])
+        self.assertFalse(media_info.safe_from_quarantine)
 
         # protect
         channel = self.make_request(
@@ -770,7 +770,7 @@ class ProtectMediaByIDTestCase(_AdminMediaTests):
 
         media_info = self.get_success(self.store.get_local_media(self.media_id))
         assert media_info is not None
-        self.assertTrue(media_info["safe_from_quarantine"])
+        self.assertTrue(media_info.safe_from_quarantine)
 
         # unprotect
         channel = self.make_request(
@@ -784,7 +784,7 @@ class ProtectMediaByIDTestCase(_AdminMediaTests):
 
         media_info = self.get_success(self.store.get_local_media(self.media_id))
         assert media_info is not None
-        self.assertFalse(media_info["safe_from_quarantine"])
+        self.assertFalse(media_info.safe_from_quarantine)
 
 
 class PurgeMediaCacheTestCase(_AdminMediaTests):

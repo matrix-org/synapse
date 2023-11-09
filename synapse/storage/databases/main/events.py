@@ -1934,8 +1934,7 @@ class PersistEventsStore:
         if row is None:
             return
 
-        redacted_relates_to = row["relates_to_id"]
-        rel_type = row["relation_type"]
+        redacted_relates_to, rel_type = row
         self.db_pool.simple_delete_txn(
             txn, table="event_relations", keyvalues={"event_id": redacted_event_id}
         )

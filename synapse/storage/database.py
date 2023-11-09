@@ -1116,7 +1116,7 @@ class DatabasePool:
     def simple_insert_many_txn(
         txn: LoggingTransaction,
         table: str,
-        keys: Collection[str],
+        keys: Sequence[str],
         values: Collection[Iterable[Any]],
     ) -> None:
         """Executes an INSERT query on the named table.
@@ -1597,7 +1597,7 @@ class DatabasePool:
         retcols: Collection[str],
         allow_none: Literal[False] = False,
         desc: str = "simple_select_one",
-    ) -> Dict[str, Any]:
+    ) -> Tuple[Any, ...]:
         ...
 
     @overload
@@ -1608,7 +1608,7 @@ class DatabasePool:
         retcols: Collection[str],
         allow_none: Literal[True] = True,
         desc: str = "simple_select_one",
-    ) -> Optional[Dict[str, Any]]:
+    ) -> Optional[Tuple[Any, ...]]:
         ...
 
     async def simple_select_one(
@@ -1618,7 +1618,7 @@ class DatabasePool:
         retcols: Collection[str],
         allow_none: bool = False,
         desc: str = "simple_select_one",
-    ) -> Optional[Dict[str, Any]]:
+    ) -> Optional[Tuple[Any, ...]]:
         """Executes a SELECT query on the named table, which is expected to
         return a single row, returning multiple columns from it.
 
@@ -2127,7 +2127,7 @@ class DatabasePool:
         keyvalues: Dict[str, Any],
         retcols: Collection[str],
         allow_none: bool = False,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> Optional[Tuple[Any, ...]]:
         select_sql = "SELECT %s FROM %s" % (", ".join(retcols), table)
 
         if keyvalues:
@@ -2145,7 +2145,7 @@ class DatabasePool:
         if txn.rowcount > 1:
             raise StoreError(500, "More than one row matched (%s)" % (table,))
 
-        return dict(zip(retcols, row))
+        return row
 
     async def simple_delete_one(
         self, table: str, keyvalues: Dict[str, Any], desc: str = "simple_delete_one"
