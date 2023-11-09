@@ -1237,13 +1237,11 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
         for user_id, device_id, algorithm, key_id, key_json in claimed_keys:
             device_results = results.setdefault(user_id, {}).setdefault(device_id, {})
             device_results[f"{algorithm}:{key_id}"] = json_decoder.decode(key_json)
-
-            if (user_id, device_id) in seen_user_device:
-                continue
             seen_user_device.add((user_id, device_id))
-            self._invalidate_cache_and_stream(
-                txn, self.get_e2e_unused_fallback_key_types, (user_id, device_id)
-            )
+
+        self._invalidate_cache_and_stream_bulk(
+            txn, self.get_e2e_unused_fallback_key_types, seen_user_device
+        )
 
         return results
 
@@ -1376,14 +1374,14 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
             List[Tuple[str, str, str, str, str]], txn.execute_values(sql, query_list)
         )
 
-        seen_user_device: Set[Tuple[str, str]] = set()
-        for user_id, device_id, _, _, _ in otk_rows:
-            if (user_id, device_id) in seen_user_device:
-                continue
-            seen_user_device.add((user_id, device_id))
-            self._invalidate_cache_and_stream(
-                txn, self.count_e2e_one_time_keys, (user_id, device_id)
-            )
+        seen_user_device = {
+            (user_id, device_id) for user_id, device_id, _, _, _ in otk_rows
+        }
+        self._invalidate_cache_and_stream_bulk(
+            txn,
+            self.count_e2e_one_time_keys,
+            seen_user_device,
+        )
 
         return otk_rows
 
