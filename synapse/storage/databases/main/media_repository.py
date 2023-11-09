@@ -27,7 +27,6 @@ from typing import (
 import attr
 
 from synapse.api.constants import Direction
-from synapse.api.errors import StoreError
 from synapse.logging.opentracing import trace
 from synapse.media._base import ThumbnailInfo
 from synapse.storage._base import SQLBaseStore
