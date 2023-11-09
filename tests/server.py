@@ -88,7 +88,7 @@ from synapse.module_api.callbacks.third_party_event_rules_callbacks import (
 from synapse.server import HomeServer
 from synapse.storage import DataStore
 from synapse.storage.database import LoggingDatabaseConnection
-from synapse.storage.engines import PostgresEngine, create_engine
+from synapse.storage.engines import create_engine
 from synapse.storage.prepare_database import prepare_database
 from synapse.types import ISynapseReactor, JsonDict
 from synapse.util import Clock
@@ -1029,9 +1029,7 @@ def setup_test_homeserver(
 
     # Create the database before we actually try and connect to it, based off
     # the template database we generate in setupdb()
-    if isinstance(db_engine, PostgresEngine):
-        import psycopg2.extensions
-
+    if USE_POSTGRES_FOR_TESTS:
         db_conn = db_engine.module.connect(
             dbname=POSTGRES_BASE_DB,
             user=POSTGRES_USER,
@@ -1039,8 +1037,7 @@ def setup_test_homeserver(
             port=POSTGRES_PORT,
             password=POSTGRES_PASSWORD,
         )
-        assert isinstance(db_conn, psycopg2.extensions.connection)
-        db_conn.autocommit = True
+        db_engine.attempt_to_set_autocommit(db_conn, True)
         cur = db_conn.cursor()
         cur.execute("DROP DATABASE IF EXISTS %s;" % (test_db,))
         cur.execute(
@@ -1065,13 +1062,12 @@ def setup_test_homeserver(
 
     hs.setup()
 
-    if isinstance(db_engine, PostgresEngine):
+    if USE_POSTGRES_FOR_TESTS:
         database_pool = hs.get_datastores().databases[0]
 
         # We need to do cleanup on PostgreSQL
         def cleanup() -> None:
             import psycopg2
-            import psycopg2.extensions
 
             # Close all the db pools
             database_pool._db_pool.close()
@@ -1086,8 +1082,7 @@ def setup_test_homeserver(
                 port=POSTGRES_PORT,
                 password=POSTGRES_PASSWORD,
             )
-            assert isinstance(db_conn, psycopg2.extensions.connection)
-            db_conn.autocommit = True
+            db_engine.attempt_to_set_autocommit(db_conn, True)
             cur = db_conn.cursor()
 
             # Try a few times to drop the DB. Some things may hold on to the
