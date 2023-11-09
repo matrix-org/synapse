@@ -248,14 +248,14 @@ class MediaRepository:
         if media is None:
             raise SynapseError(404, "Unknow media ID", errcode=Codes.NOT_FOUND)
 
-        if media["user_id"] != auth_user.to_string():
+        if media.user_id != auth_user.to_string():
             raise SynapseError(
                 403,
                 "Only the creator of the media ID can upload to it",
                 errcode=Codes.FORBIDDEN,
             )
 
-        if media.get("media_length") is not None:
+        if media.media_length is not None:
             raise SynapseError(
                 409,
                 "Media ID already has content",

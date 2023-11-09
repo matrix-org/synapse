@@ -50,13 +50,14 @@ BG_UPDATE_REMOVE_MEDIA_REPO_INDEX_WITHOUT_METHOD_2 = (
 class LocalMedia:
     media_id: str
     media_type: str
-    media_length: int
+    media_length: Optional[int]
     upload_name: str
     created_ts: int
     url_cache: Optional[str]
     last_access_ts: int
     quarantined_by: Optional[str]
     safe_from_quarantine: bool
+    user_id: Optional[str]
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
@@ -222,6 +223,7 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
             url_cache=row[5],
             last_access_ts=row[6],
             safe_from_quarantine=row[7],
+            user_id=row[8],
         )
 
     async def get_local_media_by_user_paginate(
@@ -276,7 +278,8 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
                     url_cache,
                     last_access_ts,
                     quarantined_by,
-                    safe_from_quarantine
+                    safe_from_quarantine,
+                    user_id
                 FROM local_media_repository
                 WHERE user_id = ?
                 ORDER BY {order_by_column} {order}, media_id ASC
@@ -299,6 +302,7 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
                     last_access_ts=row[6],
                     quarantined_by=row[7],
                     safe_from_quarantine=bool(row[8]),
+                    user_id=row[9],
                 )
                 for row in txn
             ]
