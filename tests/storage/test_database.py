@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Callable, Tuple, List
+from typing import Callable, List, Tuple
 from unittest.mock import Mock, call
 
 from twisted.internet import defer
