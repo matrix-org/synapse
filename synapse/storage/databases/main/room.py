@@ -1600,25 +1600,37 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             count = cast(Tuple[int], txn.fetchone())[0]
 
             sql = """
+                WITH considered_event_reports AS (
+                    SELECT
+                        er.id,
+                        er.received_ts,
+                        er.room_id,
+                        er.event_id,
+                        er.user_id,
+                        er.content,
+                        room_stats_state.canonical_alias,
+                        room_stats_state.name
+                    FROM event_reports AS er
+                    JOIN room_stats_state
+                        ON room_stats_state.room_id = er.room_id
+                    {where_clause}
+                    ORDER BY er.received_ts {order}
+                    LIMIT ?
+                    OFFSET ?
+                )
+                -- only join on `events` after the LIMIT/OFFSET has been applied
                 SELECT
-                    er.id,
-                    er.received_ts,
-                    er.room_id,
-                    er.event_id,
-                    er.user_id,
-                    er.content,
+                    cer.id,
+                    cer.received_ts,
+                    cer.room_id,
+                    cer.event_id,
+                    cer.user_id,
+                    cer.content,
                     events.sender,
-                    room_stats_state.canonical_alias,
-                    room_stats_state.name
-                FROM event_reports AS er
-                LEFT JOIN events
-                    ON events.event_id = er.event_id
-                JOIN room_stats_state
-                    ON room_stats_state.room_id = er.room_id
-                {where_clause}
-                ORDER BY er.received_ts {order}
-                LIMIT ?
-                OFFSET ?
+                    cer.canonical_alias,
+                    cer.name
+                FROM considered_event_reports AS cer
+                LEFT JOIN events ON events.event_id = cer.event_id
             """.format(
                 where_clause=where_clause,
                 order=order,
