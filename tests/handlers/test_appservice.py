@@ -31,7 +31,12 @@ from synapse.appservice import (
 from synapse.handlers.appservice import ApplicationServicesHandler
 from synapse.rest.client import login, receipts, register, room, sendtodevice
 from synapse.server import HomeServer
-from synapse.types import JsonDict, RoomStreamToken, StreamKeyType
+from synapse.types import (
+    JsonDict,
+    MultiWriterStreamToken,
+    RoomStreamToken,
+    StreamKeyType,
+)
 from synapse.util import Clock
 from synapse.util.stringutils import random_string
 
@@ -156,6 +161,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         result = self.successResultOf(
             defer.ensureDeferred(self.handler.query_room_alias_exists(room_alias))
         )
+        assert result is not None
 
         self.mock_as_api.query_alias.assert_called_once_with(
             interested_service, room_alias_str
@@ -304,7 +310,9 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         )
 
         self.handler.notify_interested_services_ephemeral(
-            StreamKeyType.RECEIPT, 580, ["@fakerecipient:example.com"]
+            StreamKeyType.RECEIPT,
+            MultiWriterStreamToken(stream=580),
+            ["@fakerecipient:example.com"],
         )
         self.mock_scheduler.enqueue_for_appservice.assert_called_once_with(
             interested_service, ephemeral=[event]
@@ -332,7 +340,9 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         )
 
         self.handler.notify_interested_services_ephemeral(
-            StreamKeyType.RECEIPT, 580, ["@fakerecipient:example.com"]
+            StreamKeyType.RECEIPT,
+            MultiWriterStreamToken(stream=580),
+            ["@fakerecipient:example.com"],
         )
         # This method will be called, but with an empty list of events
         self.mock_scheduler.enqueue_for_appservice.assert_called_once_with(
@@ -635,7 +645,7 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
                 self.hs.get_application_service_handler()._notify_interested_services_ephemeral(
                     services=[interested_appservice],
                     stream_key=StreamKeyType.RECEIPT,
-                    new_token=stream_token,
+                    new_token=MultiWriterStreamToken(stream=stream_token),
                     users=[self.exclusive_as_user],
                 )
             )

@@ -13,12 +13,13 @@
  * limitations under the License.
  */
 
--- Drop the old event transaction ID table, the event_txn_id_device_id table
--- should be used instead.
-DROP TABLE IF EXISTS event_txn_id;
+-- Records when we see a "gap in the timeline", due to missing events over
+-- federation. We record this so that we can tell clients there is a gap (by
+-- marking the timeline section of a sync request as limited).
+CREATE TABLE IF NOT EXISTS timeline_gaps (
+    room_id TEXT NOT NULL,
+    instance_name TEXT NOT NULL,
+    stream_ordering BIGINT NOT NULL
+);
 
--- Drop tables related to MSC2716 since the implementation is being removed
-DROP TABLE insertion_events;
-DROP TABLE insertion_event_edges;
-DROP TABLE insertion_event_extremities;
-DROP TABLE batch_events;
+CREATE INDEX timeline_gaps_room_id ON timeline_gaps(room_id, stream_ordering);

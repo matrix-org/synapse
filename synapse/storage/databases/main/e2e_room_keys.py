@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import TYPE_CHECKING, Dict, Iterable, Mapping, Optional, Tuple, cast
+from typing import TYPE_CHECKING, Dict, Iterable, List, Mapping, Optional, Tuple, cast
 
 from typing_extensions import Literal, TypedDict
 
@@ -52,6 +52,13 @@ class EndToEndRoomKeyBackgroundStore(SQLBaseStore):
         hs: "HomeServer",
     ):
         super().__init__(database, db_conn, hs)
+
+        self.db_pool.updates.register_background_index_update(
+            update_name="e2e_room_keys_index_room_id",
+            index_name="e2e_room_keys_room_id",
+            table="e2e_room_keys",
+            columns=("room_id",),
+        )
 
         self.db_pool.updates.register_background_update_handler(
             "delete_e2e_backup_keys_for_deactivated_users",
@@ -267,32 +274,41 @@ class EndToEndRoomKeyStore(EndToEndRoomKeyBackgroundStore):
             if session_id:
                 keyvalues["session_id"] = session_id
 
-        rows = await self.db_pool.simple_select_list(
-            table="e2e_room_keys",
-            keyvalues=keyvalues,
-            retcols=(
-                "user_id",
-                "room_id",
-                "session_id",
-                "first_message_index",
-                "forwarded_count",
-                "is_verified",
-                "session_data",
+        rows = cast(
+            List[Tuple[str, str, int, int, int, str]],
+            await self.db_pool.simple_select_list(
+                table="e2e_room_keys",
+                keyvalues=keyvalues,
+                retcols=(
+                    "room_id",
+                    "session_id",
+                    "first_message_index",
+                    "forwarded_count",
+                    "is_verified",
+                    "session_data",
+                ),
+                desc="get_e2e_room_keys",
             ),
-            desc="get_e2e_room_keys",
         )
 
         sessions: Dict[
             Literal["rooms"], Dict[str, Dict[Literal["sessions"], Dict[str, RoomKey]]]
         ] = {"rooms": {}}
-        for row in rows:
-            room_entry = sessions["rooms"].setdefault(row["room_id"], {"sessions": {}})
-            room_entry["sessions"][row["session_id"]] = {
-                "first_message_index": row["first_message_index"],
-                "forwarded_count": row["forwarded_count"],
+        for (
+            room_id,
+            session_id,
+            first_message_index,
+            forwarded_count,
+            is_verified,
+            session_data,
+        ) in rows:
+            room_entry = sessions["rooms"].setdefault(room_id, {"sessions": {}})
+            room_entry["sessions"][session_id] = {
+                "first_message_index": first_message_index,
+                "forwarded_count": forwarded_count,
                 # is_verified must be returned to the client as a boolean
-                "is_verified": bool(row["is_verified"]),
-                "session_data": db_to_json(row["session_data"]),
+                "is_verified": bool(is_verified),
+                "session_data": db_to_json(session_data),
             }
 
         return sessions
@@ -490,19 +506,26 @@ class EndToEndRoomKeyStore(EndToEndRoomKeyBackgroundStore):
                     # it isn't there.
                     raise StoreError(404, "No backup with that version exists")
 
-            result = self.db_pool.simple_select_one_txn(
-                txn,
-                table="e2e_room_keys_versions",
-                keyvalues={"user_id": user_id, "version": this_version, "deleted": 0},
-                retcols=("version", "algorithm", "auth_data", "etag"),
-                allow_none=False,
+            row = cast(
+                Tuple[int, str, str, Optional[int]],
+                self.db_pool.simple_select_one_txn(
+                    txn,
+                    table="e2e_room_keys_versions",
+                    keyvalues={
+                        "user_id": user_id,
+                        "version": this_version,
+                        "deleted": 0,
+                    },
+                    retcols=("version", "algorithm", "auth_data", "etag"),
+                    allow_none=False,
+                ),
             )
-            assert result is not None  # see comment on `simple_select_one_txn`
-            result["auth_data"] = db_to_json(result["auth_data"])
-            result["version"] = str(result["version"])
-            if result["etag"] is None:
-                result["etag"] = 0
-            return result
+            return {
+                "auth_data": db_to_json(row[2]),
+                "version": str(row[0]),
+                "algorithm": row[1],
+                "etag": 0 if row[3] is None else row[3],
+            }
 
         return await self.db_pool.runInteraction(
             "get_e2e_room_keys_version_info", _get_e2e_room_keys_version_info_txn

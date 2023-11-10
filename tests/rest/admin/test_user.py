@@ -2706,7 +2706,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         # is in user directory
         profile = self.get_success(self.store._get_user_in_directory(self.other_user))
         assert profile is not None
-        self.assertTrue(profile["display_name"] == "User")
+        self.assertEqual(profile[0], "User")
 
         # Deactivate user
         channel = self.make_request(

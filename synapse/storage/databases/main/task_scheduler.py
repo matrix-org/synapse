@@ -183,39 +183,27 @@ class TaskSchedulerWorkerStore(SQLBaseStore):
 
         Returns: the task if available, `None` otherwise
         """
-        row = await self.db_pool.simple_select_one(
-            table="scheduled_tasks",
-            keyvalues={"id": id},
-            retcols=(
-                "id",
-                "action",
-                "status",
-                "timestamp",
-                "resource_id",
-                "params",
-                "result",
-                "error",
+        row = cast(
+            Optional[ScheduledTaskRow],
+            await self.db_pool.simple_select_one(
+                table="scheduled_tasks",
+                keyvalues={"id": id},
+                retcols=(
+                    "id",
+                    "action",
+                    "status",
+                    "timestamp",
+                    "resource_id",
+                    "params",
+                    "result",
+                    "error",
+                ),
+                allow_none=True,
+                desc="get_scheduled_task",
             ),
-            allow_none=True,
-            desc="get_scheduled_task",
         )
 
-        return (
-            TaskSchedulerWorkerStore._convert_row_to_task(
-                (
-                    row["id"],
-                    row["action"],
-                    row["status"],
-                    row["timestamp"],
-                    row["resource_id"],
-                    row["params"],
-                    row["result"],
-                    row["error"],
-                )
-            )
-            if row
-            else None
-        )
+        return TaskSchedulerWorkerStore._convert_row_to_task(row) if row else None
 
     async def delete_scheduled_task(self, id: str) -> None:
         """Delete a specific task from its id.

@@ -1019,11 +1019,14 @@ def tag_args(func: Callable[P, R]) -> Callable[P, R]:
     if not opentracing:
         return func
 
+    # getfullargspec is somewhat expensive, so ensure it is only called a single
+    # time (the function signature shouldn't change anyway).
+    argspec = inspect.getfullargspec(func)
+
     @contextlib.contextmanager
     def _wrapping_logic(
-        func: Callable[P, R], *args: P.args, **kwargs: P.kwargs
+        _func: Callable[P, R], *args: P.args, **kwargs: P.kwargs
     ) -> Generator[None, None, None]:
-        argspec = inspect.getfullargspec(func)
         # We use `[1:]` to skip the `self` object reference and `start=1` to
         # make the index line up with `argspec.args`.
         #

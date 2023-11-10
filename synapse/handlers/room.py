@@ -269,7 +269,7 @@ class RoomCreationHandler:
         self,
         requester: Requester,
         old_room_id: str,
-        old_room: Dict[str, Any],
+        old_room: Tuple[bool, str, bool],
         new_room_id: str,
         new_version: RoomVersion,
         tombstone_event: EventBase,
@@ -279,7 +279,7 @@ class RoomCreationHandler:
         Args:
             requester: the user requesting the upgrade
             old_room_id: the id of the room to be replaced
-            old_room: a dict containing room information for the room to be replaced,
+            old_room: a tuple containing room information for the room to be replaced,
                 as returned by `RoomWorkerStore.get_room`.
             new_room_id: the id of the replacement room
             new_version: the version to upgrade the room to
@@ -299,7 +299,7 @@ class RoomCreationHandler:
         await self.store.store_room(
             room_id=new_room_id,
             room_creator_user_id=user_id,
-            is_public=old_room["is_public"],
+            is_public=old_room[0],
             room_version=new_version,
         )
 
@@ -1939,9 +1939,10 @@ class RoomShutdownHandler:
         else:
             logger.info("Shutting down room %r", room_id)
 
-        users = await self.store.get_users_in_room(room_id)
-        for user_id in users:
-            if not self.hs.is_mine_id(user_id):
+        users = await self.store.get_local_users_related_to_room(room_id)
+        for user_id, membership in users:
+            # If the user is not in the room (or is banned), nothing to do.
+            if membership not in (Membership.JOIN, Membership.INVITE, Membership.KNOCK):
                 continue
 
             logger.info("Kicking %r from %r...", user_id, room_id)

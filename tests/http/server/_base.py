@@ -335,7 +335,7 @@ class Deferred__next__Patch:
         self._request_number = request_number
         self._seen_awaits = seen_awaits
 
-        self._original_Deferred___next__ = Deferred.__next__
+        self._original_Deferred___next__ = Deferred.__next__  # type: ignore[misc,unused-ignore]
 
         # The number of `await`s on `Deferred`s we have seen so far.
         self.awaits_seen = 0

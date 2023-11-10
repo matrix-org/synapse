@@ -16,6 +16,8 @@ import abc
 import logging
 from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Sequence, Set
 
+import attr
+
 from synapse.api.constants import Direction, Membership
 from synapse.events import EventBase
 from synapse.types import JsonMapping, RoomStreamToken, StateMap, UserID, UserInfo
@@ -93,7 +95,7 @@ class AdminHandler:
         ]
         user_info_dict["displayname"] = profile.display_name
         user_info_dict["avatar_url"] = profile.avatar_url
-        user_info_dict["threepids"] = threepids
+        user_info_dict["threepids"] = [attr.asdict(t) for t in threepids]
         user_info_dict["external_ids"] = external_ids
         user_info_dict["erased"] = await self._store.is_user_erased(user.to_string())
 
@@ -281,7 +283,7 @@ class AdminHandler:
                 start, limit, user_id
             )
             for media in media_ids:
-                writer.write_media_id(media["media_id"], media)
+                writer.write_media_id(media.media_id, attr.asdict(media))
 
             logger.info(
                 "[%s] Written %d media_ids of %s",

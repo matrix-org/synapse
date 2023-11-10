@@ -240,15 +240,14 @@ class UrlPreviewer:
         cache_result = await self.store.get_url_cache(url, ts)
         if (
             cache_result
-            and cache_result["expires_ts"] > ts
-            and cache_result["response_code"] / 100 == 2
+            and cache_result.expires_ts > ts
+            and cache_result.response_code // 100 == 2
         ):
             # It may be stored as text in the database, not as bytes (such as
             # PostgreSQL). If so, encode it back before handing it on.
-            og = cache_result["og"]
-            if isinstance(og, str):
-                og = og.encode("utf8")
-            return og
+            if isinstance(cache_result.og, str):
+                return cache_result.og.encode("utf8")
+            return cache_result.og
 
         # If this URL can be accessed via an allowed oEmbed, use that instead.
         url_to_download = url

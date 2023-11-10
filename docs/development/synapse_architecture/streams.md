@@ -51,16 +51,23 @@ will be inserted with that ID.
 
 For any given stream reader (including writers themselves), we may define a per-writer current stream ID:
 
-> The current stream ID _for a writer W_ is the largest stream ID such that
+> A current stream ID _for a writer W_ is the largest stream ID such that
 > all transactions added by W with equal or smaller ID have completed.
 
 Similarly, there is a "linear" notion of current stream ID:
 
-> The "linear" current stream ID is the largest stream ID such that
+> A "linear" current stream ID is the largest stream ID such that
 > all facts (added by any writer) with equal or smaller ID have completed.
 
 Because different stream readers A and B learn about new facts at different times, A and B may disagree about current stream IDs.
 Put differently: we should think of stream readers as being independent of each other, proceeding through a stream of facts at different rates.
+
+The above definition does not give a unique current stream ID, in fact there can
+be a range of current stream IDs. Synapse uses both the minimum and maximum IDs
+for different purposes. Most often the maximum is used, as its generally
+beneficial for workers to advance their IDs as soon as possible. However, the
+minimum is used in situations where e.g. another worker is going to wait until
+the stream advances past a position.
 
 **NB.** For both senses of "current", that if a writer opens a transaction that never completes, the current stream ID will never advance beyond that writer's last written stream ID.
 
@@ -114,7 +121,7 @@ Writers need to track:
  - track their current position (i.e. its own per-writer stream ID).
  - their facts currently awaiting completion.
 
-At startup, 
+At startup,
  - the current position of that writer can be found by querying the database (which suggests that facts need to be written to the database atomically, in a transaction); and
  - there are no facts awaiting completion.
 

@@ -1,1 +1,0 @@
-Factor out `MultiWriter` token from `RoomStreamToken`.
