@@ -1,0 +1,1 @@
+Improve the performance of fetching event reports over the admin API when there are many of them and the requester has paginated far down the list.
