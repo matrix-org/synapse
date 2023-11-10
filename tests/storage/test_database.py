@@ -280,6 +280,7 @@ class CancellationTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(exception_callback.call_count, 6)  # no additional calls
 
+
 class PostgresReplicaIdentityTestCase(unittest.HomeserverTestCase):
     if not USE_POSTGRES_FOR_TESTS:
         skip = "Requires Postgres"
@@ -341,10 +342,20 @@ class PostgresReplicaIdentityTestCase(unittest.HomeserverTestCase):
                     )
         """
 
-        def _list_tables_with_missing_replica_identities_txn(txn: LoggingTransaction) -> List[str]:
+        def _list_tables_with_missing_replica_identities_txn(
+            txn: LoggingTransaction,
+        ) -> List[str]:
             txn.execute(sql)
             return [table_name for table_name, in txn]
 
         for pool in self.db_pools:
-            missing = self.get_success(pool.runInteraction("test_list_missing_replica_identities", _list_tables_with_missing_replica_identities_txn))
-            self.assertTrue(len(missing) == 0, f"The following tables in the {pool.name()!r} database are missing REPLICA IDENTITIES: {missing!r}.")
+            missing = self.get_success(
+                pool.runInteraction(
+                    "test_list_missing_replica_identities",
+                    _list_tables_with_missing_replica_identities_txn,
+                )
+            )
+            self.assertTrue(
+                len(missing) == 0,
+                f"The following tables in the {pool.name()!r} database are missing REPLICA IDENTITIES: {missing!r}.",
+            )
