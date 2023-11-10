@@ -302,6 +302,8 @@ class PostgresReplicaIdentityTestCase(unittest.HomeserverTestCase):
         """
 
         sql = """
+            -- Select tables that have no primary key and use the default replica identity rule
+            -- (the default is to use the primary key)
             WITH tables_no_pkey AS (
                 SELECT tbl.table_schema, tbl.table_name
                 FROM information_schema.tables tbl
@@ -315,7 +317,28 @@ class PostgresReplicaIdentityTestCase(unittest.HomeserverTestCase):
                     )
             )
             SELECT oid::regclass FROM tables_no_pkey INNER JOIN pg_class ON oid::regclass = table_name::regclass
-            WHERE relreplident = 'd';
+            WHERE relreplident = 'd'
+
+            UNION
+
+            -- Also select tables that use an index as a replica identity
+            -- but where the index doesn't exist
+            -- (e.g. it could have been deleted)
+            SELECT oid::regclass
+                FROM information_schema.tables tbl
+                INNER JOIN pg_class ON oid::regclass = table_name::regclass
+                WHERE table_type = 'BASE TABLE'
+                    AND table_schema not in ('pg_catalog', 'information_schema')
+
+                    -- 'i' means an index is used as the replica identity
+                    AND relreplident = 'i'
+
+                    -- look for indices that are marked as the replica identity
+                    AND NOT EXISTS (
+                        SELECT indexrelid::regclass
+                        FROM pg_index
+                        WHERE indrelid = oid::regclass AND indisreplident
+                    )
         """
 
         def _list_tables_with_missing_replica_identities_txn(txn: LoggingTransaction) -> List[str]:
