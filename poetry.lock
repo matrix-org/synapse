@@ -3033,13 +3033,13 @@ twisted = "*"
 
 [[package]]
 name = "types-bleach"
-version = "6.1.0.0"
+version = "6.1.0.1"
 description = "Typing stubs for bleach"
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "types-bleach-6.1.0.0.tar.gz", hash = "sha256:3cf0e55d4618890a00af1151f878b2e2a7a96433850b74e12bede7663d774532"},
-    {file = "types_bleach-6.1.0.0-py3-none-any.whl", hash = "sha256:f0bc75d0f6475036ac69afebf37c41d116dfba78dae55db80437caf0fcd35c28"},
+    {file = "types-bleach-6.1.0.1.tar.gz", hash = "sha256:1e43c437e734a90efe4f40ebfe831057599568d3b275939ffbd6094848a18a27"},
+    {file = "types_bleach-6.1.0.1-py3-none-any.whl", hash = "sha256:f83f80e0709f13d809a9c79b958a1089df9b99e68059287beb196e38967e4ddf"},
 ]
 
 [[package]]
