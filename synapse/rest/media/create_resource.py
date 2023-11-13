@@ -47,10 +47,7 @@ class CreateResource(RestServlet):
             cfg=hs.config.ratelimiting.rc_media_create,
         )
 
-    async def _async_render_OPTIONS(self, request: SynapseRequest) -> None:
-        respond_with_json(request, 200, {}, send_cors=True)
-
-    async def _async_render_POST(self, request: SynapseRequest) -> None:
+    async def on_POST(self, request: SynapseRequest) -> None:
         requester = await self.auth.get_user_by_req(request)
 
         # If the create media requests for the user are over the limit, drop them.
