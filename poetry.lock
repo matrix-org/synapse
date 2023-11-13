@@ -2914,13 +2914,13 @@ dev = ["furo", "packaging", "sphinx (>=5)", "twisted"]
 
 [[package]]
 name = "treq"
-version = "22.2.0"
+version = "23.11.0"
 description = "High-level Twisted HTTP Client API"
 optional = false
 python-versions = ">=3.6"
 files = [
-    {file = "treq-22.2.0-py3-none-any.whl", hash = "sha256:27d95b07c5c14be3e7b280416139b036087617ad5595be913b1f9b3ce981b9b2"},
-    {file = "treq-22.2.0.tar.gz", hash = "sha256:df757e3f141fc782ede076a604521194ffcb40fa2645cf48e5a37060307f52ec"},
+    {file = "treq-23.11.0-py3-none-any.whl", hash = "sha256:f494c2218d61cab2cabbee37cd6606d3eea9d16cf14190323095c95d22c467e9"},
+    {file = "treq-23.11.0.tar.gz", hash = "sha256:0914ff929fd1632ce16797235260f8bc19d20ff7c459c1deabd65b8c68cbeac5"},
 ]
 
 [package.dependencies]
@@ -2928,11 +2928,11 @@ attrs = "*"
 hyperlink = ">=21.0.0"
 incremental = "*"
 requests = ">=2.1.0"
-Twisted = {version = ">=18.7.0", extras = ["tls"]}
+Twisted = {version = ">=22.10.0", extras = ["tls"]}
 
 [package.extras]
-dev = ["httpbin (==0.5.0)", "pep8", "pyflakes"]
-docs = ["sphinx (>=1.4.8)"]
+dev = ["httpbin (==0.7.0)", "pep8", "pyflakes", "werkzeug (==2.0.3)"]
+docs = ["sphinx (<7.0.0)"]
 
 [[package]]
 name = "twine"
