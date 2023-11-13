@@ -504,7 +504,7 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         origin, media_id = self.media_id.split("/")
         info = self.get_success(self.store.get_cached_remote_media(origin, media_id))
         assert info is not None
-        file_id = info["filesystem_id"]
+        file_id = info.filesystem_id
 
         thumbnail_dir = self.media_repo.filepaths.remote_media_thumbnail_dir(
             origin, file_id

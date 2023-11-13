@@ -84,7 +84,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
 
         cols = list(stats.ABSOLUTE_STATS_FIELDS[stats_type])
 
-        return self.get_success(
+        row = self.get_success(
             self.store.db_pool.simple_select_one(
                 table + "_current",
                 {id_col: stat_id},
@@ -92,6 +92,8 @@ class StatsRoomTests(unittest.HomeserverTestCase):
                 allow_none=True,
             )
         )
+
+        return None if row is None else dict(zip(cols, row))
 
     def _perform_background_initial_update(self) -> None:
         # Do the initial population of the stats via the background update

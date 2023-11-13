@@ -1222,14 +1222,13 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
                 )
 
                 # Iterate the parent IDs and invalidate caches.
-                for parent_id in {r[1] for r in relations_to_insert}:
-                    cache_tuple = (parent_id,)
-                    self._invalidate_cache_and_stream(  # type: ignore[attr-defined]
-                        txn, self.get_relations_for_event, cache_tuple  # type: ignore[attr-defined]
-                    )
-                    self._invalidate_cache_and_stream(  # type: ignore[attr-defined]
-                        txn, self.get_thread_summary, cache_tuple  # type: ignore[attr-defined]
-                    )
+                cache_tuples = {(r[1],) for r in relations_to_insert}
+                self._invalidate_cache_and_stream_bulk(  # type: ignore[attr-defined]
+                    txn, self.get_relations_for_event, cache_tuples  # type: ignore[attr-defined]
+                )
+                self._invalidate_cache_and_stream_bulk(  # type: ignore[attr-defined]
+                    txn, self.get_thread_summary, cache_tuples  # type: ignore[attr-defined]
+                )
 
             if results:
                 latest_event_id = results[-1][0]

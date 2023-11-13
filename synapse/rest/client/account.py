@@ -299,19 +299,16 @@ class DeactivateAccountRestServlet(RestServlet):
 
         requester = await self.auth.get_user_by_req(request)
 
-        # allow ASes to deactivate their own users
-        if requester.app_service:
-            await self._deactivate_account_handler.deactivate_account(
-                requester.user.to_string(), body.erase, requester
+        # allow ASes to deactivate their own users:
+        # ASes don't need user-interactive auth
+        if not requester.app_service:
+            await self.auth_handler.validate_user_via_ui_auth(
+                requester,
+                request,
+                body.dict(exclude_unset=True),
+                "deactivate your account",
             )
-            return 200, {}
 
-        await self.auth_handler.validate_user_via_ui_auth(
-            requester,
-            request,
-            body.dict(exclude_unset=True),
-            "deactivate your account",
-        )
         result = await self._deactivate_account_handler.deactivate_account(
             requester.user.to_string(), body.erase, requester, id_server=body.id_server
         )

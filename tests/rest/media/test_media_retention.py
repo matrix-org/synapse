@@ -267,23 +267,23 @@ class MediaRetentionTestCase(unittest.HomeserverTestCase):
         def _assert_mxc_uri_purge_state(mxc_uri: MXCUri, expect_purged: bool) -> None:
             """Given an MXC URI, assert whether it has been purged or not."""
             if mxc_uri.server_name == self.hs.config.server.server_name:
-                found_media_dict = self.get_success(
-                    self.store.get_local_media(mxc_uri.media_id)
+                found_media = bool(
+                    self.get_success(self.store.get_local_media(mxc_uri.media_id))
                 )
             else:
-                found_media_dict = self.get_success(
-                    self.store.get_cached_remote_media(
-                        mxc_uri.server_name, mxc_uri.media_id
+                found_media = bool(
+                    self.get_success(
+                        self.store.get_cached_remote_media(
+                            mxc_uri.server_name, mxc_uri.media_id
+                        )
                     )
                 )
 
             if expect_purged:
-                self.assertIsNone(
-                    found_media_dict, msg=f"{mxc_uri} unexpectedly not purged"
-                )
+                self.assertFalse(found_media, msg=f"{mxc_uri} unexpectedly not purged")
             else:
-                self.assertIsNotNone(
-                    found_media_dict,
+                self.assertTrue(
+                    found_media,
                     msg=f"{mxc_uri} unexpectedly purged",
                 )
 

@@ -1476,7 +1476,7 @@ class PersistEventsStore:
             txn,
             table="event_json",
             keys=("event_id", "room_id", "internal_metadata", "json", "format_version"),
-            values=(
+            values=[
                 (
                     event.event_id,
                     event.room_id,
@@ -1485,7 +1485,7 @@ class PersistEventsStore:
                     event.format_version,
                 )
                 for event, _ in events_and_contexts
-            ),
+            ],
         )
 
         self.db_pool.simple_insert_many_txn(
@@ -1508,7 +1508,7 @@ class PersistEventsStore:
                 "state_key",
                 "rejection_reason",
             ),
-            values=(
+            values=[
                 (
                     self._instance_name,
                     event.internal_metadata.stream_ordering,
@@ -1527,7 +1527,7 @@ class PersistEventsStore:
                     context.rejected,
                 )
                 for event, context in events_and_contexts
-            ),
+            ],
         )
 
         # If we're persisting an unredacted event we go and ensure
@@ -1550,11 +1550,11 @@ class PersistEventsStore:
             txn,
             table="state_events",
             keys=("event_id", "room_id", "type", "state_key"),
-            values=(
+            values=[
                 (event.event_id, event.room_id, event.type, event.state_key)
                 for event, _ in events_and_contexts
                 if event.is_state()
-            ),
+            ],
         )
 
     def _store_rejected_events_txn(
@@ -1934,8 +1934,7 @@ class PersistEventsStore:
         if row is None:
             return
 
-        redacted_relates_to = row["relates_to_id"]
-        rel_type = row["relation_type"]
+        redacted_relates_to, rel_type = row
         self.db_pool.simple_delete_txn(
             txn, table="event_relations", keyvalues={"event_id": redacted_event_id}
         )
