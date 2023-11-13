@@ -119,7 +119,7 @@ class UploadServlet(BaseUploadServlet):
 class AsyncUploadServlet(BaseUploadServlet):
     PATTERNS = [
         re.compile(
-            "/_matrix/media/v1/upload/(?P<server_name>[^/]*)/(?P<media_id>[^/]*)$"
+            "/_matrix/media/v3/upload/(?P<server_name>[^/]*)/(?P<media_id>[^/]*)$"
         )
     ]
 
