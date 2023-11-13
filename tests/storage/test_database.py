@@ -355,7 +355,8 @@ class PostgresReplicaIdentityTestCase(unittest.HomeserverTestCase):
                     _list_tables_with_missing_replica_identities_txn,
                 )
             )
-            self.assertTrue(
-                len(missing) == 0,
+            self.assertEqual(
+                len(missing),
+                0,
                 f"The following tables in the {pool.name()!r} database are missing REPLICA IDENTITIES: {missing!r}.",
             )
