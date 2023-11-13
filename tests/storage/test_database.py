@@ -317,7 +317,7 @@ class PostgresReplicaIdentityTestCase(unittest.HomeserverTestCase):
                             AND kcu.table_schema = tbl.table_schema
                     )
             )
-            SELECT oid::regclass FROM tables_no_pkey INNER JOIN pg_class ON oid::regclass = table_name::regclass
+            SELECT pg_class.oid::regclass FROM tables_no_pkey INNER JOIN pg_class ON pg_class.oid::regclass = table_name::regclass
             WHERE relreplident = 'd'
 
             UNION
@@ -325,9 +325,9 @@ class PostgresReplicaIdentityTestCase(unittest.HomeserverTestCase):
             -- Also select tables that use an index as a replica identity
             -- but where the index doesn't exist
             -- (e.g. it could have been deleted)
-            SELECT oid::regclass
+            SELECT pg_class.oid::regclass
                 FROM information_schema.tables tbl
-                INNER JOIN pg_class ON oid::regclass = table_name::regclass
+                INNER JOIN pg_class ON pg_class.oid::regclass = table_name::regclass
                 WHERE table_type = 'BASE TABLE'
                     AND table_schema not in ('pg_catalog', 'information_schema')
 
@@ -338,7 +338,7 @@ class PostgresReplicaIdentityTestCase(unittest.HomeserverTestCase):
                     AND NOT EXISTS (
                         SELECT indexrelid::regclass
                         FROM pg_index
-                        WHERE indrelid = oid::regclass AND indisreplident
+                        WHERE indrelid = pg_class.oid::regclass AND indisreplident
                     )
         """
 
