@@ -23,6 +23,7 @@
 -- Where possible, re-use unique indices already defined on tables as a replica
 -- identity.
 ALTER TABLE appservice_room_list REPLICA IDENTITY USING INDEX appservice_room_list_idx;
+ALTER TABLE batch_events REPLICA IDENTITY USING INDEX chunk_events_event_id;
 ALTER TABLE blocked_rooms REPLICA IDENTITY USING INDEX blocked_rooms_idx;
 ALTER TABLE cache_invalidation_stream_by_instance REPLICA IDENTITY USING INDEX cache_invalidation_stream_by_instance_id;
 ALTER TABLE device_lists_changes_in_room REPLICA IDENTITY USING INDEX device_lists_changes_in_stream_id;
@@ -38,6 +39,8 @@ ALTER TABLE event_relations REPLICA IDENTITY USING INDEX event_relations_id;
 ALTER TABLE federation_inbound_events_staging REPLICA IDENTITY USING INDEX federation_inbound_events_staging_instance_event;
 ALTER TABLE federation_stream_position REPLICA IDENTITY USING INDEX federation_stream_position_instance;
 ALTER TABLE ignored_users REPLICA IDENTITY USING INDEX ignored_users_uniqueness;
+ALTER TABLE insertion_events REPLICA IDENTITY USING INDEX insertion_events_event_id;
+ALTER TABLE insertion_event_extremities REPLICA IDENTITY USING INDEX insertion_event_extremities_event_id;
 ALTER TABLE monthly_active_users REPLICA IDENTITY USING INDEX monthly_active_users_users;
 ALTER TABLE ratelimit_override REPLICA IDENTITY USING INDEX ratelimit_override_idx;
 ALTER TABLE room_stats_earliest_token REPLICA IDENTITY USING INDEX room_stats_earliest_token_idx;
@@ -66,11 +69,13 @@ ALTER TABLE e2e_cross_signing_signatures REPLICA IDENTITY FULL;
 ALTER TABLE event_auth_chain_links REPLICA IDENTITY FULL;
 ALTER TABLE event_auth REPLICA IDENTITY FULL;
 ALTER TABLE event_push_actions_staging REPLICA IDENTITY FULL;
+ALTER TABLE insertion_event_edges REPLICA IDENTITY FULL;
 ALTER TABLE local_media_repository_url_cache REPLICA IDENTITY FULL;
 ALTER TABLE presence_stream REPLICA IDENTITY FULL;
 ALTER TABLE push_rules_stream REPLICA IDENTITY FULL;
 ALTER TABLE room_alias_servers REPLICA IDENTITY FULL;
 ALTER TABLE stream_ordering_to_exterm REPLICA IDENTITY FULL;
+ALTER TABLE timeline_gaps REPLICA IDENTITY FULL;
 ALTER TABLE user_daily_visits REPLICA IDENTITY FULL;
 ALTER TABLE users_pending_deactivation REPLICA IDENTITY FULL;
 
