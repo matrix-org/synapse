@@ -4219,6 +4219,9 @@ outbound_federation_restricted_to:
 Also see the [worker
 documentation](../../workers.md#restrict-outbound-federation-traffic-to-a-specific-set-of-workers)
 for more info.
+
+_Added in Synapse 1.89.0._
+
 ---
 ### `run_background_tasks_on`
 
