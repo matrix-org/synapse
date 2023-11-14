@@ -748,7 +748,7 @@ class FederationEventHandler:
         # fetching fresh state for the room if the missing event
         # can't be found, which slightly reduces our security.
         # it may also increase our DAG extremity count for the room,
-        # causing additional state resolution?  See #1760.
+        # causing additional state resolution?  See https://github.com/matrix-org/synapse/issues/1760.
         # However, fetching state doesn't hold the linearizer lock
         # apparently.
         #

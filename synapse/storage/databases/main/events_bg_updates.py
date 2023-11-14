@@ -425,7 +425,7 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
         """Background update to clean out extremities that should have been
         deleted previously.
 
-        Mainly used to deal with the aftermath of #5269.
+        Mainly used to deal with the aftermath of https://github.com/matrix-org/synapse/issues/5269.
         """
 
         # This works by first copying all existing forward extremities into the
@@ -558,7 +558,7 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
             )
 
             logger.info(
-                "Deleted %d forward extremities of %d checked, to clean up #5269",
+                "Deleted %d forward extremities of %d checked, to clean up matrix-org/synapse#5269",
                 deleted,
                 len(original_set),
             )

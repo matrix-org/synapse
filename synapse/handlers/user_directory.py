@@ -184,8 +184,8 @@ class UserDirectoryHandler(StateDeltasHandler):
         """Called to update index of our local user profiles when they change
         irrespective of any rooms the user may be in.
         """
-        # FIXME(#3714): We should probably do this in the same worker as all
-        # the other changes.
+        # FIXME(https://github.com/matrix-org/synapse/issues/3714): We should
+        # probably do this in the same worker as all the other changes.
 
         if await self.store.should_include_local_user_in_dir(user_id):
             await self.store.update_profile_in_user_dir(
@@ -194,8 +194,8 @@ class UserDirectoryHandler(StateDeltasHandler):
 
     async def handle_local_user_deactivated(self, user_id: str) -> None:
         """Called when a user ID is deactivated"""
-        # FIXME(#3714): We should probably do this in the same worker as all
-        # the other changes.
+        # FIXME(https://github.com/matrix-org/synapse/issues/3714): We should
+        # probably do this in the same worker as all the other changes.
         await self.store.remove_from_user_dir(user_id)
 
     async def _unsafe_process(self) -> None:

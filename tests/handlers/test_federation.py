@@ -112,7 +112,7 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
         """
         Check that we store the state group correctly for rejected non-state events.
 
-        Regression test for #6289.
+        Regression test for https://github.com/matrix-org/synapse/issues/6289.
         """
         OTHER_SERVER = "otherserver"
         OTHER_USER = "@otheruser:" + OTHER_SERVER
@@ -165,7 +165,7 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
         """
         Check that we store the state group correctly for rejected state events.
 
-        Regression test for #6289.
+        Regression test for https://github.com/matrix-org/synapse/issues/6289.
         """
         OTHER_SERVER = "otherserver"
         OTHER_USER = "@otheruser:" + OTHER_SERVER
@@ -222,7 +222,7 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
         of backwards extremities(the magic number is more than 5),
         no errors are thrown.
 
-        Regression test, see #11027
+        Regression test, see https://github.com/matrix-org/synapse/pull/11027
         """
         # create the room
         user_id = self.register_user("kermit", "test")

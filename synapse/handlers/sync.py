@@ -399,7 +399,7 @@ class SyncHandler:
         #
         # If that happens, we mustn't cache it, so that when the client comes back
         # with the same cache token, we don't immediately return the same empty
-        # result, causing a tightloop. (#8518)
+        # result, causing a tightloop. (https://github.com/matrix-org/synapse/issues/8518)
         if result.next_batch == since_token:
             cache_context.should_cache = False
 
@@ -1003,7 +1003,7 @@ class SyncHandler:
                     # always make sure we LL ourselves so we know we're in the room
                     # (if we are) to fix https://github.com/vector-im/riot-web/issues/7209
                     # We only need apply this on full state syncs given we disabled
-                    # LL for incr syncs in #3840.
+                    # LL for incr syncs in https://github.com/matrix-org/synapse/pull/3840.
                     # We don't insert ourselves into `members_to_fetch`, because in some
                     # rare cases (an empty event batch with a now_token after the user's
                     # leave in a partial state room which another local user has

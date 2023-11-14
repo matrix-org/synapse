@@ -92,7 +92,7 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
         - the bad power level value for "room", before JSON serisalistion
         - whether Bob should expect the message to be highlighted
 
-        Reproduces #14060.
+        Reproduces https://github.com/matrix-org/synapse/issues/14060.
 
         A lack of validation: the gift that keeps on giving.
         """
