@@ -537,7 +537,7 @@ The following query parameters are available:
 **Response**
 
 * `event_id` - The event ID closest to the given timestamp.
-* `origin_server_ts` - The timestamp of the event.
+* `origin_server_ts` - The timestamp of the event in milliseconds since the Unix epoch.
 
 # Block Room API
 The Block Room admin API allows server admins to block and unblock rooms,
