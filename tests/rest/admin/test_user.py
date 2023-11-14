@@ -21,6 +21,7 @@ from typing import Dict, List, Optional
 from unittest.mock import AsyncMock, Mock, patch
 
 from parameterized import parameterized, parameterized_class
+
 from twisted.test.proto_helpers import MemoryReactor
 from twisted.web.resource import Resource
 
@@ -43,6 +44,7 @@ from synapse.server import HomeServer
 from synapse.storage.databases.main.client_ips import LAST_SEEN_GRANULARITY
 from synapse.types import JsonDict, UserID, create_requester
 from synapse.util import Clock
+
 from tests import unittest
 from tests.test_utils import SMALL_PNG
 from tests.unittest import override_config

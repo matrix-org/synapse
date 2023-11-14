@@ -88,11 +88,11 @@ from synapse.rest.admin.users import (
     UserByThreePid,
     UserMembershipRestServlet,
     UserRegisterServlet,
+    UserReplaceMasterCrossSigningKeyRestServlet,
     UserRestServletV2,
     UsersRestServletV2,
     UserTokenRestServlet,
     WhoisRestServlet,
-    UserReplaceMasterCrossSigningKeyRestServlet,
 )
 from synapse.types import JsonDict, RoomStreamToken, TaskStatus
 from synapse.util import SYNAPSE_VERSION
