@@ -132,11 +132,6 @@ class ThumbnailResource(RestServlet):
             request, media_id, max_timeout_ms
         )
         if not media_info:
-            respond_404(request)
-            return
-        if media_info.quarantined_by:
-            logger.info("Media is quarantined")
-            respond_404(request)
             return
 
         thumbnail_infos = await self.store.get_local_media_thumbnails(media_id)
@@ -168,11 +163,6 @@ class ThumbnailResource(RestServlet):
         )
 
         if not media_info:
-            respond_404(request)
-            return
-        if media_info.quarantined_by:
-            logger.info("Media is quarantined")
-            respond_404(request)
             return
 
         thumbnail_infos = await self.store.get_local_media_thumbnails(media_id)
