@@ -1315,29 +1315,29 @@ Changes:
 -   Avoid sending consent notice to guest users (PR #3288)
 -   disable CPUMetrics if no /proc/self/stat (PR #3299)
 -   Consistently use six's iteritems and wrap lazy keys/values in list() if they're not meant to be lazy (PR #3307)
--   Add private IPv6 addresses to example config for url preview blacklist (PR #3317) Thanks to @thegcat!
+-   Add private IPv6 addresses to example config for url preview blacklist. Thanks to @thegcat! ([\#3317](https://github.com/matrix-org/synapse/issues/3317))
 -   Reduce stuck read-receipts: ignore depth when updating (PR #3318)
 -   Put python's logs into Trial when running unit tests (PR #3319)
 
 Changes, python 3 migration:
 
--   Replace some more comparisons with six (PR #3243) Thanks to @NotAFile!
--   replace some iteritems with six (PR #3244) Thanks to @NotAFile!
--   Add `batch_iter` to utils (PR #3245) Thanks to @NotAFile!
--   use repr, not str (PR #3246) Thanks to @NotAFile!
--   Misc Python3 fixes (PR #3247) Thanks to @NotAFile!
--   Py3 `storage/_base.py` (PR #3278) Thanks to @NotAFile!
--   more six iteritems (PR #3279) Thanks to @NotAFile!
--   More Misc. py3 fixes (PR #3280) Thanks to @NotAFile!
--   remaining isintance fixes (PR #3281) Thanks to @NotAFile!
--   py3-ize state.py (PR #3283) Thanks to @NotAFile!
--   extend tox testing for py3 to avoid regressions (PR #3302) Thanks to @krombel!
--   use memoryview in py3 (PR #3303) Thanks to @NotAFile!
+-   Replace some more comparisons with six. Thanks to @NotAFile! ([\#3243](https://github.com/matrix-org/synapse/issues/3243))
+-   replace some iteritems with six. Thanks to @NotAFile! ([\#3244](https://github.com/matrix-org/synapse/issues/3244))
+-   Add `batch_iter` to utils. Thanks to @NotAFile! ([\#3245](https://github.com/matrix-org/synapse/issues/3245))
+-   use repr, not str. Thanks to @NotAFile! ([\#3246](https://github.com/matrix-org/synapse/issues/3246))
+-   Misc Python3 fixes. Thanks to @NotAFile! ([\#3247](https://github.com/matrix-org/synapse/issues/3247))
+-   Py3 `storage/_base.py`. Thanks to @NotAFile! ([\#3278](https://github.com/matrix-org/synapse/issues/3278))
+-   more six iteritems. Thanks to @NotAFile! ([\#3279](https://github.com/matrix-org/synapse/issues/3279))
+-   More Misc. py3 fixes. Thanks to @NotAFile! ([\#3280](https://github.com/matrix-org/synapse/issues/3280))
+-   remaining isintance fixes. Thanks to @NotAFile! ([\#3281](https://github.com/matrix-org/synapse/issues/3281))
+-   py3-ize state.py. Thanks to @NotAFile! ([\#3283](https://github.com/matrix-org/synapse/issues/3283))
+-   extend tox testing for py3 to avoid regressions. Thanks to @krombel! ([\#3302](https://github.com/matrix-org/synapse/issues/3302))
+-   use memoryview in py3. Thanks to @NotAFile! ([\#3303](https://github.com/matrix-org/synapse/issues/3303))
 
 Bugs:
 
 -   Fix federation backfill bugs (PR #3261)
--   federation: fix LaterGauge usage (PR #3328) Thanks to @intelfx!
+-   federation: fix LaterGauge usage. Thanks to @intelfx! ([\#3328](https://github.com/matrix-org/synapse/issues/3328))
 
 Changes in synapse v0.30.0 (2018-05-24)
 =======================================
@@ -1372,7 +1372,7 @@ Server Notices/Consent Tracking Support:
 Features:
 
 -   Cohort analytics (PR #3163, #3241, #3251)
--   Add lxml to docker image for web previews (PR #3239) Thanks to @ptman!
+-   Add lxml to docker image for web previews. Thanks to @ptman! ([\#3239](https://github.com/matrix-org/synapse/issues/3239))
 -   Add in flight request metrics (PR #3252)
 
 Changes:
@@ -1415,11 +1415,11 @@ Potentially breaking change:
 
 Features:
 
--   Add a Dockerfile for synapse (PR #2846) Thanks to @kaiyou!
+-   Add a Dockerfile for synapse. Thanks to @kaiyou! ([\#2846](https://github.com/matrix-org/synapse/issues/2846))
 
 Changes - General:
 
--   nuke-room-from-db.sh: added postgresql option and help (PR #2337) Thanks to @rubo77!
+-   nuke-room-from-db.sh: added postgresql option and help. Thanks to @rubo77! ([\#2337](https://github.com/matrix-org/synapse/issues/2337))
 -   Part user from rooms on account deactivate (PR #3201)
 -   Make "unexpected logging context" into warnings (PR #3007)
 -   Set Server header in SynapseRequest (PR #3208)
@@ -1439,7 +1439,7 @@ Changes - Refactors:
 -   Refactor sync APIs to reuse pagination API (PR #3199)
 -   Remove unused code path from member change DB func (PR #3200)
 -   Refactor request handling wrappers (PR #3203)
--   `transaction_id`, destination defined twice (PR #3209) Thanks to @damir-manapov!
+-   `transaction_id`, destination defined twice. Thanks to @damir-manapov! ([\#3209](https://github.com/matrix-org/synapse/issues/3209))
 -   Refactor event storage to prepare for changes in state calculations (PR #3141)
 -   Set Server header in SynapseRequest (PR #3208)
 -   Use deferred.addTimeout instead of `time_bound_deferred` (PR #3127, #3178)
@@ -1447,19 +1447,19 @@ Changes - Refactors:
 
 Changes - Python 3 migration:
 
--   Construct HMAC as bytes on py3 (PR #3156) Thanks to @NotAFile!
--   run config tests on py3 (PR #3159) Thanks to @NotAFile!
--   Open certificate files as bytes (PR #3084) Thanks to @NotAFile!
--   Open config file in non-bytes mode (PR #3085) Thanks to @NotAFile!
--   Make event properties raise AttributeError instead (PR #3102) Thanks to @NotAFile!
--   Use six.moves.urlparse (PR #3108) Thanks to @NotAFile!
--   Add py3 tests to tox with folders that work (PR #3145) Thanks to @NotAFile!
--   Don't yield in list comprehensions (PR #3150) Thanks to @NotAFile!
--   Move more xrange to six (PR #3151) Thanks to @NotAFile!
--   make imports local (PR #3152) Thanks to @NotAFile!
--   move httplib import to six (PR #3153) Thanks to @NotAFile!
+-   Construct HMAC as bytes on py3. Thanks to @NotAFile! ([\#3156](https://github.com/matrix-org/synapse/issues/3156))
+-   run config tests on py3. Thanks to @NotAFile! ([\#3159](https://github.com/matrix-org/synapse/issues/3159))
+-   Open certificate files as bytes. Thanks to @NotAFile! ([\#3084](https://github.com/matrix-org/synapse/issues/3084))
+-   Open config file in non-bytes mode. Thanks to @NotAFile! ([\#3085](https://github.com/matrix-org/synapse/issues/3085))
+-   Make event properties raise AttributeError instead. Thanks to @NotAFile! ([\#3102](https://github.com/matrix-org/synapse/issues/3102))
+-   Use six.moves.urlparse. Thanks to @NotAFile! ([\#3108](https://github.com/matrix-org/synapse/issues/3108))
+-   Add py3 tests to tox with folders that work. Thanks to @NotAFile! ([\#3145](https://github.com/matrix-org/synapse/issues/3145))
+-   Don't yield in list comprehensions. Thanks to @NotAFile! ([\#3150](https://github.com/matrix-org/synapse/issues/3150))
+-   Move more xrange to six. Thanks to @NotAFile! ([\#3151](https://github.com/matrix-org/synapse/issues/3151))
+-   make imports local. Thanks to @NotAFile! ([\#3152](https://github.com/matrix-org/synapse/issues/3152))
+-   move httplib import to six. Thanks to @NotAFile! ([\#3153](https://github.com/matrix-org/synapse/issues/3153))
 -   Replace stringIO imports with six (PR #3154, #3168) Thanks to @NotAFile!
--   more bytes strings (PR #3155) Thanks to @NotAFile!
+-   more bytes strings. Thanks to @NotAFile! ([\#3155](https://github.com/matrix-org/synapse/issues/3155))
 
 Bug Fixes:
 
@@ -1468,11 +1468,11 @@ Bug Fixes:
 -   Fix a couple of logcontext leaks in unit tests (PR #3172)
 -   Fix logcontext leak in media repo (PR #3174)
 -   Escape label values in prometheus metrics (PR #3175, #3186)
--   Fix "Unhandled Error" logs with Twisted 18.4 (PR #3182) Thanks to @Half-Shot!
+-   Fix "Unhandled Error" logs with Twisted 18.4. Thanks to @Half-Shot! ([\#3182](https://github.com/matrix-org/synapse/issues/3182))
 -   Fix logcontext leaks in rate limiter (PR #3183)
--   notifications: Convert `next_token` to string according to the spec (PR #3190) Thanks to @mujx!
--   nuke-room-from-db.sh: fix deletion from search table (PR #3194) Thanks to @rubo77!
--   add guard for None on `purge_history` api (PR #3160) Thanks to @krombel!
+-   notifications: Convert `next_token` to string according to the spec. Thanks to @mujx! ([\#3190](https://github.com/matrix-org/synapse/issues/3190))
+-   nuke-room-from-db.sh: fix deletion from search table. Thanks to @rubo77! ([\#3194](https://github.com/matrix-org/synapse/issues/3194))
+-   add guard for None on `purge_history` api. Thanks to @krombel! ([\#3160](https://github.com/matrix-org/synapse/issues/3160))
 
 Changes in synapse v0.28.1 (2018-05-01)
 =======================================
@@ -1509,26 +1509,26 @@ Features:
 
 Changes:
 
--   Synapse on PyPy (PR #2760) Thanks to @Valodim!
--   move handling of `auto_join_rooms` to RegisterHandler (PR #2996) Thanks to @krombel!
--   Improve handling of SRV records for federation connections (PR #3016) Thanks to @silkeh!
+-   Synapse on PyPy. Thanks to @Valodim! ([\#2760](https://github.com/matrix-org/synapse/issues/2760))
+-   move handling of `auto_join_rooms` to RegisterHandler. Thanks to @krombel! ([\#2996](https://github.com/matrix-org/synapse/issues/2996))
+-   Improve handling of SRV records for federation connections. Thanks to @silkeh! ([\#3016](https://github.com/matrix-org/synapse/issues/3016))
 -   Document the behaviour of ResponseCache (PR #3059)
 -   Preparation for py3 (PR #3061, #3073, #3074, #3075, #3103, #3104, #3106, #3107, #3109, #3110) Thanks to @NotAFile!
--   update prometheus dashboard to use new metric names (PR #3069) Thanks to @krombel!
--   use python3-compatible prints (PR #3074) Thanks to @NotAFile!
+-   update prometheus dashboard to use new metric names. Thanks to @krombel! ([\#3069](https://github.com/matrix-org/synapse/issues/3069))
+-   use python3-compatible prints. Thanks to @NotAFile! ([\#3074](https://github.com/matrix-org/synapse/issues/3074))
 -   Send federation events concurrently (PR #3078)
 -   Limit concurrent event sends for a room (PR #3079)
 -   Improve R30 stat definition (PR #3086)
 -   Send events to ASes concurrently (PR #3088)
 -   Refactor ResponseCache usage (PR #3093)
--   Clarify that SRV may not point to a CNAME (PR #3100) Thanks to @silkeh!
--   Use str(e) instead of e.message (PR #3103) Thanks to @NotAFile!
--   Use six.itervalues in some places (PR #3106) Thanks to @NotAFile!
+-   Clarify that SRV may not point to a CNAME. Thanks to @silkeh! ([\#3100](https://github.com/matrix-org/synapse/issues/3100))
+-   Use str(e) instead of e.message. Thanks to @NotAFile! ([\#3103](https://github.com/matrix-org/synapse/issues/3103))
+-   Use six.itervalues in some places. Thanks to @NotAFile! ([\#3106](https://github.com/matrix-org/synapse/issues/3106))
 -   Refactor `store.have_events` (PR #3117)
 
 Bug Fixes:
 
--   Return 401 for invalid `access_token` on logout (PR #2938) Thanks to @dklug!
+-   Return 401 for invalid `access_token` on logout. Thanks to @dklug! ([\#2938](https://github.com/matrix-org/synapse/issues/2938))
 -   Return a 404 rather than a 500 on rejoining empty rooms (PR #3080)
 -   fix `federation_domain_whitelist` (PR #3099)
 -   Avoid creating events with huge numbers of `prev_events` (PR #3113)
@@ -1577,8 +1577,8 @@ Features:
 
 Changes:
 
--   Add a blurb explaining the main synapse worker (PR #2886) Thanks to @turt2live!
--   Replace old style error catching with `as` keyword (PR #3000) Thanks to @NotAFile!
+-   Add a blurb explaining the main synapse worker. Thanks to @turt2live! ([\#2886](https://github.com/matrix-org/synapse/issues/2886))
+-   Replace old style error catching with `as` keyword. Thanks to @NotAFile! ([\#3000](https://github.com/matrix-org/synapse/issues/3000))
 -   Use `.iter*` to avoid copies in StateHandler (PR #3006)
 -   Linearize calls to `_generate_user_id` (PR #3029)
 -   Remove last usage of ujson (PR #3030)
@@ -1589,12 +1589,12 @@ Changes:
 
 Bug fixes:
 
--   Add `room_id` to the response of rooms/{roomId}/join (PR #2986) Thanks to @jplatte!
+-   Add `room_id` to the response of rooms/{roomId}/join. Thanks to @jplatte! ([\#2986](https://github.com/matrix-org/synapse/issues/2986))
 -   Fix replication after switch to simplejson (PR #3015)
 -   404 correctly on missing paths via NoResource (PR #3022)
 -   Fix error when claiming e2e keys from offline servers (PR #3034)
 -   fix `tests/storage/test_user_directory.py` (PR #3042)
--   use `PUT` instead of `POST` for federating `groups`/`m.join_policy` (PR #3070) Thanks to @krombel!
+-   use `PUT` instead of `POST` for federating `groups`/`m.join_policy`. Thanks to @krombel! ([\#3070](https://github.com/matrix-org/synapse/issues/3070))
 -   postgres port script: fix `state_groups_pkey` error (PR #3072)
 
 Changes in synapse v0.27.2 (2018-03-26)
@@ -1644,29 +1644,29 @@ Features:
 -   Add purge API features, see [docs/admin_api/purge_history_api.rst](docs/admin_api/purge_history_api.rst) for full details (PR #2858, #2867, #2882, #2946, #2962, #2943)
 -   Add support for whitelisting 3PIDs that users can register. (PR #2813)
 -   Add `/room/{id}/event/{id}` API (PR #2766)
--   Add an admin API to get all the media in a room (PR #2818) Thanks to @turt2live!
+-   Add an admin API to get all the media in a room. Thanks to @turt2live! ([\#2818](https://github.com/matrix-org/synapse/issues/2818))
 -   Add `federation_domain_whitelist` option (PR #2820, #2821)
 
 Changes:
 
 -   Continue to factor out processing from main process and into worker processes. See updated [docs/workers.rst](docs/workers.rst) (PR #2892 - \#2904, #2913, #2920 - \#2926, #2947, #2847, #2854, #2872, #2873, #2874, #2928, #2929, #2934, #2856, #2976 - \#2984, #2987 - \#2989, #2991 - \#2993, #2995, #2784)
 -   Ensure state cache is used when persisting events (PR #2864, #2871, #2802, #2835, #2836, #2841, #2842, #2849)
--   Change the default config to bind on both IPv4 and IPv6 on all platforms (PR #2435) Thanks to @silkeh!
--   No longer require a specific version of saml2 (PR #2695) Thanks to @okurz!
+-   Change the default config to bind on both IPv4 and IPv6 on all platforms. Thanks to @silkeh! ([\#2435](https://github.com/matrix-org/synapse/issues/2435))
+-   No longer require a specific version of saml2. Thanks to @okurz! ([\#2695](https://github.com/matrix-org/synapse/issues/2695))
 -   Remove `verbosity`/`log_file` from generated config (PR #2755)
 -   Add and improve metrics and logging (PR #2770, #2778, #2785, #2786, #2787, #2793, #2794, #2795, #2809, #2810, #2833, #2834, #2844, #2965, #2927, #2975, #2790, #2796, #2838)
 -   When using synctl with workers, Don't start the main synapse automatically (PR #2774)
 -   Minor performance improvements (PR #2773, #2792)
 -   Use a connection pool for non-federation outbound connections (PR #2817)
 -   Make it possible to run unit tests against postgres (PR #2829)
--   Update pynacl dependency to 1.2.1 or higher (PR #2888) Thanks to @bachp!
+-   Update pynacl dependency to 1.2.1 or higher. Thanks to @bachp! ([\#2888](https://github.com/matrix-org/synapse/issues/2888))
 -   Remove ability for AS users to call /events and /sync (PR #2948)
--   Use bcrypt.checkpw (PR #2949) Thanks to @krombel!
+-   Use bcrypt.checkpw. Thanks to @krombel! ([\#2949](https://github.com/matrix-org/synapse/issues/2949))
 
 Bug fixes:
 
--   Fix broken `ldap_config` config option (PR #2683) Thanks to @seckrv!
--   Fix error message when user is not allowed to unban (PR #2761) Thanks to @turt2live!
+-   Fix broken `ldap_config` config option. Thanks to @seckrv! ([\#2683](https://github.com/matrix-org/synapse/issues/2683))
+-   Fix error message when user is not allowed to unban. Thanks to @turt2live! ([\#2761](https://github.com/matrix-org/synapse/issues/2761))
 -   Fix publicised groups GET API (singular) over federation (PR #2772)
 -   Fix user directory when using `user_directory_search_all_users` config option (PR #2803, #2831)
 -   Fix error on `/publicRooms` when no rooms exist (PR #2827)
@@ -1691,7 +1691,7 @@ Features:
 
 Changes:
 
--   Update example Prometheus config to new format (PR #2648) Thanks to @krombel!
+-   Update example Prometheus config to new format. Thanks to @krombel! ([\#2648](https://github.com/matrix-org/synapse/issues/2648))
 -   Rename `redact_content` option to `include_content` in Push API (PR #2650)
 -   Declare support for r0.3.0 (PR #2677)
 -   Improve upserts (PR #2684, #2688, #2689, #2713)
@@ -1704,7 +1704,7 @@ Changes:
 Bug fixes:
 
 -   Fix database port script (PR #2673)
--   Fix internal server error on login with `ldap_auth_provider` (PR #2678) Thanks to @jkolo!
+-   Fix internal server error on login with `ldap_auth_provider`. Thanks to @jkolo! ([\#2678](https://github.com/matrix-org/synapse/issues/2678))
 -   Fix error on sqlite 3.7 (PR #2697)
 -   Fix `OPTIONS` on `preview_url` (PR #2707)
 -   Fix error handling on dns lookup (PR #2711)
@@ -1731,15 +1731,15 @@ Changes in synapse v0.25.0-rc1 (2017-11-14)
 Features:
 
 -   Add `is_public` to groups table to allow for private groups (PR #2582)
--   Add a route for determining who you are (PR #2668) Thanks to @turt2live!
+-   Add a route for determining who you are. Thanks to @turt2live! ([\#2668](https://github.com/matrix-org/synapse/issues/2668))
 -   Add more features to the password providers (PR #2608, #2610, #2620, #2622, #2623, #2624, #2626, #2628, #2629)
 -   Add a hook for custom rest endpoints (PR #2627)
 -   Add API to update group room visibility (PR #2651)
 
 Changes:
 
--   Ignore `<noscript\>` tags when generating URL preview descriptions (PR #2576) Thanks to @maximevaillancourt!
--   Register some /unstable endpoints in /r0 as well (PR #2579) Thanks to @krombel!
+-   Ignore `<noscript\>` tags when generating URL preview descriptions. Thanks to @maximevaillancourt! ([\#2576](https://github.com/matrix-org/synapse/issues/2576))
+-   Register some /unstable endpoints in /r0 as well. Thanks to @krombel! ([\#2579](https://github.com/matrix-org/synapse/issues/2579))
 -   Support /keys/upload on /r0 as well as /unstable (PR #2585)
 -   Front-end proxy: pass through auth header (PR #2586)
 -   Allow ASes to deactivate their own users (PR #2589)
@@ -1747,7 +1747,7 @@ Changes:
 -   Automatically set default displayname on register (PR #2617)
 -   Log login requests (PR #2618)
 -   Always return `is_public` in the `/groups/:group_id/rooms` API (PR #2630)
--   Avoid no-op media deletes (PR #2637) Thanks to @spantaleev!
+-   Avoid no-op media deletes. Thanks to @spantaleev! ([\#2637](https://github.com/matrix-org/synapse/issues/2637))
 -   Fix various embarrassing typos around `user_directory` and add some doc. (PR #2643)
 -   Return whether a user is an admin within a group (PR #2647)
 -   Namespace visibility options for groups (PR #2657)
@@ -1761,8 +1761,8 @@ Bug fixes:
 -   Fix UI auth when deleting devices (PR #2591)
 -   Fix typo when checking if user is invited to group (PR #2599)
 -   Fix the port script to drop NUL values in all tables (PR #2611)
--   Fix appservices being backlogged and not receiving new events due to a bug in `notify_interested_services` (PR #2631) Thanks to @xyzz!
--   Fix updating rooms avatar/display name when modified by admin (PR #2636) Thanks to @farialima!
+-   Fix appservices being backlogged and not receiving new events due to a bug in `notify_interested_services`. Thanks to @xyzz! ([\#2631](https://github.com/matrix-org/synapse/issues/2631))
+-   Fix updating rooms avatar/display name when modified by admin. Thanks to @farialima! ([\#2636](https://github.com/matrix-org/synapse/issues/2636))
 -   Fix bug in state group storage (PR #2649)
 -   Fix 500 on invalid utf-8 in request (PR #2663)
 
@@ -1803,7 +1803,7 @@ Changes:
 Bug fixes:
 
 -   Fix handling SERVFAILs when doing AAAA lookups for federation (PR #2477)
--   Fix incompatibility with newer versions of ujson (PR #2483) Thanks to @jeremycline!
+-   Fix incompatibility with newer versions of ujson. Thanks to @jeremycline! ([\#2483](https://github.com/matrix-org/synapse/issues/2483))
 -   Fix notification keywords that start/end with non-word chars (PR #2500)
 -   Fix stack overflow and logcontexts from linearizer (PR #2532)
 -   Fix 500 error when fields missing from `power_levels` event (PR #2552)
@@ -1840,11 +1840,11 @@ Features:
 
 Changes:
 
--   Use bcrypt module instead of py-bcrypt (PR #2288) Thanks to @kyrias!
+-   Use bcrypt module instead of py-bcrypt. Thanks to @kyrias! ([\#2288](https://github.com/matrix-org/synapse/issues/2288))
 -   Improve performance of generating push notifications (PR #2343, #2357, #2365, #2366, #2371)
 -   Improve DB performance for device list handling in sync (PR #2362)
 -   Include a sample prometheus config (PR #2416)
--   Document known to work postgres version (PR #2433) Thanks to @ptman!
+-   Document known to work postgres version. Thanks to @ptman! ([\#2433](https://github.com/matrix-org/synapse/issues/2433))
 
 Bug fixes:
 
@@ -1890,25 +1890,25 @@ Features:
 -   Add a user directory API (PR #2252, and many more)
 -   Add shutdown room API to remove room from local server (PR #2291)
 -   Add API to quarantine media (PR #2292)
--   Add new config option to not send event contents to push servers (PR #2301) Thanks to @cjdelisle!
+-   Add new config option to not send event contents to push servers. Thanks to @cjdelisle! ([\#2301](https://github.com/matrix-org/synapse/issues/2301))
 
 Changes:
 
 -   Various performance fixes (PR #2177, #2233, #2230, #2238, #2248, #2256, #2274)
--   Deduplicate sync filters (PR #2219) Thanks to @krombel!
--   Correct a typo in UPGRADE.rst (PR #2231) Thanks to @aaronraimist!
+-   Deduplicate sync filters. Thanks to @krombel! ([\#2219](https://github.com/matrix-org/synapse/issues/2219))
+-   Correct a typo in UPGRADE.rst. Thanks to @aaronraimist! ([\#2231](https://github.com/matrix-org/synapse/issues/2231))
 -   Add count of one time keys to sync stream (PR #2237)
 -   Only store `event_auth` for state events (PR #2247)
 -   Store URL cache preview downloads separately (PR #2299)
 
 Bug fixes:
 
--   Fix users not getting notifications when AS listened to that `user_id` (PR #2216) Thanks to @slipeer!
+-   Fix users not getting notifications when AS listened to that `user_id`. Thanks to @slipeer! ([\#2216](https://github.com/matrix-org/synapse/issues/2216))
 -   Fix users without push set up not getting notifications after joining rooms (PR #2236)
 -   Fix preview url API to trim long descriptions (PR #2243)
 -   Fix bug where we used cached but unpersisted state group as prev group, resulting in broken state of restart (PR #2263)
 -   Fix removing of pushers when using workers (PR #2267)
--   Fix CORS headers to allow Authorization header (PR #2285) Thanks to @krombel!
+-   Fix CORS headers to allow Authorization header. Thanks to @krombel! ([\#2285](https://github.com/matrix-org/synapse/issues/2285))
 
 Changes in synapse v0.21.1 (2017-06-15)
 =======================================
@@ -1928,14 +1928,14 @@ Changes in synapse v0.21.0-rc3 (2017-05-17)
 Features:
 
 -   Add per user rate-limiting overrides (PR #2208)
--   Add config option to limit maximum number of events requested by `/sync` and `/messages` (PR #2221) Thanks to @psaavedra!
+-   Add config option to limit maximum number of events requested by `/sync` and `/messages`. Thanks to @psaavedra! ([\#2221](https://github.com/matrix-org/synapse/issues/2221))
 
 Changes:
 
 -   Various small performance fixes (PR #2201, #2202, #2224, #2226, #2227, #2228, #2229)
 -   Update username availability checker API (PR #2209, #2213)
 -   When purging, Don't de-delta state groups we're about to delete (PR #2214)
--   Documentation to check synapse version (PR #2215) Thanks to @hamber-dick!
+-   Documentation to check synapse version. Thanks to @hamber-dick! ([\#2215](https://github.com/matrix-org/synapse/issues/2215))
 -   Add an index to `event_search` to speed up purge history API (PR #2218)
 
 Bug fixes:
@@ -2174,7 +2174,7 @@ Changes in synapse v0.18.6 (2017-01-06)
 
 Bug fixes:
 
--   Fix bug when checking if a guest user is allowed to join a room (PR #1772) Thanks to Patrik Oldsberg for diagnosing and the fix!
+-   Fix bug when checking if a guest user is allowed to join a room. Thanks to Patrik Oldsberg for diagnosing and the fix! ([\#1772](https://github.com/matrix-org/synapse/issues/1772))
 
 Changes in synapse v0.18.6-rc3 (2017-01-05)
 ===========================================
