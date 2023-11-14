@@ -46,12 +46,9 @@ class EndToEndKeyWorkerStoreTestCase(HomeserverTestCase):
         self.assertIsNone(timestamp)
 
         # Write an updateable_before timestamp.
-        written_timestamp = 123456789
-        self.get_success(
-            self.store.db_pool.simple_update_one(
-                "e2e_cross_signing_keys",
-                {"user_id": alice, "keytype": "master"},
-                {"updatable_without_uia_before_ms": written_timestamp},
+        written_timestamp = self.get_success(
+            self.store.allow_master_cross_signing_key_replacement_without_uia(
+                alice, 1000
             )
         )
 

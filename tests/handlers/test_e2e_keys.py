@@ -1626,12 +1626,10 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         self.assertIs(replaceable_without_uia, False)
 
         # Set an expiry timestamp in the future.
-        now = self.clock.time_msec()
         self.get_success(
-            self.store.db_pool.simple_update_one(
-                "e2e_cross_signing_keys",
-                {"user_id": alice, "keytype": "master"},
-                {"updatable_without_uia_before_ms": now + 1000},
+            self.store.allow_master_cross_signing_key_replacement_without_uia(
+                alice,
+                1000,
             )
         )
 
