@@ -501,7 +501,9 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
                 return 0, 0
             return row[0], (row[1] + self.unused_expiration_time if row[1] else 0)
 
-        return await self.db_pool.runInteraction("get_pending_media", get_pending_media_txn)
+        return await self.db_pool.runInteraction(
+            "get_pending_media", get_pending_media_txn
+        )
 
     async def get_url_cache(self, url: str, ts: int) -> Optional[UrlCache]:
         """Get the media_id and ts for a cached URL as of the given timestamp
