@@ -379,11 +379,12 @@ class MediaRepository:
             # Get the info for the media
             media_info = await self.store.get_local_media(media_id)
             if not media_info:
+                logger.info("Media %s is unknown", media_id)
                 respond_404(request)
                 return None
 
             if media_info.quarantined_by:
-                logger.info("Media is quarantined")
+                logger.info("Media %s is quarantined", media_id)
                 respond_404(request)
                 return None
 
@@ -395,6 +396,7 @@ class MediaRepository:
             now = self.clock.time_msec()
             expired_time_ms = now - self.unused_expiration_time
             if media_info.created_ts < expired_time_ms:
+                logger.info("Media %s has expired without being uploaded", media_id)
                 respond_404(request)
                 return None
 
@@ -403,6 +405,7 @@ class MediaRepository:
 
             await self.clock.sleep(0.5)
 
+        logger.info("Media %s has not yet been uploaded", media_id)
         self.respond_not_yet_uploaded(request)
         return None
 
