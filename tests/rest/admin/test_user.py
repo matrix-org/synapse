@@ -4908,4 +4908,5 @@ class AllowCrossSigningReplacementTestCase(unittest.HomeserverTestCase):
         _, timestamp = self.get_success(
             self.store.get_master_cross_signing_key_updatable_before(self.other_user)
         )
+        assert timestamp is not None
         self.assertGreater(timestamp, self.clock.time_msec())
