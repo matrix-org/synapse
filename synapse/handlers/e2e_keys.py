@@ -1450,19 +1450,25 @@ class E2eKeysHandler:
 
         return desired_key_data
 
-    async def is_cross_signing_set_up_for_user(self, user_id: str) -> bool:
+    async def check_cross_signing_setup(self, user_id: str) -> Tuple[bool, bool]:
         """Checks if the user has cross-signing set up
 
         Args:
             user_id: The user to check
 
-        Returns:
-            True if the user has cross-signing set up, False otherwise
+        Returns: a 2-tuple of booleans
+            - whether the user has cross-signing set up, and
+            - whether the user's master cross-signing key may be replaced without UIA.
         """
-        existing_master_key = await self.store.get_e2e_cross_signing_key(
-            user_id, "master"
-        )
-        return existing_master_key is not None
+        (
+            exists,
+            ts_replacable_without_uia_before,
+        ) = await self.store.get_master_cross_signing_key_updatable_before(user_id)
+
+        if ts_replacable_without_uia_before is None:
+            return exists, False
+        else:
+            return exists, self.clock.time_msec() < ts_replacable_without_uia_before
 
 
 def _check_cross_signing_key(
