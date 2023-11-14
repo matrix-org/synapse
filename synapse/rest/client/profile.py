@@ -13,6 +13,7 @@
 # limitations under the License.
 
 """ This module contains REST servlets to do with profile: /profile/<paths> """
+
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Tuple
 
@@ -25,6 +26,23 @@ from synapse.types import JsonDict, UserID
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
+
+
+def _read_propagate(hs: "HomeServer", request: SynapseRequest)->bool:
+    propagate = True
+    if hs.config.experimental.msc4069_profile_inhibit_propagation:
+        do_propagate = request.args.get(b"org.matrix.msc4069.propagate")
+        if do_propagate is not None:
+            do_propagate = do_propagate[0].lower()
+            if do_propagate not in [b'true', b'false']:
+                raise SynapseError(
+                    400,
+                    "'propagate' is malformed",
+                    errcode=Codes.INVALID_PARAM
+                )
+            else:
+                propagate = do_propagate == b'true'
+    return propagate
 
 
 class ProfileDisplaynameRestServlet(RestServlet):
@@ -80,7 +98,11 @@ class ProfileDisplaynameRestServlet(RestServlet):
                 errcode=Codes.BAD_JSON,
             )
 
-        await self.profile_handler.set_displayname(user, requester, new_name, is_admin)
+        propagate = _read_propagate(self.hs, request)
+
+        await self.profile_handler.set_displayname(
+            user, requester, new_name, is_admin, propagate=propagate
+        )
 
         return 200, {}
 
@@ -135,8 +157,10 @@ class ProfileAvatarURLRestServlet(RestServlet):
                 400, "Missing key 'avatar_url'", errcode=Codes.MISSING_PARAM
             )
 
+        propagate = _read_propagate(self.hs, request)
+
         await self.profile_handler.set_avatar_url(
-            user, requester, new_avatar_url, is_admin
+            user, requester, new_avatar_url, is_admin, propagate=propagate
         )
 
         return 200, {}

@@ -126,6 +126,8 @@ class VersionsRestServlet(RestServlet):
                     "org.matrix.msc3981": self.config.experimental.msc3981_recurse_relations,
                     # Adds support for deleting account data.
                     "org.matrix.msc3391": self.config.experimental.msc3391_enabled,
+                    # Allows clients to inhibit profile update propagation.
+                    "org.matrix.msc4069": self.config.experimental.msc4069_profile_inhibit_propagation,
                 },
             },
         )
