@@ -431,8 +431,7 @@ class MediaRepository:
             Resolves once a response has successfully been written to request
         """
         media_info = await self.get_local_media_info(request, media_id, max_timeout_ms)
-        if not media_info or media_info.quarantined_by:
-            respond_404(request)
+        if not media_info:
             return
 
         self.mark_recently_accessed(None, media_id)
