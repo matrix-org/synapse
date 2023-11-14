@@ -629,7 +629,8 @@ given timestamp. Defaults to <code>f</code>.</li>
 </ul>
 <p><strong>Response</strong></p>
 <ul>
-<li><code>event_id</code> - converted from timestamp</li>
+<li><code>event_id</code> - The event ID closest to the given timestamp.</li>
+<li><code>origin_server_ts</code> - The timestamp of the event in milliseconds since the Unix epoch.</li>
 </ul>
 <h1 id="block-room-api"><a class="header" href="#block-room-api">Block Room API</a></h1>
 <p>The Block Room admin API allows server admins to block and unblock rooms,
