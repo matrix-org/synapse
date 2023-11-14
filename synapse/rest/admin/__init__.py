@@ -92,6 +92,7 @@ from synapse.rest.admin.users import (
     UsersRestServletV2,
     UserTokenRestServlet,
     WhoisRestServlet,
+    UserReplaceMasterCrossSigningKeyRestServlet,
 )
 from synapse.types import JsonDict, RoomStreamToken, TaskStatus
 from synapse.util import SYNAPSE_VERSION
@@ -292,6 +293,7 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     ListDestinationsRestServlet(hs).register(http_server)
     RoomMessagesRestServlet(hs).register(http_server)
     RoomTimestampToEventRestServlet(hs).register(http_server)
+    UserReplaceMasterCrossSigningKeyRestServlet(hs).register(http_server)
     UserByExternalId(hs).register(http_server)
     UserByThreePid(hs).register(http_server)
 

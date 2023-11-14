@@ -773,6 +773,43 @@ Note: The token will expire if the *admin* user calls `/logout/all` from any
 of their devices, but the token will *not* expire if the target user does the
 same.
 
+## Allow replacing master cross-signing key without User-Interactive Auth
+
+This endpoint is not intended for server administrator usage;
+we describe it here for completeness.
+
+This API temporarily permits a user to replace their master cross-signing key
+without going through
+[user-interactive authentication](https://spec.matrix.org/v1.8/client-server-api/#user-interactive-authentication-api) (UIA).
+This is useful when Synapse has delegated its authentication to the
+[Matrix Authentication Service](https://github.com/matrix-org/matrix-authentication-service/);
+as Synapse cannot perform UIA is not possible in these circumstances.
+
+The API is
+
+```http request
+POST /_synapse/admin/v1/users/<user_id>/_allow_cross_signing_replacement_without_uia
+{}
+```
+
+If the user does not exist, or does exist but has no master cross-signing key,
+this will return with status code `404 Not Found`.
+
+Otherwise, a response body like the following is returned, with status `200 OK`:
+
+```json
+{
+    "updatable_without_uia_before_ms": 1234567890
+}
+```
+
+The response body is a JSON object with a single field:
+
+- `updatable_without_uia_before_ms`: integer. The timestamp in milliseconds
+  before which the user is permitted to replace their cross-signing key without
+  going through UIA.
+
+_Added in Synapse 1.97.0._
 
 ## User devices
 
