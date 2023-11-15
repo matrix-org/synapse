@@ -31,6 +31,13 @@ from tests import unittest
 from tests.http.server._base import make_request_with_cancellation_test
 from tests.unittest import override_config
 
+try:
+    import authlib  # noqa: F401
+
+    HAS_AUTHLIB = True
+except ImportError:
+    HAS_AUTHLIB = False
+
 
 class KeyQueryTestCase(unittest.HomeserverTestCase):
     servlets = [
@@ -270,6 +277,7 @@ class SigningKeyUploadServletTestCase(unittest.HomeserverTestCase):
 
     OIDC_ADMIN_TOKEN = "_oidc_admin_token"
 
+    @unittest.skip_unless(HAS_AUTHLIB, "requires authlib")
     @override_config(
         {
             "enable_registration": False,
