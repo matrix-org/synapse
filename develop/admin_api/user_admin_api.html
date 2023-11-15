@@ -850,6 +850,33 @@ tell they have been logged in as.</p>
 <p>Note: The token will expire if the <em>admin</em> user calls <code>/logout/all</code> from any
 of their devices, but the token will <em>not</em> expire if the target user does the
 same.</p>
+<h2 id="allow-replacing-master-cross-signing-key-without-user-interactive-auth"><a class="header" href="#allow-replacing-master-cross-signing-key-without-user-interactive-auth">Allow replacing master cross-signing key without User-Interactive Auth</a></h2>
+<p>This endpoint is not intended for server administrator usage;
+we describe it here for completeness.</p>
+<p>This API temporarily permits a user to replace their master cross-signing key
+without going through
+<a href="https://spec.matrix.org/v1.8/client-server-api/#user-interactive-authentication-api">user-interactive authentication</a> (UIA).
+This is useful when Synapse has delegated its authentication to the
+<a href="https://github.com/matrix-org/matrix-authentication-service/">Matrix Authentication Service</a>;
+as Synapse cannot perform UIA is not possible in these circumstances.</p>
+<p>The API is</p>
+<pre><code class="language-http request">POST /_synapse/admin/v1/users/&lt;user_id&gt;/_allow_cross_signing_replacement_without_uia
+{}
+</code></pre>
+<p>If the user does not exist, or does exist but has no master cross-signing key,
+this will return with status code <code>404 Not Found</code>.</p>
+<p>Otherwise, a response body like the following is returned, with status <code>200 OK</code>:</p>
+<pre><code class="language-json">{
+    &quot;updatable_without_uia_before_ms&quot;: 1234567890
+}
+</code></pre>
+<p>The response body is a JSON object with a single field:</p>
+<ul>
+<li><code>updatable_without_uia_before_ms</code>: integer. The timestamp in milliseconds
+before which the user is permitted to replace their cross-signing key without
+going through UIA.</li>
+</ul>
+<p><em>Added in Synapse 1.97.0.</em></p>
 <h2 id="user-devices"><a class="header" href="#user-devices">User devices</a></h2>
 <h3 id="list-all-devices"><a class="header" href="#list-all-devices">List all devices</a></h3>
 <p>Gets information about all devices for a specific <code>user_id</code>.</p>
