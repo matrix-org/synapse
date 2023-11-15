@@ -151,7 +151,9 @@ class MediaRepositoryBackgroundUpdateStore(SQLBaseStore):
         )
 
         if hs.config.media.can_load_media_repo:
-            self.unused_expiration_time = hs.config.media.unused_expiration_time
+            self.unused_expiration_time: Optional[
+                int
+            ] = hs.config.media.unused_expiration_time
         else:
             self.unused_expiration_time = None
 
