@@ -109,7 +109,8 @@ Changes in SCHEMA_VERSION = 78
 
 Changes in SCHEMA_VERSION = 79
     - Add tables to handle in DB read-write locks.
-    - Add some mitigations for a painful race between foreground and background updates, cf #15677.
+    - Add some mitigations for a painful race between foreground and background updates, cf
+      https://github.com/matrix-org/synapse/issues/15677.
 
 Changes in SCHEMA_VERSION = 80
     - The event_txn_id_device_id is always written to for new events.

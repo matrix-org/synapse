@@ -170,7 +170,8 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(channel.code, 200, channel.result)
         # FIXME: If a user has no displayname set, Synapse returns 200 and omits a
-        # displayname from the response. This contradicts the spec, see #13137.
+        # displayname from the response. This contradicts the spec, see
+        # https://github.com/matrix-org/synapse/issues/13137.
         return channel.json_body.get("displayname")
 
     def _get_avatar_url(self, name: Optional[str] = None) -> Optional[str]:
@@ -179,7 +180,8 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(channel.code, 200, channel.result)
         # FIXME: If a user has no avatar set, Synapse returns 200 and omits an
-        # avatar_url from the response. This contradicts the spec, see #13137.
+        # avatar_url from the response. This contradicts the spec, see
+        # https://github.com/matrix-org/synapse/issues/13137.
         return channel.json_body.get("avatar_url")
 
     @unittest.override_config({"max_avatar_size": 50})

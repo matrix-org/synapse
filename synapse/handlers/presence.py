@@ -1816,7 +1816,7 @@ class PresenceEventSource(EventSource[int, UserPresenceState]):
                 # the same token repeatedly.
                 #
                 # Hence this guard where we just return nothing so that the sync
-                # doesn't return. C.f. #5503.
+                # doesn't return. C.f. https://github.com/matrix-org/synapse/issues/5503.
                 return [], max_token
 
             # Figure out which other users this user should explicitly receive

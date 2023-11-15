@@ -317,7 +317,7 @@ class MonthlyActiveUsersWorkerStore(RegistrationWorkerStore):
             if user_id:
                 is_support = self.is_support_user_txn(txn, user_id)
                 if not is_support:
-                    # We do this manually here to avoid hitting #6791
+                    # We do this manually here to avoid hitting https://github.com/matrix-org/synapse/issues/6791
                     self.db_pool.simple_upsert_txn(
                         txn,
                         table="monthly_active_users",

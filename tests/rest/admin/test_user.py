@@ -1478,7 +1478,7 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
     def test_deactivate_user_erase_true_avatar_nonnull_but_empty(self) -> None:
         """Check we can erase a user whose avatar is the empty string.
 
-        Reproduces #12257.
+        Reproduces https://github.com/matrix-org/synapse/issues/12257.
         """
         # Patch `self.other_user` to have an empty string as their avatar.
         self.get_success(
