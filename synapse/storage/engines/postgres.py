@@ -52,7 +52,7 @@ class PostgresEngine(
         # some degenerate query plan has been created and the client has probably
         # timed out/walked off anyway.
         # This is in milliseconds.
-        self.statement_timeout: Optional[int] = database_config.get(
+        self.statement_timeout = database_config.get(
             "statement_timeout", 60 * 60 * 1000
         )
         self._version: Optional[int] = None  # unknown as yet
@@ -169,7 +169,11 @@ class PostgresEngine(
 
         # Abort really long-running statements and turn them into errors.
         if self.statement_timeout is not None:
-            cursor.execute("SET statement_timeout TO ?", (self.statement_timeout,))
+            self.attempt_to_set_statement_timeout(
+                cast(psycopg2.extensions.cursor, cursor.txn),
+                self.statement_timeout,
+                for_transaction=False,
+            )
 
         cursor.close()
         db_conn.commit()
@@ -232,6 +236,18 @@ class PostgresEngine(
         else:
             isolation_level = self.isolation_level_map[isolation_level]
         return conn.set_isolation_level(isolation_level)
+
+    def attempt_to_set_statement_timeout(
+        self,
+        cursor: psycopg2.extensions.cursor,
+        statement_timeout: int,
+        for_transaction: bool,
+    ) -> None:
+        if for_transaction:
+            sql = "SET LOCAL statement_timeout TO ?"
+        else:
+            sql = "SET statement_timeout TO ?"
+        cursor.execute(sql, (statement_timeout,))
 
     @staticmethod
     def executescript(cursor: psycopg2.extensions.cursor, script: str) -> None:

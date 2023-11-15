@@ -36,6 +36,9 @@ CursorType = TypeVar("CursorType", bound=Cursor)
 
 
 class BaseDatabaseEngine(Generic[ConnectionType, CursorType], metaclass=abc.ABCMeta):
+    # The default statement timeout to use for transactions.
+    statement_timeout: Optional[int] = None
+
     def __init__(self, module: DBAPI2Module, config: Mapping[str, Any]):
         self.module = module
 
@@ -129,6 +132,16 @@ class BaseDatabaseEngine(Generic[ConnectionType, CursorType], metaclass=abc.ABCM
         """Attempt to set the connections isolation level.
 
         Note: This has no effect on SQLite3, as transactions are SERIALIZABLE by default.
+        """
+        ...
+
+    @abc.abstractmethod
+    def attempt_to_set_statement_timeout(
+        self, cursor: CursorType, statement_timeout: int, for_transaction: bool
+    ) -> None:
+        """Attempt to set the cursor's statement timeout.
+
+        Note this has no effect on SQLite3.
         """
         ...
 

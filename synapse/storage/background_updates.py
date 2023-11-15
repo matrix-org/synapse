@@ -768,8 +768,9 @@ class BackgroundUpdater:
 
                 # override the global statement timeout to avoid accidentally squashing
                 # a long-running index creation process
-                timeout_sql = "SET SESSION statement_timeout = 0"
-                c.execute(timeout_sql)
+                self.db_pool.engine.attempt_to_set_statement_timeout(
+                    c, 0, for_transaction=True
+                )
 
                 sql = (
                     "CREATE %(unique)s INDEX CONCURRENTLY %(name)s"
@@ -791,12 +792,6 @@ class BackgroundUpdater:
                     logger.debug("[SQL] %s", sql)
                     c.execute(sql)
             finally:
-                # mypy ignore - `statement_timeout` is defined on PostgresEngine
-                # reset the global timeout to the default
-                default_timeout = self.db_pool.engine.statement_timeout  # type: ignore[attr-defined]
-                undo_timeout_sql = f"SET statement_timeout = {default_timeout}"
-                conn.cursor().execute(undo_timeout_sql)
-
                 conn.engine.attempt_to_set_autocommit(conn.conn, False)
 
         def create_index_sqlite(conn: "LoggingDatabaseConnection") -> None:

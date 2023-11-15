@@ -143,6 +143,12 @@ class Sqlite3Engine(BaseDatabaseEngine[sqlite3.Connection, sqlite3.Cursor]):
         # All transactions are SERIALIZABLE by default in sqlite
         pass
 
+    def attempt_to_set_statement_timeout(
+        self, cursor: sqlite3.Cursor, statement_timeout: int, for_transaction: bool
+    ) -> None:
+        # Not supported.
+        pass
+
     @staticmethod
     def executescript(cursor: sqlite3.Cursor, script: str) -> None:
         """Execute a chunk of SQL containing multiple semicolon-delimited statements.
