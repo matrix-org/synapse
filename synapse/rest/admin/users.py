@@ -632,8 +632,9 @@ class UserRegisterServlet(RestServlet):
 
         should_issue_refresh_token = body.get("refresh_token", False)
         if not isinstance(should_issue_refresh_token, bool):
-            raise SynapseError(HTTPStatus.BAD_REQUEST, "refresh_token must be a boolean")
-
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST, "refresh_token must be a boolean"
+            )
 
         # Reuse the parts of RegisterRestServlet to reduce code duplication
         from synapse.rest.client.register import RegisterRestServlet
@@ -651,9 +652,7 @@ class UserRegisterServlet(RestServlet):
         )
 
         result = await register._create_registration_details(
-            user_id,
-            body,
-            should_issue_refresh_token=should_issue_refresh_token
+            user_id, body, should_issue_refresh_token=should_issue_refresh_token
         )
         return HTTPStatus.OK, result
 
