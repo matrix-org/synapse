@@ -28,7 +28,7 @@ if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 
-def _read_propagate(hs: "HomeServer", request: SynapseRequest)->bool:
+def _read_propagate(hs: "HomeServer", request: SynapseRequest) -> bool:
     # This will always be set by the time Twisted calls us.
     assert request.args is not None
 
