@@ -51,6 +51,11 @@ class Psycopg2Engine(
     def get_server_version(self, db_conn: psycopg2.extensions.connection) -> int:
         return db_conn.server_version
 
+    def set_statement_timeout(
+        self, cursor: psycopg2.extensions.cursor, statement_timeout: int
+    ) -> None:
+        cursor.execute("SET statement_timeout TO ?", (statement_timeout,))
+
     def convert_param_style(self, sql: str) -> str:
         return sql.replace("?", "%s")
 

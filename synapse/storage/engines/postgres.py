@@ -64,6 +64,11 @@ class PostgresEngine(
         """
         ...
 
+    @abc.abstractmethod
+    def set_statement_timeout(self, cursor: CursorType, statement_timeout: int) -> None:
+        """Configure the current cursor's statement timeout."""
+        ...
+
     @property
     def single_threaded(self) -> bool:
         return False
@@ -168,15 +173,7 @@ class PostgresEngine(
 
         # Abort really long-running statements and turn them into errors.
         if self.statement_timeout is not None:
-            # TODO Avoid a circular import, this needs to be abstracted.
-            if self.__class__.__name__ == "Psycopg2Engine":
-                cursor.execute("SET statement_timeout TO ?", (self.statement_timeout,))
-            else:
-                cursor.execute(
-                    sql.SQL("SET statement_timeout TO {}").format(
-                        self.statement_timeout
-                    )
-                )
+            self.set_statement_timeout(cursor.txn, self.statement_timeout)  # type: ignore[arg-type]
 
         cursor.close()
         db_conn.commit()

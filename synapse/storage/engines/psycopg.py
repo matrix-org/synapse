@@ -52,6 +52,14 @@ class PsycopgEngine(
     def get_server_version(self, db_conn: psycopg.Connection) -> int:
         return db_conn.info.server_version
 
+    def set_statement_timeout(
+        self, cursor: psycopg.Cursor, statement_timeout: int
+    ) -> None:
+        """Configure the current cursor's statement timeout."""
+        cursor.execute(
+            psycopg.sql.SQL("SET statement_timeout TO {}").format(statement_timeout)
+        )
+
     def convert_param_style(self, sql: str) -> str:
         # if isinstance(sql, psycopg.sql.Composed):
         #     return sql
