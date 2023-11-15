@@ -236,6 +236,15 @@ class _StreamFromIdGen(Stream):
     ) -> bool:
         # These streams can't go backwards, so we know we can ignore any
         # positions where the tokens are from before the current token.
+
+        if new_token <= self.current_token(instance_name):
+            logger.info(
+                "Discarding POSITION %s/%s: %s vs %s",
+                self.NAME,
+                instance_name,
+                new_token,
+                self.current_token(instance_name),
+            )
         return new_token <= self.current_token(instance_name)
 
 
