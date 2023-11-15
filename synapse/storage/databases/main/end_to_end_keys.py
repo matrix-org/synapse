@@ -1707,7 +1707,6 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
             )
             if txn.rowcount == 0:
                 return None
-            assert txn.rowcount == 1
 
             return timestamp
 
