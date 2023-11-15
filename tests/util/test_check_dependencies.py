@@ -89,7 +89,8 @@ class TestDependencyChecker(TestCase):
     def test_version_reported_as_none(self) -> None:
         """Complain if importlib.metadata.version() returns None.
 
-        This shouldn't normally happen, but it was seen in the wild (#12223).
+        This shouldn't normally happen, but it was seen in the wild
+        (https://github.com/matrix-org/synapse/issues/12223).
         """
         with patch(
             "synapse.util.check_dependencies.metadata.requires",
@@ -148,7 +149,7 @@ class TestDependencyChecker(TestCase):
         """
         Tests that release candidates count as far as satisfying a dependency
         is concerned.
-        (Regression test, see #12176.)
+        (Regression test, see https://github.com/matrix-org/synapse/issues/12176.)
         """
         with patch(
             "synapse.util.check_dependencies.metadata.requires",
@@ -162,7 +163,10 @@ class TestDependencyChecker(TestCase):
                 check_requirements()
 
     def test_setuptools_rust_ignored(self) -> None:
-        """Test a workaround for a `poetry build` problem. Reproduces #13926."""
+        """
+        Test a workaround for a `poetry build` problem. Reproduces
+        https://github.com/matrix-org/synapse/issues/13926.
+        """
         with patch(
             "synapse.util.check_dependencies.metadata.requires",
             return_value=["setuptools_rust >= 1.3"],

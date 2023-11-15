@@ -64,7 +64,7 @@ class EventStreamPermissionsTestCase(unittest.HomeserverTestCase):
         # 403. However, since the v1 spec no longer exists and the v1
         # implementation is now part of the r0 implementation, the newer
         # behaviour is used instead to be consistent with the r0 spec.
-        # see issue #2602
+        # see issue https://github.com/matrix-org/synapse/issues/2602
         channel = self.make_request(
             "GET", "/events?access_token=%s" % ("invalid" + self.token,)
         )

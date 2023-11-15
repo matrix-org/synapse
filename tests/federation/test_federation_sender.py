@@ -478,7 +478,7 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
         # expect two edus, in one or two transactions. We don't know what order the
         # devices will be updated.
         self.assertEqual(len(self.edus), 2)
-        stream_id = None  # FIXME: there is a discontinuity in the stream IDs: see #7142
+        stream_id = None  # FIXME: there is a discontinuity in the stream IDs: see https://github.com/matrix-org/synapse/issues/7142
         for edu in self.edus:
             self.assertEqual(edu["edu_type"], EduTypes.DEVICE_LIST_UPDATE)
             c = edu["content"]

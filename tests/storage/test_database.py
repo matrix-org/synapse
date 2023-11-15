@@ -214,7 +214,8 @@ class CallbacksTestCase(unittest.HomeserverTestCase):
         after_callback, exception_callback = self._run_interaction(_test_txn)
 
         # Calling both `after_callback`s when the first attempt failed is rather
-        # surprising (#12184). Let's document the behaviour in a test.
+        # surprising (https://github.com/matrix-org/synapse/issues/12184).
+        # Let's document the behaviour in a test.
         after_callback.assert_has_calls(
             [
                 call(123, 456, extra=789),
@@ -293,7 +294,7 @@ class PostgresReplicaIdentityTestCase(unittest.HomeserverTestCase):
     def test_all_tables_have_postgres_replica_identity(self) -> None:
         """
         Tests that all tables have a Postgres REPLICA IDENTITY.
-        (See #16224).
+        (See https://github.com/matrix-org/synapse/issues/16224).
 
         Tables with a PRIMARY KEY have an implied REPLICA IDENTITY and are fine.
         Other tables need them to be set with `ALTER TABLE`.
