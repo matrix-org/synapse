@@ -141,7 +141,7 @@ class RedisSubscriber(SubscriberProtocol):
         # We send out our positions when there is a new connection in case the
         # other side missed updates. We do this for Redis connections as the
         # otherside won't know we've connected and so won't issue a REPLICATE.
-        self.synapse_handler.send_positions_to_connection(self)
+        self.synapse_handler.send_positions_to_connection()
 
     def messageReceived(self, pattern: str, channel: str, message: str) -> None:
         """Received a message from redis."""
