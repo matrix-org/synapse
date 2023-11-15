@@ -310,11 +310,12 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(channel.code, 200, channel.result)
 
-    @unittest.override_config({"experimental_features": {"msc4069_profile_inhibit_propagation": True}})
+    @unittest.override_config(
+        {"experimental_features": {"msc4069_profile_inhibit_propagation": True}}
+    )
     def test_msc4069_inhibit_propagation(self) -> None:
-        """Tests to ensure profile update propagation can be inhibited.
-        """
-        for prop in ['avatar_url', 'displayname']:
+        """Tests to ensure profile update propagation can be inhibited."""
+        for prop in ["avatar_url", "displayname"]:
             room_id = self.helper.create_room_as(tok=self.owner_tok)
 
             channel = self.make_request(
@@ -333,7 +334,11 @@ class ProfileTestCase(unittest.HomeserverTestCase):
             )
             self.assertEqual(channel.code, 200, channel.result)
 
-            res = self._get_avatar_url() if prop == 'avatar_url' else self._get_displayname()
+            res = (
+                self._get_avatar_url()
+                if prop == 'avatar_url'
+                else self._get_displayname()
+            )
             self.assertEqual(res, "http://my.server/pic.gif")
 
             channel = self.make_request(
@@ -342,13 +347,15 @@ class ProfileTestCase(unittest.HomeserverTestCase):
                 access_token=self.owner_tok,
             )
             self.assertEqual(channel.code, 200, channel.result)
-            self.assertEqual(channel.json_body.get("content").get(prop), "mxc://my.server/existing")
+            self.assertEqual(
+                channel.json_body.get("content").get(prop), "mxc://my.server/existing"
+            )
 
     def test_msc4069_inhibit_propagation_disabled(self) -> None:
         """Tests to ensure profile update propagation inhibit flags are ignored when the
         experimental flag is not enabled.
         """
-        for prop in ['avatar_url', 'displayname']:
+        for prop in ["avatar_url", "displayname"]:
             room_id = self.helper.create_room_as(tok=self.owner_tok)
 
             channel = self.make_request(
@@ -367,7 +374,11 @@ class ProfileTestCase(unittest.HomeserverTestCase):
             )
             self.assertEqual(channel.code, 200, channel.result)
 
-            res = self._get_avatar_url() if prop == 'avatar_url' else self._get_displayname()
+            res = (
+                self._get_avatar_url()
+                if prop == 'avatar_url'
+                else self._get_displayname()
+            )
             self.assertEqual(res, "http://my.server/pic.gif")
 
             channel = self.make_request(
@@ -379,12 +390,13 @@ class ProfileTestCase(unittest.HomeserverTestCase):
 
             # The ?propagate=false should be ignored by the server because the config flag
             # isn't enabled.
-            self.assertEqual(channel.json_body.get("content").get(prop), "http://my.server/pic.gif")
+            self.assertEqual(
+                channel.json_body.get("content").get(prop), "http://my.server/pic.gif"
+            )
 
     def test_msc4069_inhibit_propagation_default(self) -> None:
-        """Tests to ensure profile update propagation happens by default.
-        """
-        for prop in ['avatar_url', 'displayname']:
+        """Tests to ensure profile update propagation happens by default."""
+        for prop in ["avatar_url", "displayname"]:
             room_id = self.helper.create_room_as(tok=self.owner_tok)
 
             channel = self.make_request(
@@ -403,7 +415,11 @@ class ProfileTestCase(unittest.HomeserverTestCase):
             )
             self.assertEqual(channel.code, 200, channel.result)
 
-            res = self._get_avatar_url() if prop == 'avatar_url' else self._get_displayname()
+            res = (
+                self._get_avatar_url()
+                if prop == 'avatar_url'
+                else self._get_displayname()
+            )
             self.assertEqual(res, "http://my.server/pic.gif")
 
             channel = self.make_request(
@@ -415,13 +431,16 @@ class ProfileTestCase(unittest.HomeserverTestCase):
 
             # The ?propagate=false should be ignored by the server because the config flag
             # isn't enabled.
-            self.assertEqual(channel.json_body.get("content").get(prop), "http://my.server/pic.gif")
+            self.assertEqual(
+                channel.json_body.get("content").get(prop), "http://my.server/pic.gif"
+            )
 
-    @unittest.override_config({"experimental_features": {"msc4069_profile_inhibit_propagation": True}})
+    @unittest.override_config(
+        {"experimental_features": {"msc4069_profile_inhibit_propagation": True}}
+    )
     def test_msc4069_inhibit_propagation_like_default(self) -> None:
-        """Tests to ensure clients can request explicit profile propagation.
-        """
-        for prop in ['avatar_url', 'displayname']:
+        """Tests to ensure clients can request explicit profile propagation."""
+        for prop in ["avatar_url", "displayname"]:
             room_id = self.helper.create_room_as(tok=self.owner_tok)
 
             channel = self.make_request(
@@ -440,7 +459,11 @@ class ProfileTestCase(unittest.HomeserverTestCase):
             )
             self.assertEqual(channel.code, 200, channel.result)
 
-            res = self._get_avatar_url() if prop == 'avatar_url' else self._get_displayname()
+            res = (
+                self._get_avatar_url()
+                if prop == 'avatar_url'
+                else self._get_displayname()
+            )
             self.assertEqual(res, "http://my.server/pic.gif")
 
             channel = self.make_request(
@@ -451,7 +474,9 @@ class ProfileTestCase(unittest.HomeserverTestCase):
             self.assertEqual(channel.code, 200, channel.result)
 
             # The client requested ?propagate=true, so it should have happened.
-            self.assertEqual(channel.json_body.get("content").get(prop), "http://my.server/pic.gif")
+            self.assertEqual(
+                channel.json_body.get("content").get(prop), "http://my.server/pic.gif"
+            )
 
     def _setup_local_files(self, names_and_props: Dict[str, Dict[str, Any]]) -> None:
         """Stores metadata about files in the database.

@@ -34,11 +34,9 @@ def _read_propagate(hs: "HomeServer", request: SynapseRequest)->bool:
         do_propagate = request.args.get(b"org.matrix.msc4069.propagate")
         if do_propagate is not None:
             do_propagate = do_propagate[0].lower()
-            if do_propagate not in [b'true', b'false']:
+            if do_propagate not in [b"true", b"false"]:
                 raise SynapseError(
-                    400,
-                    "'propagate' is malformed",
-                    errcode=Codes.INVALID_PARAM
+                    400, "'propagate' is malformed", errcode=Codes.INVALID_PARAM
                 )
             else:
                 propagate = do_propagate == b'true'
