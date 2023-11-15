@@ -318,7 +318,9 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         self.assertEqual(
             self.fetches[0][2], "/_matrix/media/r0/download/" + self.media_id
         )
-        self.assertEqual(self.fetches[0][3], {"allow_remote": "false"})
+        self.assertEqual(
+            self.fetches[0][3], {"allow_remote": "false", "timeout_ms": "20000"}
+        )
 
         headers = {
             b"Content-Length": [b"%d" % (len(self.test_image.data))],

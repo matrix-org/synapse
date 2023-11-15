@@ -104,8 +104,8 @@ logger = logging.getLogger("synapse.app.generic_worker")
 
 
 class GenericWorkerStore(
-    # FIXME(#3714): We need to add UserDirectoryStore as we write directly
-    # rather than going via the correct worker.
+    # FIXME(https://github.com/matrix-org/synapse/issues/3714): We need to add
+    # UserDirectoryStore as we write directly rather than going via the correct worker.
     UserDirectoryStore,
     StatsStore,
     UIAuthWorkerStore,

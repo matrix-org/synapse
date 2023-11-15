@@ -1637,7 +1637,7 @@ matrix-synapse-py3 (0.99.3.1) stable; urgency=medium
 matrix-synapse-py3 (0.99.3) stable; urgency=medium
 
   [ Richard van der Hoff ]
-  * Fix warning during preconfiguration. (Fixes: #4819)
+  * Fix warning during preconfiguration. (Fixes: https://github.com/matrix-org/synapse/issues/4819)
 
   [ Synapse Packaging team ]
   * New synapse release 0.99.3.

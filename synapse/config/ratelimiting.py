@@ -204,3 +204,10 @@ class RatelimitConfig(Config):
             "rc_third_party_invite",
             defaults={"per_second": 0.0025, "burst_count": 5},
         )
+
+        # Ratelimit create media requests:
+        self.rc_media_create = RatelimitSettings.parse(
+            config,
+            "rc_media_create",
+            defaults={"per_second": 10, "burst_count": 50},
+        )
