@@ -29,6 +29,9 @@ if TYPE_CHECKING:
 
 
 def _read_propagate(hs: "HomeServer", request: SynapseRequest)->bool:
+    # This will always be set by the time Twisted calls us.
+    assert request.args is not None
+
     propagate = True
     if hs.config.experimental.msc4069_profile_inhibit_propagation:
         do_propagate = request.args.get(b"org.matrix.msc4069.propagate")
@@ -39,7 +42,7 @@ def _read_propagate(hs: "HomeServer", request: SynapseRequest)->bool:
                     400, "'propagate' is malformed", errcode=Codes.INVALID_PARAM
                 )
             else:
-                propagate = do_propagate == b'true'
+                propagate = do_propagate == b"true"
     return propagate
 
 
