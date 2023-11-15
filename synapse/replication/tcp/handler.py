@@ -588,6 +588,13 @@ class ReplicationCommandHandler:
 
         logger.debug("Handling '%s %s'", cmd.NAME, cmd.to_line())
 
+        # Check if we early discard this position.
+        stream = self._streams[cmd.stream_name]
+        if stream.can_discard_position(
+            cmd.instance_name, cmd.prev_token, cmd.new_token
+        ):
+            return
+
         self._add_command_to_stream_queue(conn, cmd)
 
     async def _process_position(
@@ -598,6 +605,11 @@ class ReplicationCommandHandler:
         Called after the command has been popped off the queue of inbound commands
         """
         stream = self._streams[stream_name]
+
+        if stream.can_discard_position(
+            cmd.instance_name, cmd.prev_token, cmd.new_token
+        ):
+            return
 
         # We're about to go and catch up with the stream, so remove from set
         # of connected streams.
