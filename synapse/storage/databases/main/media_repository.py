@@ -150,7 +150,10 @@ class MediaRepositoryBackgroundUpdateStore(SQLBaseStore):
             self._drop_media_index_without_method,
         )
 
-        self.unused_expiration_time = hs.config.media.unused_expiration_time
+        if hs.config.media.can_load_media_repo:
+            self.unused_expiration_time = hs.config.media.unused_expiration_time
+        else:
+            self.unused_expiration_time = None
 
     async def _drop_media_index_without_method(
         self, progress: JsonDict, batch_size: int
@@ -489,6 +492,7 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
                 AND created_ts > ?
                 AND media_length IS NULL
             """
+            assert self.unused_expiration_time is not None
             txn.execute(
                 sql,
                 (
