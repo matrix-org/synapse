@@ -1602,3 +1602,50 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
                 }
             },
         )
+
+    def test_check_cross_signing_setup(self) -> None:
+        # First check what happens with no master key.
+        alice = "@alice:test"
+        exists, replaceable_without_uia = self.get_success(
+            self.handler.check_cross_signing_setup(alice)
+        )
+        self.assertIs(exists, False)
+        self.assertIs(replaceable_without_uia, False)
+
+        # Upload a master key but don't specify a replacement timestamp.
+        dummy_key = {"keys": {"a": "b"}}
+        self.get_success(
+            self.store.set_e2e_cross_signing_key("@alice:test", "master", dummy_key)
+        )
+
+        # Should now find the key exists.
+        exists, replaceable_without_uia = self.get_success(
+            self.handler.check_cross_signing_setup(alice)
+        )
+        self.assertIs(exists, True)
+        self.assertIs(replaceable_without_uia, False)
+
+        # Set an expiry timestamp in the future.
+        self.get_success(
+            self.store.allow_master_cross_signing_key_replacement_without_uia(
+                alice,
+                1000,
+            )
+        )
+
+        # Should now be allowed to replace the key without UIA.
+        exists, replaceable_without_uia = self.get_success(
+            self.handler.check_cross_signing_setup(alice)
+        )
+        self.assertIs(exists, True)
+        self.assertIs(replaceable_without_uia, True)
+
+        # Wait 2 seconds, so that the timestamp is in the past.
+        self.reactor.advance(2.0)
+
+        # Should no longer be allowed to replace the key without UIA.
+        exists, replaceable_without_uia = self.get_success(
+            self.handler.check_cross_signing_setup(alice)
+        )
+        self.assertIs(exists, True)
+        self.assertIs(replaceable_without_uia, False)

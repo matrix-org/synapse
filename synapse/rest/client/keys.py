@@ -376,9 +376,10 @@ class SigningKeyUploadServlet(RestServlet):
         user_id = requester.user.to_string()
         body = parse_json_object_from_request(request)
 
-        is_cross_signing_setup = (
-            await self.e2e_keys_handler.is_cross_signing_set_up_for_user(user_id)
-        )
+        (
+            is_cross_signing_setup,
+            master_key_updatable_without_uia,
+        ) = await self.e2e_keys_handler.check_cross_signing_setup(user_id)
 
         # Before MSC3967 we required UIA both when setting up cross signing for the
         # first time and when resetting the device signing key. With MSC3967 we only
@@ -386,9 +387,14 @@ class SigningKeyUploadServlet(RestServlet):
         # time. Because there is no UIA in MSC3861, for now we throw an error if the
         # user tries to reset the device signing key when MSC3861 is enabled, but allow
         # first-time setup.
+        #
+        # XXX: We now have a get-out clause by which MAS can temporarily mark the master
+        # key as replaceable. It should do its own equivalent of user interactive auth
+        # before doing so.
         if self.hs.config.experimental.msc3861.enabled:
-            # There is no way to reset the device signing key with MSC3861
-            if is_cross_signing_setup:
+            # The auth service has to explicitly mark the master key as replaceable
+            # without UIA to reset the device signing key with MSC3861.
+            if is_cross_signing_setup and not master_key_updatable_without_uia:
                 raise SynapseError(
                     HTTPStatus.NOT_IMPLEMENTED,
                     "Resetting cross signing keys is not yet supported with MSC3861",
