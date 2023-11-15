@@ -1695,12 +1695,20 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
                 """
                 UPDATE e2e_cross_signing_keys
                 SET updatable_without_uia_before_ms = ?
-                WHERE user_id = ? AND keytype = 'master'
+                WHERE stream_id = (
+                    SELECT stream_id
+                    FROM e2e_cross_signing_keys
+                    WHERE user_id = ? AND keytype = 'master'
+                    ORDER BY stream_id DESC
+                    LIMIT 1
+                )
             """,
                 (timestamp, user_id),
             )
             if txn.rowcount == 0:
                 return None
+            assert txn.rowcount == 1
+
             return timestamp
 
         return await self.db_pool.runInteraction(
