@@ -347,9 +347,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
                 access_token=self.owner_tok,
             )
             self.assertEqual(channel.code, 200, channel.result)
-            content = channel.json_body.get("content")
-            assert content is not None
-            self.assertEqual(content.get(prop), "mxc://my.server/existing")
+            self.assertEqual(channel.json_body.get(prop), "mxc://my.server/existing")
 
     def test_msc4069_inhibit_propagation_disabled(self) -> None:
         """Tests to ensure profile update propagation inhibit flags are ignored when the
@@ -390,9 +388,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
 
             # The ?propagate=false should be ignored by the server because the config flag
             # isn't enabled.
-            content = channel.json_body.get("content")
-            assert content is not None
-            self.assertEqual(content.get(prop), "http://my.server/pic.gif")
+            self.assertEqual(channel.json_body.get(prop), "http://my.server/pic.gif")
 
     def test_msc4069_inhibit_propagation_default(self) -> None:
         """Tests to ensure profile update propagation happens by default."""
@@ -431,9 +427,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
 
             # The ?propagate=false should be ignored by the server because the config flag
             # isn't enabled.
-            content = channel.json_body.get("content")
-            assert content is not None
-            self.assertEqual(content.get(prop), "http://my.server/pic.gif")
+            self.assertEqual(channel.json_body.get(prop), "http://my.server/pic.gif")
 
     @unittest.override_config(
         {"experimental_features": {"msc4069_profile_inhibit_propagation": True}}
@@ -474,9 +468,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
             self.assertEqual(channel.code, 200, channel.result)
 
             # The client requested ?propagate=true, so it should have happened.
-            content = channel.json_body.get("content")
-            assert content is not None
-            self.assertEqual(content.get(prop), "http://my.server/pic.gif")
+            self.assertEqual(channel.json_body.get(prop), "http://my.server/pic.gif")
 
     def _setup_local_files(self, names_and_props: Dict[str, Dict[str, Any]]) -> None:
         """Stores metadata about files in the database.
