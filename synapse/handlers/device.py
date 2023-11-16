@@ -398,7 +398,7 @@ class DeviceWorkerHandler:
         # Delete the messages in batches to avoid too much DB load.
         from_stream_id = None
         while True:
-            from_stream_id = await self.store.delete_messages_for_device_between(
+            from_stream_id, _ = await self.store.delete_messages_for_device_between(
                 user_id=user_id,
                 device_id=device_id,
                 from_stream_id=from_stream_id,

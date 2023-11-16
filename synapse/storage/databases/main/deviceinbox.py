@@ -478,24 +478,19 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                 log_kv({"message": "No changes in cache since last check"})
                 return 0
 
-        def delete_messages_for_device_txn(txn: LoggingTransaction) -> int:
-            limit_statement = "" if limit is None else f"LIMIT {limit}"
-            sql = f"""
-                DELETE FROM device_inbox WHERE user_id = ? AND device_id = ? AND stream_id <= (
-                  SELECT MAX(stream_id) FROM (
-                    SELECT stream_id FROM device_inbox
-                    WHERE user_id = ? AND device_id = ? AND stream_id <= ?
-                    ORDER BY stream_id
-                    {limit_statement}
-                  ) AS q1
-                )
-                """
-            txn.execute(sql, (user_id, device_id, user_id, device_id, up_to_stream_id))
-            return txn.rowcount
-
-        count = await self.db_pool.runInteraction(
-            "delete_messages_for_device", delete_messages_for_device_txn
-        )
+        from_stream_id = None
+        count = 0
+        while True:
+            from_stream_id, loop_count = await self.delete_messages_for_device_between(
+                user_id,
+                device_id,
+                from_stream_id=None,
+                to_stream_id=up_to_stream_id,
+                limit=1000,
+            )
+            count += loop_count
+            if from_stream_id is None:
+                break
 
         log_kv({"message": f"deleted {count} messages for device", "count": count})
 
@@ -522,9 +517,10 @@ class DeviceInboxWorkerStore(SQLBaseStore):
         from_stream_id: Optional[int],
         to_stream_id: int,
         limit: int,
-    ) -> Optional[int]:
+    ) -> Tuple[Optional[int], int]:
         """Delete N device messages between the stream IDs, returning the
-        highest stream ID deleted, or None if nothing was deletable.
+        highest stream ID deleted (or None if all messages in the range have
+        been deleted) and the number of messages deleted.
 
         This is more efficient than `delete_messages_for_device` when calling in
         a loop to batch delete messages.
@@ -541,7 +537,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
 
         def delete_messages_for_device_between_txn(
             txn: LoggingTransaction,
-        ) -> Optional[int]:
+        ) -> Tuple[Optional[int], int]:
             txn.execute(
                 """
                 SELECT MAX(stream_id) FROM (
@@ -556,7 +552,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
             )
             row = txn.fetchone()
             if row is None or row[0] is None:
-                return None
+                return None, 0
 
             (max_stream_id,) = row
 
@@ -569,10 +565,11 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                 (user_id, device_id, from_stream_id, max_stream_id),
             )
 
-            if txn.rowcount < limit:
-                return None
+            num_deleted = txn.rowcount
+            if num_deleted < limit:
+                return None, num_deleted
 
-            return max_stream_id
+            return max_stream_id, num_deleted
 
         return await self.db_pool.runInteraction(
             "delete_messages_for_device_between",
