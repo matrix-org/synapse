@@ -524,7 +524,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
         limit: int,
     ) -> Optional[int]:
         """Delete N device messages between the stream IDs, returning the
-        highest stream ID deleted.
+        highest stream ID deleted, or None if nothing was deletable.
 
         This is more efficient than `delete_messages_for_device` when calling in
         a loop to batch delete messages.
