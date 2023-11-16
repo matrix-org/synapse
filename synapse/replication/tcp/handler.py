@@ -595,9 +595,11 @@ class ReplicationCommandHandler:
             cmd.instance_name, cmd.prev_token, cmd.new_token
         ) and self.is_stream_connected(conn, cmd.stream_name):
             logger.debug(
-                "Discarding redundant POSITION %s/%s",
+                "Discarding redundant POSITION %s/%s %s %s",
                 cmd.instance_name,
                 cmd.stream_name,
+                cmd.prev_token,
+                cmd.new_token,
             )
             return
 
@@ -616,9 +618,11 @@ class ReplicationCommandHandler:
             cmd.instance_name, cmd.prev_token, cmd.new_token
         ) and self.is_stream_connected(conn, cmd.stream_name):
             logger.debug(
-                "Discarding redundant POSITION %s/%s",
+                "Discarding redundant POSITION %s/%s %s %s",
                 cmd.instance_name,
                 cmd.stream_name,
+                cmd.prev_token,
+                cmd.new_token,
             )
             return
 
