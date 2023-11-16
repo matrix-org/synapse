@@ -107,13 +107,16 @@ class KeyStore(CacheInvalidationWorkerStore):
             # invalidate takes a tuple corresponding to the params of
             # _get_server_keys_json. _get_server_keys_json only takes one
             # param, which is itself the 2-tuple (server_name, key_id).
-            for key_id in verify_keys:
-                self._invalidate_cache_and_stream(
-                    txn, self._get_server_keys_json, ((server_name, key_id),)
-                )
-                self._invalidate_cache_and_stream(
-                    txn, self.get_server_key_json_for_remote, (server_name, key_id)
-                )
+            self._invalidate_cache_and_stream_bulk(
+                txn,
+                self._get_server_keys_json,
+                [((server_name, key_id),) for key_id in verify_keys],
+            )
+            self._invalidate_cache_and_stream_bulk(
+                txn,
+                self.get_server_key_json_for_remote,
+                [(server_name, key_id) for key_id in verify_keys],
+            )
 
         await self.db_pool.runInteraction(
             "store_server_keys_response", store_server_keys_response_txn
@@ -248,17 +251,20 @@ class KeyStore(CacheInvalidationWorkerStore):
 
         If we have multiple entries for a given key ID, returns the most recent.
         """
-        rows = await self.db_pool.simple_select_list(
-            table="server_keys_json",
-            keyvalues={"server_name": server_name},
-            retcols=(
-                "key_id",
-                "from_server",
-                "ts_added_ms",
-                "ts_valid_until_ms",
-                "key_json",
+        rows = cast(
+            List[Tuple[str, str, int, int, Union[bytes, memoryview]]],
+            await self.db_pool.simple_select_list(
+                table="server_keys_json",
+                keyvalues={"server_name": server_name},
+                retcols=(
+                    "key_id",
+                    "from_server",
+                    "ts_added_ms",
+                    "ts_valid_until_ms",
+                    "key_json",
+                ),
+                desc="get_server_keys_json_for_remote",
             ),
-            desc="get_server_keys_json_for_remote",
         )
 
         if not rows:
@@ -266,14 +272,14 @@ class KeyStore(CacheInvalidationWorkerStore):
 
         # We sort the rows by ts_added_ms so that the most recently added entry
         # will stomp over older entries in the dictionary.
-        rows.sort(key=lambda r: r["ts_added_ms"])
+        rows.sort(key=lambda r: r[2])
 
         return {
-            row["key_id"]: FetchKeyResultForRemote(
+            key_id: FetchKeyResultForRemote(
                 # Cast to bytes since postgresql returns a memoryview.
-                key_json=bytes(row["key_json"]),
-                valid_until_ts=row["ts_valid_until_ms"],
-                added_ts=row["ts_added_ms"],
+                key_json=bytes(key_json),
+                valid_until_ts=ts_valid_until_ms,
+                added_ts=ts_added_ms,
             )
-            for row in rows
+            for key_id, from_server, ts_added_ms, ts_valid_until_ms, key_json in rows
         }

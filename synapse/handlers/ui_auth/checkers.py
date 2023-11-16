@@ -187,9 +187,9 @@ class _BaseThreepidAuthChecker:
 
                 if row:
                     threepid = {
-                        "medium": row["medium"],
-                        "address": row["address"],
-                        "validated_at": row["validated_at"],
+                        "medium": row.medium,
+                        "address": row.address,
+                        "validated_at": row.validated_at,
                     }
 
                     # Valid threepid returned, delete from the db

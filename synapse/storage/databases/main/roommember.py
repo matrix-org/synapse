@@ -482,6 +482,22 @@ class RoomMemberWorkerStore(EventsWorkerStore, CacheInvalidationWorkerStore):
             desc="get_local_users_in_room",
         )
 
+    async def get_local_users_related_to_room(
+        self, room_id: str
+    ) -> List[Tuple[str, str]]:
+        """
+        Retrieves a list of the current roommembers who are local to the server and their membership status.
+        """
+        return cast(
+            List[Tuple[str, str]],
+            await self.db_pool.simple_select_list(
+                table="local_current_membership",
+                keyvalues={"room_id": room_id},
+                retcols=("user_id", "membership"),
+                desc="get_local_users_in_room",
+            ),
+        )
+
     async def check_local_user_in_room(self, user_id: str, room_id: str) -> bool:
         """
         Check whether a given local user is currently joined to the given room.
@@ -543,17 +559,20 @@ class RoomMemberWorkerStore(EventsWorkerStore, CacheInvalidationWorkerStore):
                 "non-local user %s" % (user_id,),
             )
 
-        results_dict = await self.db_pool.simple_select_one(
-            "local_current_membership",
-            {"room_id": room_id, "user_id": user_id},
-            ("membership", "event_id"),
-            allow_none=True,
-            desc="get_local_current_membership_for_user_in_room",
+        results = cast(
+            Optional[Tuple[str, str]],
+            await self.db_pool.simple_select_one(
+                "local_current_membership",
+                {"room_id": room_id, "user_id": user_id},
+                ("membership", "event_id"),
+                allow_none=True,
+                desc="get_local_current_membership_for_user_in_room",
+            ),
         )
-        if not results_dict:
+        if not results:
             return None, None
 
-        return results_dict.get("membership"), results_dict.get("event_id")
+        return results
 
     @cached(max_entries=500000, iterable=True)
     async def get_rooms_for_user_with_stream_ordering(
@@ -940,7 +959,7 @@ class RoomMemberWorkerStore(EventsWorkerStore, CacheInvalidationWorkerStore):
         like_clause = "%:" + host
 
         rows = await self.db_pool.execute(
-            "is_host_joined", None, sql, membership, room_id, like_clause
+            "is_host_joined", sql, membership, room_id, like_clause
         )
 
         if not rows:
@@ -1070,13 +1089,16 @@ class RoomMemberWorkerStore(EventsWorkerStore, CacheInvalidationWorkerStore):
         for fully-joined rooms.
         """
 
-        rows = await self.db_pool.simple_select_list(
-            "current_state_events",
-            keyvalues={"room_id": room_id},
-            retcols=("event_id", "membership"),
-            desc="has_completed_background_updates",
+        rows = cast(
+            List[Tuple[str, Optional[str]]],
+            await self.db_pool.simple_select_list(
+                "current_state_events",
+                keyvalues={"room_id": room_id},
+                retcols=("event_id", "membership"),
+                desc="has_completed_background_updates",
+            ),
         )
-        return {row["event_id"]: row["membership"] for row in rows}
+        return dict(rows)
 
     # TODO This returns a mutable object, which is generally confusing when using a cache.
     @cached(max_entries=10000)  # type: ignore[synapse-@cached-mutable]
@@ -1165,7 +1187,7 @@ class RoomMemberWorkerStore(EventsWorkerStore, CacheInvalidationWorkerStore):
                 AND forgotten = 0;
         """
 
-        rows = await self.db_pool.execute("is_forgotten_room", None, sql, room_id)
+        rows = await self.db_pool.execute("is_forgotten_room", sql, room_id)
 
         # `count(*)` returns always an integer
         # If any rows still exist it means someone has not forgotten this room yet

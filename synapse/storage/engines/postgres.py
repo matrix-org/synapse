@@ -38,7 +38,8 @@ class PostgresEngine(
         super().__init__(psycopg2, database_config)
         psycopg2.extensions.register_type(psycopg2.extensions.UNICODE)
 
-        # Disables passing `bytes` to txn.execute, c.f. #6186. If you do
+        # Disables passing `bytes` to txn.execute, c.f.
+        # https://github.com/matrix-org/synapse/issues/6186. If you do
         # actually want to use bytes than wrap it in `bytearray`.
         def _disable_bytes_adapter(_: bytes) -> NoReturn:
             raise Exception("Passing bytes to DB is disabled.")

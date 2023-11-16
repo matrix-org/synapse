@@ -230,6 +230,13 @@ Example configuration:
 presence:
   enabled: false
 ```
+
+`enabled` can also be set to a special value of "untracked" which ignores updates
+received via clients and federation, while still accepting updates from the
+[module API](../../modules/index.md).
+
+*The "untracked" option was added in Synapse 1.96.0.*
+
 ---
 ### `require_auth_for_profile_requests`
 
@@ -1440,7 +1447,7 @@ database:
   args:
     user: synapse_user
     password: secretpassword
-    database: synapse
+    dbname: synapse
     host: localhost
     port: 5432
     cp_min: 5
@@ -1519,7 +1526,7 @@ databases:
     args:
       user: synapse_user
       password: secretpassword
-      database: synapse_main
+      dbname: synapse_main
       host: localhost
       port: 5432
       cp_min: 5
@@ -1532,7 +1539,7 @@ databases:
     args:
       user: synapse_user
       password: secretpassword
-      database: synapse_state
+      dbname: synapse_state
       host: localhost
       port: 5432
       cp_min: 5
@@ -1746,6 +1753,19 @@ rc_third_party_invite:
   burst_count: 10
 ```
 ---
+### `rc_media_create`
+
+This option ratelimits creation of MXC URIs via the `/_matrix/media/v1/create`
+endpoint based on the account that's creating the media. Defaults to
+`per_second: 10`, `burst_count: 50`.
+
+Example configuration:
+```yaml
+rc_media_create:
+  per_second: 10
+  burst_count: 50
+```
+---
 ### `rc_federation`
 
 Defines limits on federation requests.
@@ -1805,6 +1825,27 @@ Directory where uploaded images and attachments are stored.
 Example configuration:
 ```yaml
 media_store_path: "DATADIR/media_store"
+```
+---
+### `max_pending_media_uploads`
+
+How many *pending media uploads* can a given user have? A pending media upload
+is a created MXC URI that (a) is not expired (the `unused_expires_at` timestamp
+has not passed) and (b) the media has not yet been uploaded for. Defaults to 5.
+
+Example configuration:
+```yaml
+max_pending_media_uploads: 5
+```
+---
+### `unused_expiration_time`
+
+How long to wait in milliseconds before expiring created media IDs. Defaults to
+"24h"
+
+Example configuration:
+```yaml
+unused_expiration_time: "1h"
 ```
 ---
 ### `media_storage_providers`
@@ -4212,6 +4253,9 @@ outbound_federation_restricted_to:
 Also see the [worker
 documentation](../../workers.md#restrict-outbound-federation-traffic-to-a-specific-set-of-workers)
 for more info.
+
+_Added in Synapse 1.89.0._
+
 ---
 ### `run_background_tasks_on`
 

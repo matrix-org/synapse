@@ -786,7 +786,7 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_event_client_serializer(self) -> EventClientSerializer:
-        return EventClientSerializer()
+        return EventClientSerializer(self)
 
     @cache_in_self
     def get_password_policy_handler(self) -> PasswordPolicyHandler:

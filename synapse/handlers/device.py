@@ -328,6 +328,9 @@ class DeviceWorkerHandler:
         return result
 
     async def on_federation_query_user_devices(self, user_id: str) -> JsonDict:
+        if not self.hs.is_mine(UserID.from_string(user_id)):
+            raise SynapseError(400, "User is not hosted on this homeserver")
+
         stream_id, devices = await self.store.get_e2e_device_keys_for_federation_query(
             user_id
         )
@@ -393,15 +396,17 @@ class DeviceWorkerHandler:
         up_to_stream_id = task.params["up_to_stream_id"]
 
         # Delete the messages in batches to avoid too much DB load.
+        from_stream_id = None
         while True:
-            res = await self.store.delete_messages_for_device(
+            from_stream_id, _ = await self.store.delete_messages_for_device_between(
                 user_id=user_id,
                 device_id=device_id,
-                up_to_stream_id=up_to_stream_id,
+                from_stream_id=from_stream_id,
+                to_stream_id=up_to_stream_id,
                 limit=DeviceHandler.DEVICE_MSGS_DELETE_BATCH_LIMIT,
             )
 
-            if res < DeviceHandler.DEVICE_MSGS_DELETE_BATCH_LIMIT:
+            if from_stream_id is None:
                 return TaskStatus.COMPLETE, None, None
 
             await self.clock.sleep(DeviceHandler.DEVICE_MSGS_DELETE_SLEEP_MS / 1000.0)

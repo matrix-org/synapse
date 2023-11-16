@@ -19,6 +19,8 @@ import logging
 import urllib.parse
 from typing import TYPE_CHECKING, Awaitable, Callable, Dict, List, Optional, Tuple
 
+import attr
+
 from synapse.api.errors import (
     CodeMessageException,
     Codes,
@@ -357,9 +359,9 @@ class IdentityHandler:
 
         # Check to see if a session already exists and that it is not yet
         # marked as validated
-        if session and session.get("validated_at") is None:
-            session_id = session["session_id"]
-            last_send_attempt = session["last_send_attempt"]
+        if session and session.validated_at is None:
+            session_id = session.session_id
+            last_send_attempt = session.last_send_attempt
 
             # Check that the send_attempt is higher than previous attempts
             if send_attempt <= last_send_attempt:
@@ -480,7 +482,6 @@ class IdentityHandler:
 
         # We don't actually know which medium this 3PID is. Thus we first assume it's email,
         # and if validation fails we try msisdn
-        validation_session = None
 
         # Try to validate as email
         if self.hs.config.email.can_verify_email:
@@ -488,19 +489,18 @@ class IdentityHandler:
             validation_session = await self.store.get_threepid_validation_session(
                 "email", client_secret, sid=sid, validated=True
             )
-
-        if validation_session:
-            return validation_session
+            if validation_session:
+                return attr.asdict(validation_session)
 
         # Try to validate as msisdn
         if self.hs.config.registration.account_threepid_delegate_msisdn:
             # Ask our delegated msisdn identity server
-            validation_session = await self.threepid_from_creds(
+            return await self.threepid_from_creds(
                 self.hs.config.registration.account_threepid_delegate_msisdn,
                 threepid_creds,
             )
 
-        return validation_session
+        return None
 
     async def proxy_msisdn_submit_token(
         self, id_server: str, client_secret: str, sid: str, token: str

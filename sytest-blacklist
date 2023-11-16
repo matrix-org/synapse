@@ -29,5 +29,5 @@ We can't peek into rooms with joined history_visibility
 Local users can peek by room alias
 Peeked rooms only turn up in the sync for the device who peeked them
 
-# Validation needs to be added to Synapse: #10554
+# Validation needs to be added to Synapse: https://github.com/matrix-org/synapse/issues/10554
 Rejects invalid device keys

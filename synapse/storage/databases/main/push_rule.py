@@ -28,8 +28,11 @@ from typing import (
     cast,
 )
 
+from twisted.internet import defer
+
 from synapse.api.errors import StoreError
 from synapse.config.homeserver import ExperimentalConfig
+from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.replication.tcp.streams import PushRulesStream
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import (
@@ -51,7 +54,8 @@ from synapse.storage.util.id_generators import (
 )
 from synapse.synapse_rust.push import FilteredPushRules, PushRule, PushRules
 from synapse.types import JsonDict
-from synapse.util import json_encoder
+from synapse.util import json_encoder, unwrapFirstError
+from synapse.util.async_helpers import gather_results
 from synapse.util.caches.descriptors import cached, cachedList
 from synapse.util.caches.stream_change_cache import StreamChangeCache
 
@@ -179,46 +183,44 @@ class PushRulesWorkerStore(
 
     @cached(max_entries=5000)
     async def get_push_rules_for_user(self, user_id: str) -> FilteredPushRules:
-        rows = await self.db_pool.simple_select_list(
-            table="push_rules",
-            keyvalues={"user_name": user_id},
-            retcols=(
-                "user_name",
-                "rule_id",
-                "priority_class",
-                "priority",
-                "conditions",
-                "actions",
+        rows = cast(
+            List[Tuple[str, int, int, str, str]],
+            await self.db_pool.simple_select_list(
+                table="push_rules",
+                keyvalues={"user_name": user_id},
+                retcols=(
+                    "rule_id",
+                    "priority_class",
+                    "priority",
+                    "conditions",
+                    "actions",
+                ),
+                desc="get_push_rules_for_user",
             ),
-            desc="get_push_rules_for_user",
         )
 
-        rows.sort(key=lambda row: (-int(row["priority_class"]), -int(row["priority"])))
+        # Sort by highest priority_class, then highest priority.
+        rows.sort(key=lambda row: (-int(row[1]), -int(row[2])))
 
         enabled_map = await self.get_push_rules_enabled_for_user(user_id)
 
         return _load_rules(
-            [
-                (
-                    row["rule_id"],
-                    row["priority_class"],
-                    row["conditions"],
-                    row["actions"],
-                )
-                for row in rows
-            ],
+            [(row[0], row[1], row[3], row[4]) for row in rows],
             enabled_map,
             self.hs.config.experimental,
         )
 
     async def get_push_rules_enabled_for_user(self, user_id: str) -> Dict[str, bool]:
-        results = await self.db_pool.simple_select_list(
-            table="push_rules_enable",
-            keyvalues={"user_name": user_id},
-            retcols=("rule_id", "enabled"),
-            desc="get_push_rules_enabled_for_user",
+        results = cast(
+            List[Tuple[str, Optional[Union[int, bool]]]],
+            await self.db_pool.simple_select_list(
+                table="push_rules_enable",
+                keyvalues={"user_name": user_id},
+                retcols=("rule_id", "enabled"),
+                desc="get_push_rules_enabled_for_user",
+            ),
         )
-        return {r["rule_id"]: bool(r["enabled"]) for r in results}
+        return {r[0]: bool(r[1]) for r in results}
 
     async def have_push_rules_changed_for_user(
         self, user_id: str, last_id: int
@@ -251,23 +253,33 @@ class PushRulesWorkerStore(
             user_id: [] for user_id in user_ids
         }
 
-        rows = cast(
-            List[Tuple[str, str, int, int, str, str]],
-            await self.db_pool.simple_select_many_batch(
-                table="push_rules",
-                column="user_name",
-                iterable=user_ids,
-                retcols=(
-                    "user_name",
-                    "rule_id",
-                    "priority_class",
-                    "priority",
-                    "conditions",
-                    "actions",
+        # gatherResults loses all type information.
+        rows, enabled_map_by_user = await make_deferred_yieldable(
+            gather_results(
+                (
+                    cast(
+                        "defer.Deferred[List[Tuple[str, str, int, int, str, str]]]",
+                        run_in_background(
+                            self.db_pool.simple_select_many_batch,
+                            table="push_rules",
+                            column="user_name",
+                            iterable=user_ids,
+                            retcols=(
+                                "user_name",
+                                "rule_id",
+                                "priority_class",
+                                "priority",
+                                "conditions",
+                                "actions",
+                            ),
+                            desc="bulk_get_push_rules",
+                            batch_size=1000,
+                        ),
+                    ),
+                    run_in_background(self.bulk_get_push_rules_enabled, user_ids),
                 ),
-                desc="bulk_get_push_rules",
-                batch_size=1000,
-            ),
+                consumeErrors=True,
+            ).addErrback(unwrapFirstError)
         )
 
         # Sort by highest priority_class, then highest priority.
@@ -277,8 +289,6 @@ class PushRulesWorkerStore(
             raw_rules.setdefault(user_name, []).append(
                 (rule_id, priority_class, conditions, actions)
             )
-
-        enabled_map_by_user = await self.bulk_get_push_rules_enabled(user_ids)
 
         results: Dict[str, FilteredPushRules] = {}
 
@@ -439,27 +449,28 @@ class PushRuleStore(PushRulesWorkerStore):
         before: str,
         after: str,
     ) -> None:
-        # Lock the table since otherwise we'll have annoying races between the
-        # SELECT here and the UPSERT below.
-        self.database_engine.lock_table(txn, "push_rules")
-
         relative_to_rule = before or after
 
-        res = self.db_pool.simple_select_one_txn(
-            txn,
-            table="push_rules",
-            keyvalues={"user_name": user_id, "rule_id": relative_to_rule},
-            retcols=["priority_class", "priority"],
-            allow_none=True,
-        )
+        sql = """
+            SELECT priority, priority_class FROM push_rules
+            WHERE user_name = ? AND rule_id = ?
+        """
 
-        if not res:
+        if isinstance(self.database_engine, PostgresEngine):
+            sql += " FOR UPDATE"
+        else:
+            # Annoyingly SQLite doesn't support row level locking, so lock the whole table
+            self.database_engine.lock_table(txn, "push_rules")
+
+        txn.execute(sql, (user_id, relative_to_rule))
+        row = txn.fetchone()
+
+        if row is None:
             raise RuleNotFoundException(
                 "before/after rule not found: %s" % (relative_to_rule,)
             )
 
-        base_priority_class = res["priority_class"]
-        base_rule_priority = res["priority"]
+        base_rule_priority, base_priority_class = row
 
         if base_priority_class != priority_class:
             raise InconsistentRuleException(
@@ -507,9 +518,18 @@ class PushRuleStore(PushRulesWorkerStore):
         conditions_json: str,
         actions_json: str,
     ) -> None:
-        # Lock the table since otherwise we'll have annoying races between the
-        # SELECT here and the UPSERT below.
-        self.database_engine.lock_table(txn, "push_rules")
+        if isinstance(self.database_engine, PostgresEngine):
+            # Postgres doesn't do FOR UPDATE on aggregate functions, so select the rows first
+            # then re-select the count/max below.
+            sql = """
+                SELECT * FROM push_rules
+                WHERE user_name = ? and priority_class = ?
+                FOR UPDATE
+            """
+            txn.execute(sql, (user_id, priority_class))
+        else:
+            # Annoyingly SQLite doesn't support row level locking, so lock the whole table
+            self.database_engine.lock_table(txn, "push_rules")
 
         # find the highest priority rule in that class
         sql = (

@@ -144,6 +144,16 @@ class Stream:
         """
         raise NotImplementedError()
 
+    def can_discard_position(
+        self, instance_name: str, prev_token: int, new_token: int
+    ) -> bool:
+        """Whether or not a position command for this stream can be discarded.
+
+        Useful for streams that can never go backwards and where we already know
+        the stream ID for the instance has advanced.
+        """
+        return False
+
     def discard_updates_and_advance(self) -> None:
         """Called when the stream should advance but the updates would be discarded,
         e.g. when there are no currently connected workers.
@@ -161,6 +171,14 @@ class Stream:
             and `limited` is whether there are more updates to fetch.
         """
         current_token = self.current_token(self.local_instance_name)
+
+        # If the minimum current token for the local instance is less than or
+        # equal to the last thing we published, we know that there are no
+        # updates.
+        if self.last_token >= self.minimal_local_current_token():
+            self.last_token = current_token
+            return [], current_token, False
+
         updates, current_token, limited = await self.get_updates_since(
             self.local_instance_name, self.last_token, current_token
         )
@@ -212,6 +230,14 @@ class _StreamFromIdGen(Stream):
 
     def minimal_local_current_token(self) -> Token:
         return self._stream_id_gen.get_minimal_local_current_token()
+
+    def can_discard_position(
+        self, instance_name: str, prev_token: int, new_token: int
+    ) -> bool:
+        # These streams can't go backwards, so we know we can ignore any
+        # positions where the tokens are from before the current token.
+
+        return new_token <= self.current_token(instance_name)
 
 
 def current_token_without_instance(
@@ -489,6 +515,8 @@ class CachesStream(Stream):
         return self.store.get_cache_stream_token_for_writer(instance_name)
 
     def minimal_local_current_token(self) -> Token:
+        if self.store._cache_id_gen:
+            return self.store._cache_id_gen.get_minimal_local_current_token()
         return self.current_token(self.local_instance_name)
 
 

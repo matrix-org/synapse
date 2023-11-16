@@ -1,1 +1,0 @@
-Run trial & integration tests in continuous integration when `.ci` directory is modified.

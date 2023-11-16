@@ -27,7 +27,7 @@ from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.tcp.commands import PositionCommand
 from synapse.replication.tcp.protocol import ServerReplicationStreamProtocol
 from synapse.replication.tcp.streams import EventsStream
-from synapse.replication.tcp.streams._base import StreamRow, Token
+from synapse.replication.tcp.streams._base import CachesStream, StreamRow, Token
 from synapse.util.metrics import Measure
 
 if TYPE_CHECKING:
@@ -123,7 +123,7 @@ class ReplicationStreamer:
 
         # We check up front to see if anything has actually changed, as we get
         # poked because of changes that happened on other instances.
-        if all(
+        if not self.command_handler.should_announce_positions() and all(
             stream.last_token == stream.current_token(self._instance_name)
             for stream in self.streams
         ):
@@ -157,6 +157,21 @@ class ReplicationStreamer:
                         # so let's shuffle them around a bit when we are in torture mode.
                         all_streams = list(all_streams)
                         random.shuffle(all_streams)
+
+                    if self.command_handler.should_announce_positions():
+                        # We need to send out POSITIONs for all streams, usually
+                        # because a worker has reconnected.
+                        self.command_handler.will_announce_positions()
+
+                        for stream in all_streams:
+                            self.command_handler.send_command(
+                                PositionCommand(
+                                    stream.NAME,
+                                    self._instance_name,
+                                    stream.last_token,
+                                    stream.last_token,
+                                )
+                            )
 
                     for stream in all_streams:
                         if stream.last_token == stream.current_token(
@@ -204,6 +219,23 @@ class ReplicationStreamer:
                             # The token has advanced but there is no data to
                             # send, so we send a `POSITION` to inform other
                             # workers of the updated position.
+                            #
+                            # There are two reasons for this: 1) this instance
+                            # requested a stream ID but didn't use it, or 2)
+                            # this instance advanced its own stream position due
+                            # to receiving notifications about other instances
+                            # advancing their stream position.
+
+                            # We skip sending `POSITION` for the `caches` stream
+                            # for the second case as a) it generates a lot of
+                            # traffic as every worker would echo each write, and
+                            # b) nothing cares if a given worker's caches stream
+                            # position lags.
+                            if stream.NAME == CachesStream.NAME:
+                                # If there haven't been any writes since the
+                                # `last_token` then we're in the second case.
+                                if stream.minimal_local_current_token() <= last_token:
+                                    continue
 
                             # Note: `last_token` may not *actually* be the
                             # last token we sent out in a RDATA or POSITION.

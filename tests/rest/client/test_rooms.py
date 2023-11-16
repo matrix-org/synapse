@@ -888,7 +888,8 @@ class RoomsCreateTestCase(RoomBase):
     )
     def test_room_creation_ratelimiting(self) -> None:
         """
-        Regression test for #14312, where ratelimiting was made too strict.
+        Regression test for https://github.com/matrix-org/synapse/issues/14312,
+        where ratelimiting was made too strict.
         Clients should be able to create 10 rooms in a row
         without hitting rate limits, using default rate limit config.
         (We override rate limiting config back to its default value.)

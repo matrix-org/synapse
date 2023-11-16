@@ -93,7 +93,7 @@ class EventSearchInsertionTest(HomeserverTestCase):
         both strings and integers. When using Postgres, integers are automatically
         converted to strings.
 
-        Regression test for #11918.
+        Regression test for https://github.com/matrix-org/synapse/issues/11918.
         """
         store = self.hs.get_datastores().main
 

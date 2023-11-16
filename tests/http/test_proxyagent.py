@@ -29,18 +29,14 @@ from twisted.internet.endpoints import (
 )
 from twisted.internet.interfaces import IProtocol, IProtocolFactory
 from twisted.internet.protocol import Factory, Protocol
-from twisted.protocols.tls import TLSMemoryBIOFactory, TLSMemoryBIOProtocol
+from twisted.protocols.tls import TLSMemoryBIOProtocol
 from twisted.web.http import HTTPChannel
 
 from synapse.http.client import BlocklistingReactorWrapper
 from synapse.http.connectproxyclient import BasicProxyCredentials
 from synapse.http.proxyagent import ProxyAgent, parse_proxy
 
-from tests.http import (
-    TestServerTLSConnectionFactory,
-    dummy_address,
-    get_test_https_policy,
-)
+from tests.http import dummy_address, get_test_https_policy, wrap_server_factory_for_tls
 from tests.server import FakeTransport, ThreadedMemoryReactorClock
 from tests.unittest import TestCase
 from tests.utils import checked_cast
@@ -272,7 +268,9 @@ class MatrixFederationAgentTests(TestCase):
             the server Protocol returned by server_factory
         """
         if ssl:
-            server_factory = _wrap_server_factory_for_tls(server_factory, tls_sanlist)
+            server_factory = wrap_server_factory_for_tls(
+                server_factory, self.reactor, tls_sanlist or [b"DNS:test.com"]
+            )
 
         server_protocol = server_factory.buildProtocol(dummy_address)
         assert server_protocol is not None
@@ -639,8 +637,8 @@ class MatrixFederationAgentTests(TestCase):
         request.finish()
 
         # now we make another test server to act as the upstream HTTP server.
-        server_ssl_protocol = _wrap_server_factory_for_tls(
-            _get_test_protocol_factory()
+        server_ssl_protocol = wrap_server_factory_for_tls(
+            _get_test_protocol_factory(), self.reactor, sanlist=[b"DNS:test.com"]
         ).buildProtocol(dummy_address)
 
         # Tell the HTTP server to send outgoing traffic back via the proxy's transport.
@@ -806,7 +804,9 @@ class MatrixFederationAgentTests(TestCase):
         request.finish()
 
         # now we can replace the proxy channel with a new, SSL-wrapped HTTP channel
-        ssl_factory = _wrap_server_factory_for_tls(_get_test_protocol_factory())
+        ssl_factory = wrap_server_factory_for_tls(
+            _get_test_protocol_factory(), self.reactor, sanlist=[b"DNS:test.com"]
+        )
         ssl_protocol = ssl_factory.buildProtocol(dummy_address)
         assert isinstance(ssl_protocol, TLSMemoryBIOProtocol)
         http_server = ssl_protocol.wrappedProtocol
@@ -868,30 +868,6 @@ class MatrixFederationAgentTests(TestCase):
         proxy_ep = checked_cast(_WrapperEndpoint, https_proxy_agent.http_proxy_endpoint)
         self.assertEqual(proxy_ep._wrappedEndpoint._hostStr, "proxy.com")
         self.assertEqual(proxy_ep._wrappedEndpoint._port, 8888)
-
-
-def _wrap_server_factory_for_tls(
-    factory: IProtocolFactory, sanlist: Optional[List[bytes]] = None
-) -> TLSMemoryBIOFactory:
-    """Wrap an existing Protocol Factory with a test TLSMemoryBIOFactory
-
-    The resultant factory will create a TLS server which presents a certificate
-    signed by our test CA, valid for the domains in `sanlist`
-
-    Args:
-        factory: protocol factory to wrap
-        sanlist: list of domains the cert should be valid for
-
-    Returns:
-        interfaces.IProtocolFactory
-    """
-    if sanlist is None:
-        sanlist = [b"DNS:test.com"]
-
-    connection_creator = TestServerTLSConnectionFactory(sanlist=sanlist)
-    return TLSMemoryBIOFactory(
-        connection_creator, isClient=False, wrappedFactory=factory
-    )
 
 
 def _get_test_protocol_factory() -> IProtocolFactory:
