@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Callable, List, Tuple
+from typing import Callable, List, Set, Tuple
 from unittest.mock import Mock, call
 
 from twisted.internet import defer
@@ -360,4 +360,137 @@ class PostgresReplicaIdentityTestCase(unittest.HomeserverTestCase):
                 len(missing),
                 0,
                 f"The following tables in the {pool.name()!r} database are missing REPLICA IDENTITIES: {missing!r}.",
+            )
+
+
+class PostgresPrimaryKeyTestCase(unittest.HomeserverTestCase):
+    if not USE_POSTGRES_FOR_TESTS:
+        skip = "Requires Postgres"
+
+    # Some tables are exempt, mostly for historical reasons
+    EXEMPT_TABLES = {
+        "appservice_room_list",
+        "batch_events",
+        "blocked_rooms",
+        "cache_invalidation_stream_by_instance",
+        "current_state_delta_stream",
+        "deleted_pushers",
+        "device_auth_providers",
+        "device_federation_inbox",
+        "device_federation_outbox",
+        "device_inbox",
+        "device_lists_changes_in_room",
+        "device_lists_outbound_last_success",
+        "device_lists_outbound_pokes",
+        "device_lists_remote_cache",
+        "device_lists_remote_extremeties",
+        "device_lists_remote_resync",
+        "device_lists_stream",
+        "e2e_cross_signing_keys",
+        "e2e_cross_signing_signatures",
+        "e2e_room_keys",
+        "e2e_room_keys_versions",
+        "erased_users",
+        "event_auth",
+        "event_auth_chain_links",
+        "event_push_actions_staging",
+        "event_push_summary",
+        "event_relations",
+        "event_search",
+        "federation_inbound_events_staging",
+        "federation_stream_position",
+        "ignored_users",
+        "insertion_event_edges",
+        "insertion_event_extremities",
+        "insertion_events",
+        "local_media_repository_thumbnails",
+        "local_media_repository_url_cache",
+        "monthly_active_users",
+        "presence_stream",
+        "push_rules_stream",
+        "ratelimit_override",
+        "remote_media_cache_thumbnails",
+        "room_alias_servers",
+        "room_stats_earliest_token",
+        "room_stats_state",
+        "state_group_edges",
+        "state_groups_state",
+        "stream_ordering_to_exterm",
+        "stream_positions",
+        "threepid_guest_access_tokens",
+        "timeline_gaps",
+        "user_daily_visits",
+        "user_directory",
+        "user_directory_search",
+        "user_filters",
+        "user_ips",
+        "user_signature_stream",
+        "user_threepid_id_server",
+        "users_in_public_rooms",
+        "users_pending_deactivation",
+        "users_who_share_private_rooms",
+        "worker_locks",
+    }
+
+    def prepare(
+        self, reactor: MemoryReactor, clock: Clock, homeserver: HomeServer
+    ) -> None:
+        self.db_pools = homeserver.get_datastores().databases
+
+    def test_all_nonexempt_tables_have_primary_key(self) -> None:
+        """
+        Tests that all tables have a PRIMARY KEY.
+
+        Whilst there are occasionally potentially good reasons to not have one,
+        we should default to having PRIMARY KEYs on new tables.
+
+        Historically we have not created PRIMARY KEYs when they should be created
+        (sometimes even creating a UNIQUE index on the same columns instead).
+
+        It is preferable to use PRIMARY KEYs instead of UNIQUE indices where possible
+        because this:
+
+        - provides a default REPLICA IDENTITY, ensuring logical replication works
+          without extra complication;
+        - is sometimes more helpful for understanding; and
+        - is more useful to external tools which expect PRIMARY KEYs (e.g. some database
+          migration tools on some cloud providers do not work with tables without PRIMARY
+          KEYs)
+        """
+
+        sql = """
+            SELECT tbl.table_name
+            FROM information_schema.tables tbl
+            WHERE table_type = 'BASE TABLE'
+                AND table_schema not in ('pg_catalog', 'information_schema')
+                AND NOT EXISTS (
+                    SELECT 1
+                    FROM information_schema.key_column_usage kcu
+                    WHERE kcu.table_name = tbl.table_name
+                        AND kcu.table_schema = tbl.table_schema
+                )
+        """
+
+        def _list_tables_with_missing_primary_keys_txn(
+            txn: LoggingTransaction,
+        ) -> Set[str]:
+            txn.execute(sql)
+            return {table_name for table_name, in txn}
+
+        for pool in self.db_pools:
+            missing = sorted(
+                self.get_success(
+                    pool.runInteraction(
+                        "test_list_missing_primary_keys",
+                        _list_tables_with_missing_primary_keys_txn,
+                    )
+                )
+                - self.EXEMPT_TABLES
+            )
+            self.assertEqual(
+                len(missing),
+                0,
+                f"The following tables in the {pool.name()!r} database are missing PRIMARY KEYs: {missing!r}.\n"
+                f"Please consider adding a primary key if it makes sense to do so — this gives the table a replica identity for free and helps humans and tools to understand the table better.\n"
+                f"If this lack of a primary key is intentional, please add an exemption.",
             )
