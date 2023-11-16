@@ -484,7 +484,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
             from_stream_id, loop_count = await self.delete_messages_for_device_between(
                 user_id,
                 device_id,
-                from_stream_id=None,
+                from_stream_id=from_stream_id,
                 to_stream_id=up_to_stream_id,
                 limit=limit,
             )
