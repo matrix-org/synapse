@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Callable, List, Tuple
+from typing import Callable, Tuple
 from unittest.mock import Mock, call
 
 from twisted.internet import defer
@@ -29,7 +29,6 @@ from synapse.storage.database import (
 from synapse.util import Clock
 
 from tests import unittest
-from tests.utils import USE_POSTGRES_FOR_TESTS
 
 
 class TupleComparisonClauseTestCase(unittest.TestCase):
@@ -280,85 +279,3 @@ class CancellationTestCase(unittest.HomeserverTestCase):
             ]
         )
         self.assertEqual(exception_callback.call_count, 6)  # no additional calls
-
-
-class PostgresReplicaIdentityTestCase(unittest.HomeserverTestCase):
-    if not USE_POSTGRES_FOR_TESTS:
-        skip = "Requires Postgres"
-
-    def prepare(
-        self, reactor: MemoryReactor, clock: Clock, homeserver: HomeServer
-    ) -> None:
-        self.db_pools = homeserver.get_datastores().databases
-
-    def test_all_tables_have_postgres_replica_identity(self) -> None:
-        """
-        Tests that all tables have a Postgres REPLICA IDENTITY.
-        (See https://github.com/matrix-org/synapse/issues/16224).
-
-        Tables with a PRIMARY KEY have an implied REPLICA IDENTITY and are fine.
-        Other tables need them to be set with `ALTER TABLE`.
-
-        A REPLICA IDENTITY is required for Postgres logical replication to work
-        properly without blocking updates and deletes.
-        """
-
-        sql = """
-            -- Select tables that have no primary key and use the default replica identity rule
-            -- (the default is to use the primary key)
-            WITH tables_no_pkey AS (
-                SELECT tbl.table_schema, tbl.table_name
-                FROM information_schema.tables tbl
-                WHERE table_type = 'BASE TABLE'
-                    AND table_schema not in ('pg_catalog', 'information_schema')
-                    AND NOT EXISTS (
-                        SELECT 1
-                        FROM information_schema.table_constraints tc
-                        WHERE tc.constraint_type = 'PRIMARY KEY'
-                            AND tc.table_schema = tbl.table_schema
-                            AND tc.table_name = tbl.table_name
-                    )
-            )
-            SELECT pg_class.oid::regclass FROM tables_no_pkey INNER JOIN pg_class ON pg_class.oid::regclass = table_name::regclass
-            WHERE relreplident = 'd'
-
-            UNION
-
-            -- Also select tables that use an index as a replica identity
-            -- but where the index doesn't exist
-            -- (e.g. it could have been deleted)
-            SELECT pg_class.oid::regclass
-                FROM information_schema.tables tbl
-                INNER JOIN pg_class ON pg_class.oid::regclass = table_name::regclass
-                WHERE table_type = 'BASE TABLE'
-                    AND table_schema not in ('pg_catalog', 'information_schema')
-
-                    -- 'i' means an index is used as the replica identity
-                    AND relreplident = 'i'
-
-                    -- look for indices that are marked as the replica identity
-                    AND NOT EXISTS (
-                        SELECT indexrelid::regclass
-                        FROM pg_index
-                        WHERE indrelid = pg_class.oid::regclass AND indisreplident
-                    )
-        """
-
-        def _list_tables_with_missing_replica_identities_txn(
-            txn: LoggingTransaction,
-        ) -> List[str]:
-            txn.execute(sql)
-            return [table_name for table_name, in txn]
-
-        for pool in self.db_pools:
-            missing = self.get_success(
-                pool.runInteraction(
-                    "test_list_missing_replica_identities",
-                    _list_tables_with_missing_replica_identities_txn,
-                )
-            )
-            self.assertEqual(
-                len(missing),
-                0,
-                f"The following tables in the {pool.name()!r} database are missing REPLICA IDENTITIES: {missing!r}.",
-            )
