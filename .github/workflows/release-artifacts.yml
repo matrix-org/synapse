@@ -111,8 +111,8 @@ jobs:
 
         exclude:
           # Don't build macos wheels on PR CI.
-          - is_pr: true
-            os: "macos-11"
+          #- is_pr: true
+          #  os: "macos-11"
           # Don't build aarch64 wheels on mac.
           - os: "macos-11"
             arch: aarch64
@@ -130,7 +130,7 @@ jobs:
           python-version: "3.x"
 
       - name: Install cibuildwheel
-        run: python -m pip install cibuildwheel==2.9.0
+        run: python -m pip install cibuildwheel==2.16.2
 
       - name: Set up QEMU to emulate aarch64
         if: matrix.arch == 'aarch64'
