@@ -283,6 +283,31 @@ def flush_buffers() -> None:
     sys.stderr.flush()
 
 
+def merge_into(dest: Any, new: Any) -> None:
+    """
+    Merges `new` into `dest` with the following rules:
+
+    - dicts: values with the same key will be merged recursively
+    - lists: `new` will be appended to `dest`
+    - primitives: they will be checked for equality and inequality will result
+        in a ValueError
+
+    It is an error for `dest` and `new` to be of different types.
+    """
+    if isinstance(dest, dict) and isinstance(new, dict):
+        for k, v in new.items():
+            if k in dest:
+                merge_into(dest[k], v)
+            else:
+                dest[k] = v
+    elif isinstance(dest, list) and isinstance(new, list):
+        dest.extend(new)
+    elif type(dest) != type(new):
+        raise TypeError(f"Cannot merge {type(dest).__name__} and {type(new).__name__}")
+    elif dest != new:
+        raise ValueError(f"Cannot merge primitive values: {dest!r} != {new!r}")
+
+
 def convert(src: str, dst: str, **template_vars: object) -> None:
     """Generate a file from a template
 
