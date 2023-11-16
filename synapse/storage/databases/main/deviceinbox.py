@@ -450,14 +450,12 @@ class DeviceInboxWorkerStore(SQLBaseStore):
         user_id: str,
         device_id: Optional[str],
         up_to_stream_id: int,
-        limit: Optional[int] = None,
     ) -> int:
         """
         Args:
             user_id: The recipient user_id.
             device_id: The recipient device_id.
             up_to_stream_id: Where to delete messages up to.
-            limit: maximum number of messages to delete
 
         Returns:
             The number of messages deleted.
@@ -486,18 +484,13 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                 device_id,
                 from_stream_id=from_stream_id,
                 to_stream_id=up_to_stream_id,
-                limit=limit,
+                limit=1000,
             )
             count += loop_count
             if from_stream_id is None:
                 break
 
         log_kv({"message": f"deleted {count} messages for device", "count": count})
-
-        # In this case we don't know if we hit the limit or the delete is complete
-        # so let's not update the cache.
-        if count == limit:
-            return count
 
         # Update the cache, ensuring that we only ever increase the value
         updated_last_deleted_stream_id = self._last_device_delete_cache.get(
