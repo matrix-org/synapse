@@ -370,13 +370,13 @@ def convert(src: str, dst: str, **template_vars: object) -> None:
         outfile.write(rendered)
 
 
-def add_worker_roles_to_shared_config(
+def add_worker_to_instance_map(
     shared_config: dict,
     worker_name: str,
     worker_port: int,
 ) -> None:
-    """Given a dictionary representing a config file shared across all workers,
-    append appropriate worker information to it for the current worker_type instance.
+    """
+    Update the shared config map to add the worker in the instance_map.
 
     Args:
         shared_config: The config dict that all worker instances share (after being
@@ -384,13 +384,8 @@ def add_worker_roles_to_shared_config(
         worker_name: The name of the worker instance.
         worker_port: The HTTP replication port that the worker instance is listening on.
     """
-    # The instance_map config field marks the workers that write to various replication
-    # streams
     instance_map = shared_config.setdefault("instance_map", {})
 
-    # Add all workers to the `instance_map`
-    # Technically only certain types of workers, such as stream writers, are needed
-    # here but it is simpler just to be consistent.
     if os.environ.get("SYNAPSE_USE_UNIX_SOCKET", False):
         instance_map[worker_name] = {
             "path": f"/run/worker.{worker_port}",
@@ -808,8 +803,10 @@ def generate_worker_files(
         else:
             healthcheck_urls.append("http://localhost:%d/health" % (worker_port,))
 
-        # Update the shared config with sharding-related options if necessary
-        add_worker_roles_to_shared_config(shared_config, worker_name, worker_port)
+        # Add all workers to the `instance_map`
+        # Technically only certain types of workers, such as stream writers, are needed
+        # here but it is simpler just to be consistent.
+        add_worker_to_instance_map(shared_config, worker_name, worker_port)
 
         # Enable the worker in supervisord
         worker_descriptors.append(worker_config)
