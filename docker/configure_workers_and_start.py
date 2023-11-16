@@ -98,12 +98,7 @@ class WorkerTemplate:
 
 
 WORKERS_CONFIG: Dict[str, WorkerTemplate] = {
-    "pusher": WorkerTemplate(
-        listener_resources=[],
-        endpoint_patterns=[],
-        shared_extra_conf=lambda _worker_name: {},
-        worker_extra_conf="",
-    ),
+    "pusher": WorkerTemplate(),
     "user_dir": WorkerTemplate(
         listener_resources=["client"],
         endpoint_patterns=[
@@ -112,7 +107,6 @@ WORKERS_CONFIG: Dict[str, WorkerTemplate] = {
         shared_extra_conf=lambda worker_name: {
             "update_user_directory_from_worker": worker_name
         },
-        worker_extra_conf="",
     ),
     "media_repository": WorkerTemplate(
         listener_resources=["media"],
@@ -132,19 +126,11 @@ WORKERS_CONFIG: Dict[str, WorkerTemplate] = {
         worker_extra_conf="enable_media_repo: true",
     ),
     "appservice": WorkerTemplate(
-        listener_resources=[],
-        endpoint_patterns=[],
         shared_extra_conf=lambda worker_name: {
             "notify_appservices_from_worker": worker_name
         },
-        worker_extra_conf="",
     ),
-    "federation_sender": WorkerTemplate(
-        listener_resources=[],
-        endpoint_patterns=[],
-        shared_extra_conf=lambda _worker_name: {},
-        worker_extra_conf="",
-    ),
+    "federation_sender": WorkerTemplate(),
     "synchrotron": WorkerTemplate(
         listener_resources=["client"],
         endpoint_patterns=[
@@ -153,8 +139,6 @@ WORKERS_CONFIG: Dict[str, WorkerTemplate] = {
             "^/_matrix/client/(api/v1|r0|v3)/initialSync$",
             "^/_matrix/client/(api/v1|r0|v3)/rooms/[^/]+/initialSync$",
         ],
-        shared_extra_conf=lambda _worker_name: {},
-        worker_extra_conf="",
     ),
     "client_reader": WorkerTemplate(
         listener_resources=["client"],
@@ -187,8 +171,6 @@ WORKERS_CONFIG: Dict[str, WorkerTemplate] = {
             "^/_matrix/client/(r0|v3|unstable)/capabilities$",
             "^/_matrix/client/(r0|v3|unstable)/notifications$",
         ],
-        shared_extra_conf=lambda _worker_name: {},
-        worker_extra_conf="",
     ),
     "federation_reader": WorkerTemplate(
         listener_resources=["federation"],
@@ -213,28 +195,18 @@ WORKERS_CONFIG: Dict[str, WorkerTemplate] = {
             "^/_matrix/federation/(v1|v2)/get_groups_publicised$",
             "^/_matrix/key/v2/query",
         ],
-        shared_extra_conf=lambda _worker_name: {},
-        worker_extra_conf="",
     ),
     "federation_inbound": WorkerTemplate(
         listener_resources=["federation"],
         endpoint_patterns=["/_matrix/federation/(v1|v2)/send/"],
-        shared_extra_conf=lambda _worker_name: {},
-        worker_extra_conf="",
     ),
     "event_persister": WorkerTemplate(
         listener_resources=["replication"],
-        endpoint_patterns=[],
-        shared_extra_conf=lambda _worker_name: {},
-        worker_extra_conf="",
     ),
     "background_worker": WorkerTemplate(
-        listener_resources=[],
-        endpoint_patterns=[],
         # This worker cannot be sharded. Therefore, there should only ever be one
         # background worker. This is enforced for the safety of your database.
         shared_extra_conf=lambda worker_name: {"run_background_tasks_on": worker_name},
-        worker_extra_conf="",
     ),
     "event_creator": WorkerTemplate(
         listener_resources=["client"],
@@ -246,14 +218,10 @@ WORKERS_CONFIG: Dict[str, WorkerTemplate] = {
             "^/_matrix/client/(api/v1|r0|v3|unstable)/knock/",
             "^/_matrix/client/(api/v1|r0|v3|unstable)/profile/",
         ],
-        shared_extra_conf=lambda _worker_name: {},
-        worker_extra_conf="",
     ),
     "frontend_proxy": WorkerTemplate(
         listener_resources=["client", "replication"],
         endpoint_patterns=["^/_matrix/client/(api/v1|r0|v3|unstable)/keys/upload"],
-        shared_extra_conf=lambda _worker_name: {},
-        worker_extra_conf="",
     ),
     "account_data": WorkerTemplate(
         listener_resources=["client", "replication"],
@@ -261,14 +229,10 @@ WORKERS_CONFIG: Dict[str, WorkerTemplate] = {
             "^/_matrix/client/(r0|v3|unstable)/.*/tags",
             "^/_matrix/client/(r0|v3|unstable)/.*/account_data",
         ],
-        shared_extra_conf=lambda _worker_name: {},
-        worker_extra_conf="",
     ),
     "presence": WorkerTemplate(
         listener_resources=["client", "replication"],
         endpoint_patterns=["^/_matrix/client/(api/v1|r0|v3|unstable)/presence/"],
-        shared_extra_conf=lambda _worker_name: {},
-        worker_extra_conf="",
     ),
     "receipts": WorkerTemplate(
         listener_resources=["client", "replication"],
@@ -276,20 +240,14 @@ WORKERS_CONFIG: Dict[str, WorkerTemplate] = {
             "^/_matrix/client/(r0|v3|unstable)/rooms/.*/receipt",
             "^/_matrix/client/(r0|v3|unstable)/rooms/.*/read_markers",
         ],
-        shared_extra_conf=lambda _worker_name: {},
-        worker_extra_conf="",
     ),
     "to_device": WorkerTemplate(
         listener_resources=["client", "replication"],
         endpoint_patterns=["^/_matrix/client/(r0|v3|unstable)/sendToDevice/"],
-        shared_extra_conf=lambda _worker_name: {},
-        worker_extra_conf="",
     ),
     "typing": WorkerTemplate(
         listener_resources=["client", "replication"],
         endpoint_patterns=["^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/typing"],
-        shared_extra_conf=lambda _worker_name: {},
-        worker_extra_conf="",
     ),
 }
 
