@@ -1,11 +1,17 @@
 # Synapse 1.96.0 (2023-11-16)
 
+Synapse will soon be getting forked by Element under an AGPLv3.0 licence (with
+CLA, for proprietary dual licensing). You can read more about this here:
+
+* https://matrix.org/blog/2023/11/06/future-of-synapse-dendrite/
+* https://element.io/blog/element-to-adopt-agplv3/
+
+Any changes needed by server administrators will be communicated via our usual
+announcements channels, but we are striving to make this as seamless as possible.
+
 ### Bugfixes
 
 - Fix "'int' object is not iterable" error in `set_device_id_for_pushers` background update introduced in Synapse 1.95.0. ([\#16594](https://github.com/matrix-org/synapse/issues/16594))
-
-
-
 
 # Synapse 1.96.0rc1 (2023-10-31)
 
