@@ -486,7 +486,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                 device_id,
                 from_stream_id=None,
                 to_stream_id=up_to_stream_id,
-                limit=1000,
+                limit=limit,
             )
             count += loop_count
             if from_stream_id is None:
