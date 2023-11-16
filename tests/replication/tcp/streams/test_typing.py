@@ -35,6 +35,10 @@ class TypingStreamTestCase(BaseStreamTestCase):
         typing = self.hs.get_typing_handler()
         assert isinstance(typing, TypingWriterHandler)
 
+        # Create a typing update before we reconnect so that there is a missing
+        # update to fetch.
+        typing._push_update(member=RoomMember(ROOM_ID, USER_ID), typing=True)
+
         self.reconnect()
 
         typing._push_update(member=RoomMember(ROOM_ID, USER_ID), typing=True)
@@ -90,6 +94,10 @@ class TypingStreamTestCase(BaseStreamTestCase):
         """
         typing = self.hs.get_typing_handler()
         assert isinstance(typing, TypingWriterHandler)
+
+        # Create a typing update before we reconnect so that there is a missing
+        # update to fetch.
+        typing._push_update(member=RoomMember(ROOM_ID, USER_ID), typing=True)
 
         self.reconnect()
 
