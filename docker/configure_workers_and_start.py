@@ -82,21 +82,21 @@ MAIN_PROCESS_UNIX_SOCKET_PUBLIC_PATH = "/run/main_public.sock"
 MAIN_PROCESS_UNIX_SOCKET_PRIVATE_PATH = "/run/main_private.sock"
 
 
+@dataclass
+class WorkerTemplate:
+    listener_resources: Set[str] = field(default_factory=set)
+    endpoint_patterns: Set[str] = field(default_factory=set)
+    # (worker_name) -> {config}
+    shared_extra_conf: Callable[[str], Dict[str, Any]] = lambda _worker_name: {}
+    worker_extra_conf: str = ""
+
+
 # Workers with exposed endpoints needs either "client", "federation", or "media" listener_resources
 # Watching /_matrix/client needs a "client" listener
 # Watching /_matrix/federation needs a "federation" listener
 # Watching /_matrix/media and related needs a "media" listener
 # Stream Writers require "client" and "replication" listeners because they
 #   have to attach by instance_map to the master process and have client endpoints.
-@dataclass
-class WorkerTemplate:
-    listener_resources: Set[str] = field(default_factory=set)
-    endpoint_patterns: Set[str] = field(default_factory=set)
-    # (worker_name) -> {}
-    shared_extra_conf: Callable[[str], Dict[str, Any]] = lambda _worker_name: {}
-    worker_extra_conf: str = ""
-
-
 WORKERS_CONFIG: Dict[str, WorkerTemplate] = {
     "pusher": WorkerTemplate(),
     "user_dir": WorkerTemplate(
