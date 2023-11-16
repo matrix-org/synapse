@@ -161,7 +161,7 @@ class ReplicationStreamer:
                     if self.command_handler.should_announce_positions():
                         # We need to send out POSITIONs for all streams, usually
                         # because a worker has reconnected.
-                        self.command_handler.will_should_announce_positions()
+                        self.command_handler.will_announce_positions()
 
                         for stream in all_streams:
                             self.command_handler.send_command(

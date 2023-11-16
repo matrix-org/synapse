@@ -416,7 +416,7 @@ class ReplicationCommandHandler:
         """Check if we should send POSITION commands for all streams ASAP."""
         return self._should_announce_positions
 
-    def will_should_announce_positions(self) -> None:
+    def will_announce_positions(self) -> None:
         """Mark that we're about to send POSITIONs out for all streams."""
         self._should_announce_positions = False
 
