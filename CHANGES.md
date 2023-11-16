@@ -1,3 +1,12 @@
+# Synapse 1.96.0 (2023-11-16)
+
+### Bugfixes
+
+- Fix "'int' object is not iterable" error in `set_device_id_for_pushers` background update introduced in Synapse 1.95.0. ([\#16594](https://github.com/matrix-org/synapse/issues/16594))
+
+
+
+
 # Synapse 1.96.0rc1 (2023-10-31)
 
 ### Features

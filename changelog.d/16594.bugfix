@@ -1,1 +1,0 @@
-Fix "'int' object is not iterable" error in `set_device_id_for_pushers` background update introduced in Synapse 1.95.0.
