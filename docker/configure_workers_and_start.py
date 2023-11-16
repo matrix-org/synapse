@@ -81,6 +81,10 @@ MAIN_PROCESS_REPLICATION_PORT = 9093
 MAIN_PROCESS_UNIX_SOCKET_PUBLIC_PATH = "/run/main_public.sock"
 MAIN_PROCESS_UNIX_SOCKET_PRIVATE_PATH = "/run/main_private.sock"
 
+# We place a file at this path to indicate that the script has already been
+# run and should not be run again.
+MARKER_FILE_PATH = "/conf/workers_have_been_configured"
+
 
 @dataclass
 class WorkerTemplate:
@@ -980,8 +984,8 @@ def main(args: List[str], environ: MutableMapping[str, str]) -> None:
         log("Base homeserver config exists—not regenerating")
     # This script may be run multiple times (mostly by Complement, see note at top of
     # file). Don't re-configure workers in this instance.
-    mark_filepath = "/conf/workers_have_been_configured"
-    if not os.path.exists(mark_filepath):
+
+    if not os.path.exists(MARKER_FILE_PATH):
         # Collect and validate worker_type requests
         # Read the desired worker configuration from the environment
         worker_types_env = environ.get("SYNAPSE_WORKER_TYPES", "").strip()
@@ -1000,7 +1004,7 @@ def main(args: List[str], environ: MutableMapping[str, str]) -> None:
         generate_worker_files(environ, config_path, data_dir, requested_worker_types)
 
         # Mark workers as being configured
-        with open(mark_filepath, "w") as f:
+        with open(MARKER_FILE_PATH, "w") as f:
             f.write("")
     else:
         log("Worker config exists—not regenerating")
