@@ -581,14 +581,14 @@ class FederationSender(AbstractFederationSender):
                                 "get_joined_hosts", str(sg)
                             )
                             if destinations is None:
-                                # Add logging to help track down #13444
+                                # Add logging to help track down https://github.com/matrix-org/synapse/issues/13444
                                 logger.info(
                                     "Unexpectedly did not have cached destinations for %s / %s",
                                     sg,
                                     event.event_id,
                                 )
                         else:
-                            # Add logging to help track down #13444
+                            # Add logging to help track down https://github.com/matrix-org/synapse/issues/13444
                             logger.info(
                                 "Unexpectedly did not have cached prev group for %s",
                                 event.event_id,

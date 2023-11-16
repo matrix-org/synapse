@@ -192,7 +192,7 @@ phonenumbers = ">=8.2.0"
 # we use GaugeHistogramMetric, which was added in prom-client 0.4.0.
 prometheus-client = ">=0.4.0"
 # we use `order`, which arrived in attrs 19.2.0.
-# Note: 21.1.0 broke `/sync`, see #9936
+# Note: 21.1.0 broke `/sync`, see https://github.com/matrix-org/synapse/issues/9936
 attrs = ">=19.2.0,!=21.1.0"
 netaddr = ">=0.7.18"
 # Jinja 2.x is incompatible with MarkupSafe>=2.1. To ensure that admins do not
@@ -357,7 +357,7 @@ commonmark = ">=0.9.1"
 pygithub = ">=1.55"
 # The following are executed as commands by the release script.
 twine = "*"
-# Towncrier min version comes from #3425. Rationale unclear.
+# Towncrier min version comes from https://github.com/matrix-org/synapse/pull/3425. Rationale unclear.
 towncrier = ">=18.6.0rc1"
 
 # Used for checking the Poetry lockfile
@@ -377,8 +377,9 @@ furo = ">=2022.12.7,<2024.0.0"
 
 [build-system]
 # The upper bounds here are defensive, intended to prevent situations like
-# #13849 and #14079 where we see buildtime or runtime errors caused by build
-# system changes.
+# https://github.com/matrix-org/synapse/issues/13849 and
+# https://github.com/matrix-org/synapse/issues/14079 where we see buildtime or
+# runtime errors caused by build system changes.
 # We are happy to raise these upper bounds upon request,
 # provided we check that it's safe to do so (i.e. that CI passes).
 requires = ["poetry-core>=1.1.0,<=1.7.0", "setuptools_rust>=1.3,<=1.8.1"]

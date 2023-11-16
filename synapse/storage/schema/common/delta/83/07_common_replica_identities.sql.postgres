@@ -1,0 +1,30 @@
+/* Copyright 2023 The Matrix.org Foundation C.I.C
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+-- Annotate some tables in Postgres with a REPLICA IDENTITY.
+-- Any table that doesn't have a primary key should be annotated explicitly with
+-- a REPLICA IDENTITY so that logical replication can be used.
+-- If this is not done, then UPDATE and DELETE statements on those tables
+-- will fail if logical replication is in use.
+
+
+-- Re-use unique indices already defined on tables as a replica identity.
+ALTER TABLE applied_module_schemas REPLICA IDENTITY USING INDEX applied_module_schemas_module_name_file_key;
+ALTER TABLE applied_schema_deltas REPLICA IDENTITY USING INDEX applied_schema_deltas_version_file_key;
+ALTER TABLE background_updates REPLICA IDENTITY USING INDEX background_updates_uniqueness;
+ALTER TABLE schema_compat_version REPLICA IDENTITY USING INDEX schema_compat_version_lock_key;
+ALTER TABLE schema_version REPLICA IDENTITY USING INDEX schema_version_lock_key;
+
+

@@ -66,7 +66,7 @@ database:
   args:
     user: <user>
     password: <pass>
-    database: <db>
+    dbname: <db>
     host: <host>
     cp_min: 5
     cp_max: 10

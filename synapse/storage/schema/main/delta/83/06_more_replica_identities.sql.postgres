@@ -1,0 +1,80 @@
+/* Copyright 2023 The Matrix.org Foundation C.I.C
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+-- Annotate some tables in Postgres with a REPLICA IDENTITY.
+-- Any table that doesn't have a primary key should be annotated explicitly with
+-- a REPLICA IDENTITY so that logical replication can be used.
+-- If this is not done, then UPDATE and DELETE statements on those tables
+-- will fail if logical replication is in use.
+
+
+-- Where possible, re-use unique indices already defined on tables as a replica
+-- identity.
+ALTER TABLE account_data REPLICA IDENTITY USING INDEX account_data_uniqueness;
+ALTER TABLE application_services_txns REPLICA IDENTITY USING INDEX application_services_txns_as_id_txn_id_key;
+ALTER TABLE appservice_stream_position REPLICA IDENTITY USING INDEX appservice_stream_position_lock_key;
+ALTER TABLE current_state_events REPLICA IDENTITY USING INDEX current_state_events_event_id_key;
+ALTER TABLE device_lists_changes_converted_stream_position REPLICA IDENTITY USING INDEX device_lists_changes_converted_stream_position_lock_key;
+ALTER TABLE devices REPLICA IDENTITY USING INDEX device_uniqueness;
+ALTER TABLE e2e_device_keys_json REPLICA IDENTITY USING INDEX e2e_device_keys_json_uniqueness;
+ALTER TABLE e2e_fallback_keys_json REPLICA IDENTITY USING INDEX e2e_fallback_keys_json_uniqueness;
+ALTER TABLE e2e_one_time_keys_json REPLICA IDENTITY USING INDEX e2e_one_time_keys_json_uniqueness;
+ALTER TABLE event_backward_extremities REPLICA IDENTITY USING INDEX event_backward_extremities_event_id_room_id_key;
+ALTER TABLE event_edges REPLICA IDENTITY USING INDEX event_edges_event_id_prev_event_id_idx;
+ALTER TABLE event_forward_extremities REPLICA IDENTITY USING INDEX event_forward_extremities_event_id_room_id_key;
+ALTER TABLE event_json REPLICA IDENTITY USING INDEX event_json_event_id_key;
+ALTER TABLE event_push_summary_last_receipt_stream_id REPLICA IDENTITY USING INDEX event_push_summary_last_receipt_stream_id_lock_key;
+ALTER TABLE event_push_summary_stream_ordering REPLICA IDENTITY USING INDEX event_push_summary_stream_ordering_lock_key;
+ALTER TABLE events REPLICA IDENTITY USING INDEX events_event_id_key;
+ALTER TABLE event_to_state_groups REPLICA IDENTITY USING INDEX event_to_state_groups_event_id_key;
+ALTER TABLE event_txn_id_device_id REPLICA IDENTITY USING INDEX event_txn_id_device_id_event_id;
+ALTER TABLE event_txn_id REPLICA IDENTITY USING INDEX event_txn_id_event_id;
+ALTER TABLE local_current_membership REPLICA IDENTITY USING INDEX local_current_membership_idx;
+ALTER TABLE partial_state_events REPLICA IDENTITY USING INDEX partial_state_events_event_id_key;
+ALTER TABLE partial_state_rooms_servers REPLICA IDENTITY USING INDEX partial_state_rooms_servers_room_id_server_name_key;
+ALTER TABLE profiles REPLICA IDENTITY USING INDEX profiles_user_id_key;
+ALTER TABLE redactions REPLICA IDENTITY USING INDEX redactions_event_id_key;
+ALTER TABLE registration_tokens REPLICA IDENTITY USING INDEX registration_tokens_token_key;
+ALTER TABLE rejections REPLICA IDENTITY USING INDEX rejections_event_id_key;
+ALTER TABLE room_account_data REPLICA IDENTITY USING INDEX room_account_data_uniqueness;
+ALTER TABLE room_aliases REPLICA IDENTITY USING INDEX room_aliases_room_alias_key;
+ALTER TABLE room_depth REPLICA IDENTITY USING INDEX room_depth_room_id_key;
+ALTER TABLE room_forgetter_stream_pos REPLICA IDENTITY USING INDEX room_forgetter_stream_pos_lock_key;
+ALTER TABLE room_memberships REPLICA IDENTITY USING INDEX room_memberships_event_id_key;
+ALTER TABLE room_tags REPLICA IDENTITY USING INDEX room_tag_uniqueness;
+ALTER TABLE room_tags_revisions REPLICA IDENTITY USING INDEX room_tag_revisions_uniqueness;
+ALTER TABLE server_keys_json REPLICA IDENTITY USING INDEX server_keys_json_uniqueness;
+ALTER TABLE sessions REPLICA IDENTITY USING INDEX sessions_session_type_session_id_key;
+ALTER TABLE state_events REPLICA IDENTITY USING INDEX state_events_event_id_key;
+ALTER TABLE stats_incremental_position REPLICA IDENTITY USING INDEX stats_incremental_position_lock_key;
+ALTER TABLE threads REPLICA IDENTITY USING INDEX threads_uniqueness;
+ALTER TABLE ui_auth_sessions_credentials REPLICA IDENTITY USING INDEX ui_auth_sessions_credentials_session_id_stage_type_key;
+ALTER TABLE ui_auth_sessions_ips REPLICA IDENTITY USING INDEX ui_auth_sessions_ips_session_id_ip_user_agent_key;
+ALTER TABLE ui_auth_sessions REPLICA IDENTITY USING INDEX ui_auth_sessions_session_id_key;
+ALTER TABLE user_directory_stream_pos REPLICA IDENTITY USING INDEX user_directory_stream_pos_lock_key;
+ALTER TABLE user_external_ids REPLICA IDENTITY USING INDEX user_external_ids_auth_provider_external_id_key;
+ALTER TABLE user_threepids REPLICA IDENTITY USING INDEX medium_address;
+ALTER TABLE worker_read_write_locks_mode REPLICA IDENTITY USING INDEX worker_read_write_locks_mode_key;
+ALTER TABLE worker_read_write_locks REPLICA IDENTITY USING INDEX worker_read_write_locks_key;
+
+-- special cases: unique indices on nullable columns can't be used
+ALTER TABLE event_push_actions REPLICA IDENTITY FULL;
+ALTER TABLE local_media_repository REPLICA IDENTITY FULL;
+ALTER TABLE receipts_graph REPLICA IDENTITY FULL;
+ALTER TABLE receipts_linearized REPLICA IDENTITY FULL;
+ALTER TABLE received_transactions REPLICA IDENTITY FULL;
+ALTER TABLE remote_media_cache REPLICA IDENTITY FULL;
+ALTER TABLE server_signature_keys REPLICA IDENTITY FULL;
+ALTER TABLE users REPLICA IDENTITY FULL;

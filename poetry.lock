@@ -417,19 +417,6 @@ files = [
 colorama = {version = "*", markers = "platform_system == \"Windows\""}
 
 [[package]]
-name = "click-default-group"
-version = "1.2.2"
-description = "Extends click.Group to invoke a command without explicit subcommand name"
-optional = false
-python-versions = "*"
-files = [
-    {file = "click-default-group-1.2.2.tar.gz", hash = "sha256:d9560e8e8dfa44b3562fbc9425042a0fd6d21956fcc2db0077f63f34253ab904"},
-]
-
-[package.dependencies]
-click = "*"
-
-[[package]]
 name = "colorama"
 version = "0.4.6"
 description = "Cross-platform colored terminal text."
@@ -1742,13 +1729,13 @@ test = ["appdirs (==1.4.4)", "covdefaults (>=2.2.2)", "pytest (>=7.2.1)", "pytes
 
 [[package]]
 name = "prometheus-client"
-version = "0.17.1"
+version = "0.18.0"
 description = "Python client for the Prometheus monitoring system."
 optional = false
-python-versions = ">=3.6"
+python-versions = ">=3.8"
 files = [
-    {file = "prometheus_client-0.17.1-py3-none-any.whl", hash = "sha256:e537f37160f6807b8202a6fc4764cdd19bac5480ddd3e0d463c3002b34462101"},
-    {file = "prometheus_client-0.17.1.tar.gz", hash = "sha256:21e674f39831ae3f8acde238afd9a27a37d0d2fb5a28ea094f0ce25d2cbf2091"},
+    {file = "prometheus_client-0.18.0-py3-none-any.whl", hash = "sha256:8de3ae2755f890826f4b6479e5571d4f74ac17a81345fe69a6778fdb92579184"},
+    {file = "prometheus_client-0.18.0.tar.gz", hash = "sha256:35f7a8c22139e2bb7ca5a698e92d38145bc8dc74c1c0bf56f25cca886a764e17"},
 ]
 
 [package.extras]
@@ -2906,18 +2893,17 @@ files = [
 
 [[package]]
 name = "towncrier"
-version = "23.6.0"
+version = "23.11.0"
 description = "Building newsfiles for your project."
 optional = false
-python-versions = ">=3.7"
+python-versions = ">=3.8"
 files = [
-    {file = "towncrier-23.6.0-py3-none-any.whl", hash = "sha256:da552f29192b3c2b04d630133f194c98e9f14f0558669d427708e203fea4d0a5"},
-    {file = "towncrier-23.6.0.tar.gz", hash = "sha256:fc29bd5ab4727c8dacfbe636f7fb5dc53b99805b62da1c96b214836159ff70c1"},
+    {file = "towncrier-23.11.0-py3-none-any.whl", hash = "sha256:2e519ca619426d189e3c98c99558fe8be50c9ced13ea1fc20a4a353a95d2ded7"},
+    {file = "towncrier-23.11.0.tar.gz", hash = "sha256:13937c247e3f8ae20ac44d895cf5f96a60ad46cfdcc1671759530d7837d9ee5d"},
 ]
 
 [package.dependencies]
 click = "*"
-click-default-group = "*"
 importlib-resources = {version = ">=5", markers = "python_version < \"3.10\""}
 incremental = "*"
 jinja2 = "*"
@@ -2928,13 +2914,13 @@ dev = ["furo", "packaging", "sphinx (>=5)", "twisted"]
 
 [[package]]
 name = "treq"
-version = "22.2.0"
+version = "23.11.0"
 description = "High-level Twisted HTTP Client API"
 optional = false
 python-versions = ">=3.6"
 files = [
-    {file = "treq-22.2.0-py3-none-any.whl", hash = "sha256:27d95b07c5c14be3e7b280416139b036087617ad5595be913b1f9b3ce981b9b2"},
-    {file = "treq-22.2.0.tar.gz", hash = "sha256:df757e3f141fc782ede076a604521194ffcb40fa2645cf48e5a37060307f52ec"},
+    {file = "treq-23.11.0-py3-none-any.whl", hash = "sha256:f494c2218d61cab2cabbee37cd6606d3eea9d16cf14190323095c95d22c467e9"},
+    {file = "treq-23.11.0.tar.gz", hash = "sha256:0914ff929fd1632ce16797235260f8bc19d20ff7c459c1deabd65b8c68cbeac5"},
 ]
 
 [package.dependencies]
@@ -2942,11 +2928,11 @@ attrs = "*"
 hyperlink = ">=21.0.0"
 incremental = "*"
 requests = ">=2.1.0"
-Twisted = {version = ">=18.7.0", extras = ["tls"]}
+Twisted = {version = ">=22.10.0", extras = ["tls"]}
 
 [package.extras]
-dev = ["httpbin (==0.5.0)", "pep8", "pyflakes"]
-docs = ["sphinx (>=1.4.8)"]
+dev = ["httpbin (==0.7.0)", "pep8", "pyflakes", "werkzeug (==2.0.3)"]
+docs = ["sphinx (<7.0.0)"]
 
 [[package]]
 name = "twine"
@@ -3047,13 +3033,13 @@ twisted = "*"
 
 [[package]]
 name = "types-bleach"
-version = "6.1.0.0"
+version = "6.1.0.1"
 description = "Typing stubs for bleach"
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "types-bleach-6.1.0.0.tar.gz", hash = "sha256:3cf0e55d4618890a00af1151f878b2e2a7a96433850b74e12bede7663d774532"},
-    {file = "types_bleach-6.1.0.0-py3-none-any.whl", hash = "sha256:f0bc75d0f6475036ac69afebf37c41d116dfba78dae55db80437caf0fcd35c28"},
+    {file = "types-bleach-6.1.0.1.tar.gz", hash = "sha256:1e43c437e734a90efe4f40ebfe831057599568d3b275939ffbd6094848a18a27"},
+    {file = "types_bleach-6.1.0.1-py3-none-any.whl", hash = "sha256:f83f80e0709f13d809a9c79b958a1089df9b99e68059287beb196e38967e4ddf"},
 ]
 
 [[package]]
@@ -3127,13 +3113,13 @@ files = [
 
 [[package]]
 name = "types-pyopenssl"
-version = "23.2.0.2"
+version = "23.3.0.0"
 description = "Typing stubs for pyOpenSSL"
 optional = false
-python-versions = "*"
+python-versions = ">=3.7"
 files = [
-    {file = "types-pyOpenSSL-23.2.0.2.tar.gz", hash = "sha256:6a010dac9ecd42b582d7dd2cc3e9e40486b79b3b64bb2fffba1474ff96af906d"},
-    {file = "types_pyOpenSSL-23.2.0.2-py3-none-any.whl", hash = "sha256:19536aa3debfbe25a918cf0d898e9f5fbbe6f3594a429da7914bf331deb1b342"},
+    {file = "types-pyOpenSSL-23.3.0.0.tar.gz", hash = "sha256:5ffb077fe70b699c88d5caab999ae80e192fe28bf6cda7989b7e79b1e4e2dcd3"},
+    {file = "types_pyOpenSSL-23.3.0.0-py3-none-any.whl", hash = "sha256:00171433653265843b7469ddb9f3c86d698668064cc33ef10537822156130ebf"},
 ]
 
 [package.dependencies]

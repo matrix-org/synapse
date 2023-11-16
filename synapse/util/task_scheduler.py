@@ -193,7 +193,7 @@ class TaskScheduler:
         result: Optional[JsonMapping] = None,
         error: Optional[str] = None,
     ) -> bool:
-        """Update some task associated values. This is exposed publically so it can
+        """Update some task associated values. This is exposed publicly so it can
         be used inside task functions, mainly to update the result and be able to
         resume a task at a specific step after a restart of synapse.
 

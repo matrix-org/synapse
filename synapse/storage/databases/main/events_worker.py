@@ -1312,7 +1312,8 @@ class EventsWorkerStore(SQLBaseStore):
             room_version: Optional[RoomVersion]
             if not room_version_id:
                 # this should only happen for out-of-band membership events which
-                # arrived before #6983 landed. For all other events, we should have
+                # arrived before https://github.com/matrix-org/synapse/issues/6983
+                # landed. For all other events, we should have
                 # an entry in the 'rooms' table.
                 #
                 # However, the 'out_of_band_membership' flag is unreliable for older
@@ -1323,7 +1324,8 @@ class EventsWorkerStore(SQLBaseStore):
                         "Room %s for event %s is unknown" % (d["room_id"], event_id)
                     )
 
-                # so, assuming this is an out-of-band-invite that arrived before #6983
+                # so, assuming this is an out-of-band-invite that arrived before
+                # https://github.com/matrix-org/synapse/issues/6983
                 # landed, we know that the room version must be v5 or earlier (because
                 # v6 hadn't been invented at that point, so invites from such rooms
                 # would have been rejected.)

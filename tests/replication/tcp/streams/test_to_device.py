@@ -62,7 +62,7 @@ class ToDeviceStreamTestCase(BaseStreamTestCase):
             )
 
         # add one more message, for user2 this time
-        # this message would be dropped before fixing #15335
+        # this message would be dropped before fixing https://github.com/matrix-org/synapse/issues/15335
         msg["content"] = {"device": {}}
         messages = {user2: {"device": msg}}
 

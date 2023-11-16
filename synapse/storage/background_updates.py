@@ -49,7 +49,11 @@ else:
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
-    from synapse.storage.database import DatabasePool, LoggingTransaction
+    from synapse.storage.database import (
+        DatabasePool,
+        LoggingDatabaseConnection,
+        LoggingTransaction,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -746,10 +750,10 @@ class BackgroundUpdater:
                 The named index will be dropped upon completion of the new index.
         """
 
-        def create_index_psql(conn: Connection) -> None:
+        def create_index_psql(conn: "LoggingDatabaseConnection") -> None:
             conn.rollback()
             # postgres insists on autocommit for the index
-            conn.set_session(autocommit=True)  # type: ignore
+            conn.engine.attempt_to_set_autocommit(conn.conn, True)
 
             try:
                 c = conn.cursor()
@@ -793,9 +797,9 @@ class BackgroundUpdater:
                 undo_timeout_sql = f"SET statement_timeout = {default_timeout}"
                 conn.cursor().execute(undo_timeout_sql)
 
-                conn.set_session(autocommit=False)  # type: ignore
+                conn.engine.attempt_to_set_autocommit(conn.conn, False)
 
-        def create_index_sqlite(conn: Connection) -> None:
+        def create_index_sqlite(conn: "LoggingDatabaseConnection") -> None:
             # Sqlite doesn't support concurrent creation of indexes.
             #
             # We assume that sqlite doesn't give us invalid indices; however
@@ -825,7 +829,9 @@ class BackgroundUpdater:
                 c.execute(sql)
 
         if isinstance(self.db_pool.engine, engines.PostgresEngine):
-            runner: Optional[Callable[[Connection], None]] = create_index_psql
+            runner: Optional[
+                Callable[[LoggingDatabaseConnection], None]
+            ] = create_index_psql
         elif psql_only:
             runner = None
         else:

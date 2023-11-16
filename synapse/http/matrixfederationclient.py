@@ -465,7 +465,7 @@ class MatrixFederationHttpClient:
         """Wrapper for _send_request which can optionally retry the request
         upon receiving a combination of a 400 HTTP response code and a
         'M_UNRECOGNIZED' errcode. This is a workaround for Synapse <= v0.99.3
-        due to #3622.
+        due to https://github.com/matrix-org/synapse/issues/3622.
 
         Args:
             request: details of request to be sent
@@ -958,9 +958,9 @@ class MatrixFederationHttpClient:
                 requests).
             try_trailing_slash_on_400: True if on a 400 M_UNRECOGNIZED
                 response we should try appending a trailing slash to the end
-                of the request. Workaround for #3622 in Synapse <= v0.99.3. This
-                will be attempted before backing off if backing off has been
-                enabled.
+                of the request. Workaround for https://github.com/matrix-org/synapse/issues/3622
+                in Synapse <= v0.99.3. This will be attempted before backing off if
+                backing off has been enabled.
             parser: The parser to use to decode the response. Defaults to
                 parsing as JSON.
             backoff_on_all_error_codes: Back off if we get any error response
@@ -1155,7 +1155,8 @@ class MatrixFederationHttpClient:
 
             try_trailing_slash_on_400: True if on a 400 M_UNRECOGNIZED
                 response we should try appending a trailing slash to the end of
-                the request. Workaround for #3622 in Synapse <= v0.99.3.
+                the request. Workaround for https://github.com/matrix-org/synapse/issues/3622
+                in Synapse <= v0.99.3.
 
             parser: The parser to use to decode the response. Defaults to
                 parsing as JSON.
@@ -1250,7 +1251,8 @@ class MatrixFederationHttpClient:
 
             try_trailing_slash_on_400: True if on a 400 M_UNRECOGNIZED
                 response we should try appending a trailing slash to the end of
-                the request. Workaround for #3622 in Synapse <= v0.99.3.
+                the request. Workaround for https://github.com/matrix-org/synapse/issues/3622
+                in Synapse <= v0.99.3.
 
             parser: The parser to use to decode the response. Defaults to
                 parsing as JSON.

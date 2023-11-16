@@ -425,7 +425,7 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
         """Background update to clean out extremities that should have been
         deleted previously.
 
-        Mainly used to deal with the aftermath of #5269.
+        Mainly used to deal with the aftermath of https://github.com/matrix-org/synapse/issues/5269.
         """
 
         # This works by first copying all existing forward extremities into the
@@ -558,7 +558,7 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
             )
 
             logger.info(
-                "Deleted %d forward extremities of %d checked, to clean up #5269",
+                "Deleted %d forward extremities of %d checked, to clean up matrix-org/synapse#5269",
                 deleted,
                 len(original_set),
             )
@@ -1222,14 +1222,13 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
                 )
 
                 # Iterate the parent IDs and invalidate caches.
-                for parent_id in {r[1] for r in relations_to_insert}:
-                    cache_tuple = (parent_id,)
-                    self._invalidate_cache_and_stream(  # type: ignore[attr-defined]
-                        txn, self.get_relations_for_event, cache_tuple  # type: ignore[attr-defined]
-                    )
-                    self._invalidate_cache_and_stream(  # type: ignore[attr-defined]
-                        txn, self.get_thread_summary, cache_tuple  # type: ignore[attr-defined]
-                    )
+                cache_tuples = {(r[1],) for r in relations_to_insert}
+                self._invalidate_cache_and_stream_bulk(  # type: ignore[attr-defined]
+                    txn, self.get_relations_for_event, cache_tuples  # type: ignore[attr-defined]
+                )
+                self._invalidate_cache_and_stream_bulk(  # type: ignore[attr-defined]
+                    txn, self.get_thread_summary, cache_tuples  # type: ignore[attr-defined]
+                )
 
             if results:
                 latest_event_id = results[-1][0]
