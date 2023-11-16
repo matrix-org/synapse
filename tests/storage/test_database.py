@@ -313,9 +313,10 @@ class PostgresReplicaIdentityTestCase(unittest.HomeserverTestCase):
                     AND table_schema not in ('pg_catalog', 'information_schema')
                     AND NOT EXISTS (
                         SELECT 1
-                        FROM information_schema.key_column_usage kcu
-                        WHERE kcu.table_name = tbl.table_name
-                            AND kcu.table_schema = tbl.table_schema
+                        FROM information_schema.table_constraints tc
+                        WHERE tc.constraint_type = 'PRIMARY KEY'
+                            AND tc.table_schema = tbl.table_schema
+                            AND tc.table_name = tbl.table_name
                     )
             )
             SELECT pg_class.oid::regclass FROM tables_no_pkey INNER JOIN pg_class ON pg_class.oid::regclass = table_name::regclass
