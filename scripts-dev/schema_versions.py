@@ -49,8 +49,7 @@ def get_schema_versions(tag: git.Tag) -> Tuple[Optional[int], Optional[int]]:
                     if line.startswith(b"SCHEMA_VERSION"):
                         schema_version = int(line.split()[2])
 
-                    # Bail early.
-                    if schema_version:
+                        # Bail early.
                         break
         else:
             # SCHEMA_COMPAT_VERSION is sometimes across multiple lines, the easist
