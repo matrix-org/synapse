@@ -1,0 +1,1 @@
+ALTER TABLE schema_version REPLICA IDENTITY USING INDEX schema_version_lock_key;

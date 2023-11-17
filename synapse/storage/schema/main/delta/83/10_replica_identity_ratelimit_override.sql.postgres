@@ -1,0 +1,1 @@
+ALTER TABLE ratelimit_override REPLICA IDENTITY USING INDEX ratelimit_override_idx;

@@ -1,0 +1,1 @@
+ALTER TABLE event_txn_id REPLICA IDENTITY USING INDEX event_txn_id_event_id;
