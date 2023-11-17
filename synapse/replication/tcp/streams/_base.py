@@ -305,6 +305,14 @@ class BackfillStream(Stream):
         # which means we need to negate it.
         return -self.store._backfill_id_gen.get_minimal_local_current_token()
 
+    def can_discard_position(
+        self, instance_name: str, prev_token: int, new_token: int
+    ) -> bool:
+        # Caches streams can't go backwards, so we know we can ignore any
+        # positions where the tokens are from before the current token.
+
+        return new_token <= self.current_token(instance_name)
+
 
 class PresenceStream(_StreamFromIdGen):
     @attr.s(slots=True, frozen=True, auto_attribs=True)
@@ -518,6 +526,14 @@ class CachesStream(Stream):
         if self.store._cache_id_gen:
             return self.store._cache_id_gen.get_minimal_local_current_token()
         return self.current_token(self.local_instance_name)
+
+    def can_discard_position(
+        self, instance_name: str, prev_token: int, new_token: int
+    ) -> bool:
+        # Caches streams can't go backwards, so we know we can ignore any
+        # positions where the tokens are from before the current token.
+
+        return new_token <= self.current_token(instance_name)
 
 
 class DeviceListsStream(_StreamFromIdGen):
