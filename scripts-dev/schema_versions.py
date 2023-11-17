@@ -14,6 +14,8 @@
 # limitations under the License.
 
 import io
+import json
+import sys
 from collections import defaultdict
 from typing import Iterator, Optional, Tuple
 
@@ -90,7 +92,7 @@ def get_tags(repo: git.Repo) -> Iterator[git.Tag]:
     return (tag for _, tag in sorted(tags, key=lambda t: t[0]))
 
 
-if __name__ == "__main__":
+def calculate_version_chart() -> str:
     repo = git.Repo(path=".")
 
     schema_version = None
@@ -116,7 +118,27 @@ if __name__ == "__main__":
         schema_versions[schema_compat_version or schema_version].append(tag.name)
 
     # Generate a table of which maps a version to the version it can be rolled back to.
-    print("| Synapse version | Backwards compatible version |")
-    print("|-----------------|------------------------------|")
+    result = "| Synapse version | Backwards compatible version |\n"
+    result += "|-----------------|------------------------------|\n"
     for synapse_versions in schema_versions.values():
-        print(f"| {synapse_versions[-1]: ^15} | {synapse_versions[0]: ^28} |")
+        result += f"| {synapse_versions[-1]: ^15} | {synapse_versions[0]: ^28} |\n"
+
+    return result
+
+
+if __name__ == "__main__":
+    if len(sys.argv) == 3 and sys.argv[1] == "supports":
+        # We don't care about the renderer which is being used, which is the second argument.
+        sys.exit(0)
+    else:
+        # Expect JSON data on stdin.
+        context, book = json.load(sys.stdin)
+
+        for section in book["sections"]:
+            if "Chapter" in section and section["Chapter"]["path"] == "upgrade.md":
+                section["Chapter"]["content"] = section["Chapter"]["content"].replace(
+                    "<!-- REPLACE_WITH_SCHEMA_VERSIONS -->", calculate_version_chart()
+                )
+
+        # Print the result back out to stdout.
+        print(json.dumps(book))
