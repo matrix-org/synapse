@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import io
+from collections import defaultdict
 from typing import Iterator, Optional, Tuple
 
 import git
@@ -95,27 +96,27 @@ if __name__ == "__main__":
     schema_version = None
     schema_compat_version = None
 
-    # Maps of schema versions -> Synapse version.
-    schema_versions = {}
-    schema_compat_versions = {}
+    # Map of schema version -> Synapse versions at that schema.
+    schema_versions = defaultdict(list)
 
+    # Find ranges of versions which are compatible with a schema version.
+    #
+    # There are two modes of operation:
+    #
+    # 1. If schema_compat_version is None, then Synapse can only move to a new
+    #    version with schema_version >= its current version.
+    # 2. If schema_compat_version is *not* None, then Synapse can move to a new
+    #    version with schema version >= schema_compat_version.
+    #
+    # See https://github.com/matrix-org/synapse/pull/9933 which was included in v1.37.0.
     for tag in get_tags(repo):
-        cur_schema_version, cur_schema_compat_version = get_schema_versions(tag)
+        schema_version, schema_compat_version = get_schema_versions(tag)
 
-        if schema_version != cur_schema_version:
-            schema_versions[cur_schema_version] = tag.name
-            schema_version = cur_schema_version
-        if schema_compat_version != cur_schema_compat_version:
-            schema_compat_versions[cur_schema_compat_version] = tag.name
-            schema_compat_version = cur_schema_compat_version
+        # If a schema compat version is given, prefer that over the schema version.
+        schema_versions[schema_compat_version or schema_version].append(tag.name)
 
     # Generate a table of which maps a version to the version it can be rolled back to.
     print("| Synapse version | Backwards compatible version |")
     print("|-----------------|------------------------------|")
-    # v1.37.0 was when the schema compat version was added.
-    #
-    # See https://github.com/matrix-org/synapse/pull/9933.
-    for schema_compat_version, synapse_version in schema_compat_versions.items():
-        print(
-            f"| {synapse_version: ^15} | {schema_versions[schema_compat_version]: ^28} |"
-        )
+    for synapse_versions in schema_versions.values():
+        print(f"| {synapse_versions[-1]: ^15} | {synapse_versions[0]: ^28} |")
