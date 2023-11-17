@@ -699,7 +699,7 @@ The following fields are returned in the JSON response body:
   - `quarantined_by` - string or null - The user ID that initiated the quarantine request
     for this media. Null if not quarantined.
   - `safe_from_quarantine` - bool - Status if this media is safe from quarantining.
-  - `upload_name` - string or null - The name the media was uploaded with. Null if unavailable.
+  - `upload_name` - string or null - The name the media was uploaded with. Null if not provided during upload.
 - `next_token`: integer - Indication for pagination. See above.
 - `total` - integer - Total number of media.
 
