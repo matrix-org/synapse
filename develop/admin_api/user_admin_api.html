@@ -715,6 +715,16 @@ The newest media is on top. You can change the order with parameters
       &quot;quarantined_by&quot;: null,
       &quot;safe_from_quarantine&quot;: false,
       &quot;upload_name&quot;: &quot;test2.png&quot;
+    },
+    {
+      &quot;created_ts&quot;: 300400,
+      &quot;last_access_ts&quot;: 300700,
+      &quot;media_id&quot;: &quot;BzYNLRUgGHphBkdKGbzXwbjX&quot;,
+      &quot;media_length&quot;: 1337,
+      &quot;media_type&quot;: &quot;application/octet-stream&quot;,
+      &quot;quarantined_by&quot;: null,
+      &quot;safe_from_quarantine&quot;: false,
+      &quot;upload_name&quot;: null
     }
   ],
   &quot;next_token&quot;: 3,
@@ -780,16 +790,17 @@ database, especially for large environments.</p>
 Media objects contain the following fields:
 <ul>
 <li><code>created_ts</code> - integer - Timestamp when the content was uploaded in ms.</li>
-<li><code>last_access_ts</code> - integer - Timestamp when the content was last accessed in ms.</li>
+<li><code>last_access_ts</code> - integer or null - Timestamp when the content was last accessed in ms.
+Null if there was no access, yet.</li>
 <li><code>media_id</code> - string - The id used to refer to the media. Details about the format
 are documented under
 <a href="../media_repository.html">media repository</a>.</li>
 <li><code>media_length</code> - integer - Length of the media in bytes.</li>
 <li><code>media_type</code> - string - The MIME-type of the media.</li>
-<li><code>quarantined_by</code> - string - The user ID that initiated the quarantine request
-for this media.</li>
+<li><code>quarantined_by</code> - string or null - The user ID that initiated the quarantine request
+for this media. Null if not quarantined.</li>
 <li><code>safe_from_quarantine</code> - bool - Status if this media is safe from quarantining.</li>
-<li><code>upload_name</code> - string - The name the media was uploaded with.</li>
+<li><code>upload_name</code> - string or null - The name the media was uploaded with. Null if not provided during upload.</li>
 </ul>
 </li>
 <li><code>next_token</code>: integer - Indication for pagination. See above.</li>
