@@ -1,13 +1,5 @@
 # Synapse 1.96.1 (2023-11-17)
 
-This minor release was needed only because of CI-related trouble on [v1.96.0](https://github.com/matrix-org/synapse/releases/tag/v1.96.0), which was never released.
-
-### Internal Changes
-
-- Fix building of wheels in CI. ([\#16653](https://github.com/matrix-org/synapse/issues/16653))
-
-# Synapse 1.96.0 (2023-11-16)
-
 Synapse will soon be getting forked by Element under an AGPLv3.0 licence (with
 CLA, for proprietary dual licensing). You can read more about this here:
 
@@ -16,6 +8,14 @@ CLA, for proprietary dual licensing). You can read more about this here:
 
 Any changes needed by server administrators will be communicated via our usual
 announcements channels, but we are striving to make this as seamless as possible.
+
+This minor release was needed only because of CI-related trouble on [v1.96.0](https://github.com/matrix-org/synapse/releases/tag/v1.96.0), which was never released.
+
+### Internal Changes
+
+- Fix building of wheels in CI. ([\#16653](https://github.com/matrix-org/synapse/issues/16653))
+
+# Synapse 1.96.0 (2023-11-16)
 
 ### Bugfixes
 
