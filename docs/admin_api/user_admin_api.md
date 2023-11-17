@@ -618,6 +618,16 @@ A response body like the following is returned:
       "quarantined_by": null,
       "safe_from_quarantine": false,
       "upload_name": "test2.png"
+    },
+    {
+      "created_ts": 300400,
+      "last_access_ts": 300700,
+      "media_id": "BzYNLRUgGHphBkdKGbzXwbjX",
+      "media_length": 1337,
+      "media_type": "application/octet-stream",
+      "quarantined_by": null,
+      "safe_from_quarantine": false,
+      "upload_name": null
     }
   ],
   "next_token": 3,
@@ -679,16 +689,17 @@ The following fields are returned in the JSON response body:
 - `media` - An array of objects, each containing information about a media.
   Media objects contain the following fields:
   - `created_ts` - integer - Timestamp when the content was uploaded in ms.
-  - `last_access_ts` - integer - Timestamp when the content was last accessed in ms.
+  - `last_access_ts` - integer or null - Timestamp when the content was last accessed in ms.
+     Null if there was no access, yet.
   - `media_id` - string - The id used to refer to the media. Details about the format
     are documented under
     [media repository](../media_repository.md).
   - `media_length` - integer - Length of the media in bytes.
   - `media_type` - string - The MIME-type of the media.
-  - `quarantined_by` - string - The user ID that initiated the quarantine request
-    for this media.
+  - `quarantined_by` - string or null - The user ID that initiated the quarantine request
+    for this media. Null if not quarantined.
   - `safe_from_quarantine` - bool - Status if this media is safe from quarantining.
-  - `upload_name` - string - The name the media was uploaded with.
+  - `upload_name` - string or null - The name the media was uploaded with. Null if unavailable.
 - `next_token`: integer - Indication for pagination. See above.
 - `total` - integer - Total number of media.
 
