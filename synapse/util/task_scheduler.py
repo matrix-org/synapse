@@ -377,7 +377,7 @@ class TaskScheduler:
                 self._running_tasks.remove(task.id)
 
             # Try launch a new task since we've finished with this one.
-            self._clock.call_later(1, self._launch_scheduled_tasks)
+            self._clock.call_later(0.1, self._launch_scheduled_tasks)
 
         if len(self._running_tasks) >= TaskScheduler.MAX_CONCURRENT_RUNNING_TASKS:
             return
