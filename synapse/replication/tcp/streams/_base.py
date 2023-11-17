@@ -308,7 +308,7 @@ class BackfillStream(Stream):
     def can_discard_position(
         self, instance_name: str, prev_token: int, new_token: int
     ) -> bool:
-        # Caches streams can't go backwards, so we know we can ignore any
+        # Backfill stream can't go backwards, so we know we can ignore any
         # positions where the tokens are from before the current token.
 
         return new_token <= self.current_token(instance_name)
