@@ -1,1 +1,0 @@
-Remove whole table locks on push rule modifications. Contributed by Nick @ Beeper (@fizzadar).
