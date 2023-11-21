@@ -33,7 +33,7 @@ but we are striving to make this as seamless as possible.
 - Support reactor tick timings on more types of event loops. ([\#16532](https://github.com/matrix-org/synapse/issues/16532))
 - Improve type hints. ([\#16564](https://github.com/matrix-org/synapse/issues/16564), [\#16611](https://github.com/matrix-org/synapse/issues/16611), [\#16612](https://github.com/matrix-org/synapse/issues/16612))
 - Avoid executing no-op queries. ([\#16583](https://github.com/matrix-org/synapse/issues/16583))
-- Simplify persistance code to be per-room. ([\#16584](https://github.com/matrix-org/synapse/issues/16584))
+- Simplify persistence code to be per-room. ([\#16584](https://github.com/matrix-org/synapse/issues/16584))
 - Use standard SQL helpers in persistence code. ([\#16585](https://github.com/matrix-org/synapse/issues/16585))
 - Avoid updating the stream cache unnecessarily. ([\#16586](https://github.com/matrix-org/synapse/issues/16586))
 - Improve performance when using opentracing. ([\#16589](https://github.com/matrix-org/synapse/issues/16589))
