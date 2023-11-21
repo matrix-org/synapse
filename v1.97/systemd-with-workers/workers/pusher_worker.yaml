@@ -1,0 +1,4 @@
+worker_app: synapse.app.pusher
+worker_name: pusher_worker1
+
+worker_log_config: /etc/matrix-synapse/pusher-worker-log.yaml
