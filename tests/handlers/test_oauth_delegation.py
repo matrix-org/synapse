@@ -13,7 +13,8 @@
 # limitations under the License.
 
 from http import HTTPStatus
-from typing import Any, Dict, Union
+from io import BytesIO
+from typing import Any, Dict, Optional, Union
 from unittest.mock import ANY, AsyncMock, Mock
 from urllib.parse import parse_qs
 
@@ -25,6 +26,8 @@ from signedjson.key import (
 from signedjson.sign import sign_json
 
 from twisted.test.proto_helpers import MemoryReactor
+from twisted.web.http_headers import Headers
+from twisted.web.iweb import IResponse
 
 from synapse.api.errors import (
     AuthError,
@@ -33,14 +36,16 @@ from synapse.api.errors import (
     OAuthInsufficientScopeError,
     SynapseError,
 )
+from synapse.http.site import SynapseRequest
 from synapse.rest import admin
 from synapse.rest.client import account, devices, keys, login, logout, register
 from synapse.server import HomeServer
-from synapse.types import JsonDict
+from synapse.types import JsonDict, UserID
 from synapse.util import Clock
 
+from tests.server import FakeChannel
 from tests.test_utils import FakeResponse, get_awaitable_result
-from tests.unittest import HomeserverTestCase, skip_unless
+from tests.unittest import HomeserverTestCase, override_config, skip_unless
 from tests.utils import HAS_AUTHLIB, mock_getRawHeaders
 
 # These are a few constants that are used as config parameters in the tests.
@@ -677,3 +682,69 @@ class MSC3861OAuthDelegation(HomeserverTestCase):
 
         # There should be no call to the introspection endpoint
         self.http_client.request.assert_not_called()
+
+    @override_config({"mau_stats_only": True})
+    def test_request_tracking(self) -> None:
+        """Using an access token should update the client_ips and MAU tables."""
+        # To start, there are no MAU users.
+        store = self.hs.get_datastores().main
+        mau = self.get_success(store.get_monthly_active_count())
+        self.assertEqual(mau, 0)
+
+        known_token = "token-token-GOOD-:)"
+
+        async def mock_http_client_request(
+            method: str,
+            uri: str,
+            data: Optional[bytes] = None,
+            headers: Optional[Headers] = None,
+        ) -> IResponse:
+            """Mocked auth provider response."""
+            assert method == "POST"
+            token = parse_qs(data)[b"token"][0].decode("utf-8")
+            if token == known_token:
+                return FakeResponse.json(
+                    code=200,
+                    payload={
+                        "active": True,
+                        "scope": MATRIX_USER_SCOPE,
+                        "sub": SUBJECT,
+                        "username": USERNAME,
+                    },
+                )
+
+            return FakeResponse.json(code=200, payload={"active": False})
+
+        self.http_client.request = mock_http_client_request
+
+        EXAMPLE_IPV4_ADDR = "123.123.123.123"
+        EXAMPLE_USER_AGENT = "httprettygood"
+
+        # First test a known access token
+        channel = FakeChannel(self.site, self.reactor)
+        req = SynapseRequest(channel, self.site)
+        req.client.host = EXAMPLE_IPV4_ADDR
+        req.requestHeaders.addRawHeader("Authorization", f"Bearer {known_token}")
+        req.requestHeaders.addRawHeader("User-Agent", EXAMPLE_USER_AGENT)
+        req.content = BytesIO(b"")
+        req.requestReceived(
+            b"GET",
+            b"/_matrix/client/v3/account/whoami",
+            b"1.1",
+        )
+        channel.await_result()
+        self.assertEqual(channel.code, HTTPStatus.OK, channel.json_body)
+        self.assertEqual(channel.json_body["user_id"], USER_ID, channel.json_body)
+
+        # Expect to see one MAU entry, from the first request
+        mau = self.get_success(store.get_monthly_active_count())
+        self.assertEqual(mau, 1)
+
+        conn_infos = self.get_success(
+            store.get_user_ip_and_agents(UserID.from_string(USER_ID))
+        )
+        self.assertEqual(len(conn_infos), 1, conn_infos)
+        conn_info = conn_infos[0]
+        self.assertEqual(conn_info["access_token"], known_token)
+        self.assertEqual(conn_info["ip"], EXAMPLE_IPV4_ADDR)
+        self.assertEqual(conn_info["user_agent"], EXAMPLE_USER_AGENT)
