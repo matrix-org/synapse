@@ -226,6 +226,7 @@ class ServerNoticesManager:
             target=UserID.from_string(user_id),
             room_id=room_id,
             action="invite",
+            ratelimit=False,
         )
 
     async def _update_notice_user_profile_if_changed(
@@ -268,5 +269,6 @@ class ServerNoticesManager:
                 target=UserID.from_string(self.server_notices_mxid),
                 room_id=room_id,
                 action="join",
+                ratelimit=False,
                 content={"displayname": display_name, "avatar_url": avatar_url},
             )
