@@ -16,13 +16,7 @@ from twisted.web.resource import Resource
 from synapse.rest.well_known import well_known_resource
 
 from tests import unittest
-
-try:
-    import authlib  # noqa: F401
-
-    HAS_AUTHLIB = True
-except ImportError:
-    HAS_AUTHLIB = False
+from tests.utils import HAS_AUTHLIB
 
 
 class WellKnownTests(unittest.HomeserverTestCase):

@@ -41,15 +41,7 @@ from synapse.util import Clock
 
 from tests.test_utils import FakeResponse, get_awaitable_result
 from tests.unittest import HomeserverTestCase, skip_unless
-from tests.utils import mock_getRawHeaders
-
-try:
-    import authlib  # noqa: F401
-
-    HAS_AUTHLIB = True
-except ImportError:
-    HAS_AUTHLIB = False
-
+from tests.utils import HAS_AUTHLIB, mock_getRawHeaders
 
 # These are a few constants that are used as config parameters in the tests.
 SERVER_NAME = "test"

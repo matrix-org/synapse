@@ -22,15 +22,7 @@ from synapse.types import JsonDict
 
 from tests.server import get_clock, setup_test_homeserver
 from tests.unittest import TestCase, skip_unless
-from tests.utils import default_config
-
-try:
-    import authlib  # noqa: F401
-
-    HAS_AUTHLIB = True
-except ImportError:
-    HAS_AUTHLIB = False
-
+from tests.utils import HAS_AUTHLIB, default_config
 
 # These are a few constants that are used as config parameters in the tests.
 SERVER_NAME = "test"
