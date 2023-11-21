@@ -2,10 +2,14 @@
 Synapse |support| |development| |documentation| |license| |pypi| |python|
 =========================================================================
 
-Synapse is an open-source `Matrix <https://matrix.org/>`_ homeserver written and
-maintained by the Matrix.org Foundation. We began rapid development in 2014,
-reaching v1.0.0 in 2019. Development on Synapse and the Matrix protocol itself continues
-in earnest today.
+Synapse is now actively maintained at `vector-im/synapse <https://github.com/vector-im/synapse>`_
+=================================================================================================
+
+Synapse is an open-source `Matrix <https://matrix.org/>`_ homeserver developed
+from 2014 through 2023 as part of the Matrix.org Foundation. The Matrix.org
+Foundation is not able to resource maintenance of Synapse and it
+`continues to be developed by Element <https://github.com/vector-im/synapse>`_;
+additionally you have the choice of `other Matrix homeservers <https://matrix.org/ecosystem/servers/>`_.
 
 Briefly, Matrix is an open standard for communications on the internet, supporting
 federation, encryption and VoIP. Matrix.org has more to say about the `goals of the
