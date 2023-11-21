@@ -383,7 +383,7 @@ class DeviceWorkerHandler:
         )
 
     DEVICE_MSGS_DELETE_BATCH_LIMIT = 1000
-    DEVICE_MSGS_DELETE_SLEEP_MS = 1000
+    DEVICE_MSGS_DELETE_SLEEP_MS = 100
 
     async def _delete_device_messages(
         self,

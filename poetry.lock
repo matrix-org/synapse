@@ -2081,20 +2081,20 @@ tests = ["hypothesis (>=3.27.0)", "pytest (>=3.2.1,!=3.3.0)"]
 
 [[package]]
 name = "pyopenssl"
-version = "23.2.0"
+version = "23.3.0"
 description = "Python wrapper module around the OpenSSL library"
 optional = false
-python-versions = ">=3.6"
+python-versions = ">=3.7"
 files = [
-    {file = "pyOpenSSL-23.2.0-py3-none-any.whl", hash = "sha256:24f0dc5227396b3e831f4c7f602b950a5e9833d292c8e4a2e06b709292806ae2"},
-    {file = "pyOpenSSL-23.2.0.tar.gz", hash = "sha256:276f931f55a452e7dea69c7173e984eb2a4407ce413c918aa34b55f82f9b8bac"},
+    {file = "pyOpenSSL-23.3.0-py3-none-any.whl", hash = "sha256:6756834481d9ed5470f4a9393455154bc92fe7a64b7bc6ee2c804e78c52099b2"},
+    {file = "pyOpenSSL-23.3.0.tar.gz", hash = "sha256:6b2cba5cc46e822750ec3e5a81ee12819850b11303630d575e98108a079c2b12"},
 ]
 
 [package.dependencies]
-cryptography = ">=38.0.0,<40.0.0 || >40.0.0,<40.0.1 || >40.0.1,<42"
+cryptography = ">=41.0.5,<42"
 
 [package.extras]
-docs = ["sphinx (!=5.2.0,!=5.2.0.post0)", "sphinx-rtd-theme"]
+docs = ["sphinx (!=5.2.0,!=5.2.0.post0,!=7.2.5)", "sphinx-rtd-theme"]
 test = ["flaky", "pretend", "pytest (>=3.0.1)"]
 
 [[package]]
@@ -2273,13 +2273,13 @@ use-chardet-on-py3 = ["chardet (>=3.0.2,<6)"]
 
 [[package]]
 name = "requests-toolbelt"
-version = "0.10.1"
+version = "1.0.0"
 description = "A utility belt for advanced users of python-requests"
 optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 files = [
-    {file = "requests-toolbelt-0.10.1.tar.gz", hash = "sha256:62e09f7ff5ccbda92772a29f394a49c3ad6cb181d568b1337626b2abb628a63d"},
-    {file = "requests_toolbelt-0.10.1-py2.py3-none-any.whl", hash = "sha256:18565aa58116d9951ac39baa288d3adb5b3ff975c4f25eee78555d89e8f247f7"},
+    {file = "requests-toolbelt-1.0.0.tar.gz", hash = "sha256:7681a0a3d047012b5bdc0ee37d7f8f07ebe76ab08caeccfc3921ce23c88d5bc6"},
+    {file = "requests_toolbelt-1.0.0-py2.py3-none-any.whl", hash = "sha256:cccfdd665f0a24fcf4726e690f65639d272bb0637b9b92dfd91a5568ccf6bd06"},
 ]
 
 [package.dependencies]
@@ -2482,13 +2482,13 @@ doc = ["Sphinx", "sphinx-rtd-theme"]
 
 [[package]]
 name = "sentry-sdk"
-version = "1.32.0"
+version = "1.35.0"
 description = "Python client for Sentry (https://sentry.io)"
 optional = true
 python-versions = "*"
 files = [
-    {file = "sentry-sdk-1.32.0.tar.gz", hash = "sha256:935e8fbd7787a3702457393b74b13d89a5afb67185bc0af85c00cb27cbd42e7c"},
-    {file = "sentry_sdk-1.32.0-py2.py3-none-any.whl", hash = "sha256:eeb0b3550536f3bbc05bb1c7e0feb3a78d74acb43b607159a606ed2ec0a33a4d"},
+    {file = "sentry-sdk-1.35.0.tar.gz", hash = "sha256:04e392db9a0d59bd49a51b9e3a92410ac5867556820465057c2ef89a38e953e9"},
+    {file = "sentry_sdk-1.35.0-py2.py3-none-any.whl", hash = "sha256:a7865952701e46d38b41315c16c075367675c48d049b90a4cc2e41991ebc7efa"},
 ]
 
 [package.dependencies]
@@ -3091,24 +3091,24 @@ files = [
 
 [[package]]
 name = "types-pillow"
-version = "10.1.0.0"
+version = "10.1.0.2"
 description = "Typing stubs for Pillow"
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "types-Pillow-10.1.0.0.tar.gz", hash = "sha256:0f5e7cf010ed226800cb5821e87781e5d0e81257d948a9459baa74a8c8b7d822"},
-    {file = "types_Pillow-10.1.0.0-py3-none-any.whl", hash = "sha256:f97f596b6a39ddfd26da3eb67421062193e10732d2310f33898d36f9694331b5"},
+    {file = "types-Pillow-10.1.0.2.tar.gz", hash = "sha256:525c1c5ee67b0ac1721c40d2bc618226ef2123c347e527e14e05b920721a13b9"},
+    {file = "types_Pillow-10.1.0.2-py3-none-any.whl", hash = "sha256:131078ffa547bf9a201d39ffcdc65633e108148085f4f1b07d4647fcfec6e923"},
 ]
 
 [[package]]
 name = "types-psycopg2"
-version = "2.9.21.15"
+version = "2.9.21.16"
 description = "Typing stubs for psycopg2"
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "types-psycopg2-2.9.21.15.tar.gz", hash = "sha256:cf99b62ab32cd4ef412fc3c4da1c29ca5a130847dff06d709b84a523802406f0"},
-    {file = "types_psycopg2-2.9.21.15-py3-none-any.whl", hash = "sha256:cc80479def02e4dd1ef21649d82f04426c73bc0693bcc0a8b5223c7c168472af"},
+    {file = "types-psycopg2-2.9.21.16.tar.gz", hash = "sha256:44a3ae748173bb637cff31654d6bd12de9ad0c7ad73afe737df6152830ed82ed"},
+    {file = "types_psycopg2-2.9.21.16-py3-none-any.whl", hash = "sha256:e2f24b651239ccfda320ab3457099af035cf37962c36c9fa26a4dc65991aebed"},
 ]
 
 [[package]]
