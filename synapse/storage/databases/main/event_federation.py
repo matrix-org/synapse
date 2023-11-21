@@ -303,9 +303,12 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         # database, there is a chance that a sequence number here will end up being a
         # '0', which doesn't exist. Don't bother sending that to the database query.
         for chain_id, seq_no in event_chains.items():
-            max_sequence_result = max(seq_no - 1, chains.get(chain_id, 0))
-            if max_sequence_result > 0:
-                chains[chain_id] = max_sequence_result
+            # Check if the initial event is the first item in the chain. If so, then
+            # there is nothing new to add from this chain.
+            if seq_no == 1:
+                continue
+
+            chains[chain_id] = max(seq_no - 1, chains.get(chain_id, 0))
 
         # Now for each chain we figure out the maximum sequence number reachable
         # from *any* event ID. Events with a sequence less than that are in the
