@@ -722,7 +722,8 @@ class MSC3861OAuthDelegation(HomeserverTestCase):
 
         # First test a known access token
         channel = FakeChannel(self.site, self.reactor)
-        req = SynapseRequest(channel, self.site)
+        # type-ignore: FakeChannel is a mock of an HTTPChannel, not a proper HTTPChannel
+        req = SynapseRequest(channel, self.site)  # type: ignore[arg-type]
         req.client.host = EXAMPLE_IPV4_ADDR
         req.requestHeaders.addRawHeader("Authorization", f"Bearer {known_token}")
         req.requestHeaders.addRawHeader("User-Agent", EXAMPLE_USER_AGENT)
