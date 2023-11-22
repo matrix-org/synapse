@@ -29,7 +29,6 @@ from twisted.test.proto_helpers import MemoryReactor
 from twisted.web.http_headers import Headers
 from twisted.web.iweb import IResponse
 
-from synapse.api.auth.msc3861_delegated import MSC3861DelegatedAuth
 from synapse.api.errors import (
     AuthError,
     Codes,
@@ -132,6 +131,9 @@ class MSC3861OAuthDelegation(HomeserverTestCase):
         self.http_client.user_agent = b"Synapse Test"
 
         hs = self.setup_test_homeserver(proxied_http_client=self.http_client)
+
+        # Import this here so that we've checked that authlib is available.
+        from synapse.api.auth.msc3861_delegated import MSC3861DelegatedAuth
 
         self.auth = checked_cast(MSC3861DelegatedAuth, hs.get_auth())
 
