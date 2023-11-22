@@ -1,1 +1,1 @@
-Disable rate limit for all underlying calls when using the server notice admin API.
+Consistently bypass rate limits when using the server notice admin API.
