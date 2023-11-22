@@ -72,6 +72,7 @@ MATRIX_DEVICE_SCOPE = MATRIX_DEVICE_SCOPE_PREFIX + DEVICE
 SUBJECT = "abc-def-ghi"
 USERNAME = "test-user"
 USER_ID = "@" + USERNAME + ":" + SERVER_NAME
+OIDC_ADMIN_USERID = f"@__oidc_admin:{SERVER_NAME}"
 
 
 async def get_json(url: str) -> JsonDict:
@@ -672,7 +673,8 @@ class MSC3861OAuthDelegation(HomeserverTestCase):
         request.requestHeaders.getRawHeaders = mock_getRawHeaders()
         requester = self.get_success(self.auth.get_user_by_req(request))
         self.assertEqual(
-            requester.user.to_string(), "@%s:%s" % ("__oidc_admin", SERVER_NAME)
+            requester.user.to_string(),
+            OIDC_ADMIN_USERID,
         )
         self.assertEqual(requester.is_guest, False)
         self.assertEqual(requester.device_id, None)
@@ -749,3 +751,35 @@ class MSC3861OAuthDelegation(HomeserverTestCase):
         self.assertEqual(conn_info["access_token"], known_token)
         self.assertEqual(conn_info["ip"], EXAMPLE_IPV4_ADDR)
         self.assertEqual(conn_info["user_agent"], EXAMPLE_USER_AGENT)
+
+        # Now test MAS making a request using the special __oidc_admin token
+        MAS_IPV4_ADDR = "127.0.0.1"
+        MAS_USER_AGENT = "masmasmas"
+
+        channel = FakeChannel(self.site, self.reactor)
+        req = SynapseRequest(channel, self.site)  # type: ignore[arg-type]
+        req.client.host = MAS_IPV4_ADDR
+        req.requestHeaders.addRawHeader(
+            "Authorization", f"Bearer {self.hs.get_auth()._admin_token}"
+        )
+        req.requestHeaders.addRawHeader("User-Agent", MAS_USER_AGENT)
+        req.content = BytesIO(b"")
+        req.requestReceived(
+            b"GET",
+            b"/_matrix/client/v3/account/whoami",
+            b"1.1",
+        )
+        channel.await_result()
+        self.assertEqual(channel.code, HTTPStatus.OK, channel.json_body)
+        self.assertEqual(
+            channel.json_body["user_id"], OIDC_ADMIN_USERID, channel.json_body
+        )
+
+        # Still expect to see one MAU entry, from the first request
+        mau = self.get_success(store.get_monthly_active_count())
+        self.assertEqual(mau, 1)
+
+        conn_infos = self.get_success(
+            store.get_user_ip_and_agents(UserID.from_string(OIDC_ADMIN_USERID))
+        )
+        self.assertEqual(conn_infos, [])
