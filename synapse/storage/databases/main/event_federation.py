@@ -301,6 +301,11 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         # Add the initial set of chains, excluding the sequence corresponding to
         # initial event.
         for chain_id, seq_no in event_chains.items():
+            # Check if the initial event is the first item in the chain. If so, then
+            # there is nothing new to add from this chain.
+            if seq_no == 1:
+                continue
+
             chains[chain_id] = max(seq_no - 1, chains.get(chain_id, 0))
 
         # Now for each chain we figure out the maximum sequence number reachable
