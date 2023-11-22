@@ -299,9 +299,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                     )
 
         # Add the initial set of chains, excluding the sequence corresponding to
-        # initial event. Ultimately, the chains dict will be what is pulled from the
-        # database, there is a chance that a sequence number here will end up being a
-        # '0', which doesn't exist. Don't bother sending that to the database query.
+        # initial event.
         for chain_id, seq_no in event_chains.items():
             # Check if the initial event is the first item in the chain. If so, then
             # there is nothing new to add from this chain.
