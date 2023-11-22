@@ -1060,7 +1060,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         self,
     ) -> None:
         """
-        A test that reproduces #13929 (Postgres only).
+        A test that reproduces https://github.com/matrix-org/synapse/issues/13929 (Postgres only).
 
         Test to make sure we can still get backfill points after many failed pull
         attempts that cause us to backoff to the limit. Even if the backoff formula

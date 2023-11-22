@@ -18,6 +18,8 @@ import secrets
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
+import attr
+
 from synapse.api.constants import Direction, UserTypes
 from synapse.api.errors import Codes, NotFoundError, SynapseError
 from synapse.http.servlet import (
@@ -161,11 +163,13 @@ class UsersRestServletV2(RestServlet):
         )
 
         # If support for MSC3866 is not enabled, don't show the approval flag.
+        filter = None
         if not self._msc3866_enabled:
-            for user in users:
-                del user["approved"]
 
-        ret = {"users": users, "total": total}
+            def _filter(a: attr.Attribute) -> bool:
+                return a.name != "approved"
+
+        ret = {"users": [attr.asdict(u, filter=filter) for u in users], "total": total}
         if (start + limit) < total:
             ret["next_token"] = str(start + len(users))
 
@@ -1264,6 +1268,46 @@ class AccountDataRestServlet(RestServlet):
                 "rooms": by_room_data,
             },
         }
+
+
+class UserReplaceMasterCrossSigningKeyRestServlet(RestServlet):
+    """Allow a given user to replace their master cross-signing key without UIA.
+
+    This replacement is permitted for a limited period (currently 10 minutes).
+
+    While this is exposed via the admin API, this is intended for use by the
+    Matrix Authentication Service rather than server admins.
+    """
+
+    PATTERNS = admin_patterns(
+        "/users/(?P<user_id>[^/]*)/_allow_cross_signing_replacement_without_uia"
+    )
+    REPLACEMENT_PERIOD_MS = 10 * 60 * 1000  # 10 minutes
+
+    def __init__(self, hs: "HomeServer"):
+        self._auth = hs.get_auth()
+        self._store = hs.get_datastores().main
+
+    async def on_POST(
+        self,
+        request: SynapseRequest,
+        user_id: str,
+    ) -> Tuple[int, JsonDict]:
+        await assert_requester_is_admin(self._auth, request)
+
+        if user_id is None:
+            raise NotFoundError("User not found")
+
+        timestamp = (
+            await self._store.allow_master_cross_signing_key_replacement_without_uia(
+                user_id, self.REPLACEMENT_PERIOD_MS
+            )
+        )
+
+        if timestamp is None:
+            raise NotFoundError("User has no master cross-signing key")
+
+        return HTTPStatus.OK, {"updatable_without_uia_before_ms": timestamp}
 
 
 class UserByExternalId(RestServlet):

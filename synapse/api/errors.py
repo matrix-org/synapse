@@ -83,6 +83,8 @@ class Codes(str, Enum):
     USER_DEACTIVATED = "M_USER_DEACTIVATED"
     # USER_LOCKED = "M_USER_LOCKED"
     USER_LOCKED = "ORG_MATRIX_MSC3939_USER_LOCKED"
+    NOT_YET_UPLOADED = "M_NOT_YET_UPLOADED"
+    CANNOT_OVERWRITE_MEDIA = "M_CANNOT_OVERWRITE_MEDIA"
 
     # Part of MSC3848
     # https://github.com/matrix-org/matrix-spec-proposals/pull/3848

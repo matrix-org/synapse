@@ -50,7 +50,7 @@ def request_registration(
     url = "%s/_synapse/admin/v1/register" % (server_location.rstrip("/"),)
 
     # Get the nonce
-    r = requests.get(url, verify=False)
+    r = requests.get(url)
 
     if r.status_code != 200:
         _print("ERROR! Received %d %s" % (r.status_code, r.reason))
@@ -88,7 +88,7 @@ def request_registration(
     }
 
     _print("Sending registration request...")
-    r = requests.post(url, json=data, verify=False)
+    r = requests.post(url, json=data)
 
     if r.status_code != 200:
         _print("ERROR! Received %d %s" % (r.status_code, r.reason))

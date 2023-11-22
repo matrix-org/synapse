@@ -191,7 +191,7 @@ IGNORED_TABLES = {
     "user_directory_search_stat",
     "user_directory_search_pos",
     "users_who_share_private_rooms",
-    "users_in_public_room",
+    "users_in_public_rooms",
     # UI auth sessions have foreign keys so additional care needs to be taken,
     # the sessions are transient anyway, so ignore them.
     "ui_auth_sessions",
@@ -348,8 +348,7 @@ class Porter:
                     backward_chunk = 0
                     already_ported = 0
             else:
-                forward_chunk = row["forward_rowid"]
-                backward_chunk = row["backward_rowid"]
+                forward_chunk, backward_chunk = row
 
             if total_to_port is None:
                 already_ported, total_to_port = await self._get_total_count_to_port(

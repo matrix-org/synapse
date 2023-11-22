@@ -1,1 +1,0 @@
-Fixes possbile `AttributeError` when `_matrix/client/v3/account/whoami` is called over a unix socket. Contributed by @Sir-Photch.

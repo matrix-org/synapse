@@ -295,7 +295,8 @@ class ThirdPartyEventRulesModuleApiCallbacks:
                 raise
             except SynapseError as e:
                 # FIXME: Being able to throw SynapseErrors is relied upon by
-                # some modules. PR #10386 accidentally broke this ability.
+                # some modules. PR https://github.com/matrix-org/synapse/pull/10386
+                # accidentally broke this ability.
                 # That said, we aren't keen on exposing this implementation detail
                 # to modules and we should one day have a proper way to do what
                 # is wanted.

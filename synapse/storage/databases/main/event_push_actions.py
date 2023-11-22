@@ -311,6 +311,14 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             self._background_drop_null_thread_id_indexes,
         )
 
+        # Add a room ID index to speed up room deletion
+        self.db_pool.updates.register_background_index_update(
+            "event_push_summary_index_room_id",
+            index_name="event_push_summary_index_room_id",
+            table="event_push_summary",
+            columns=["room_id"],
+        )
+
     async def _background_drop_null_thread_id_indexes(
         self, progress: JsonDict, batch_size: int
     ) -> int:

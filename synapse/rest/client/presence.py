@@ -42,15 +42,13 @@ class PresenceStatusRestServlet(RestServlet):
         self.clock = hs.get_clock()
         self.auth = hs.get_auth()
 
-        self._use_presence = hs.config.server.use_presence
-
     async def on_GET(
         self, request: SynapseRequest, user_id: str
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
         user = UserID.from_string(user_id)
 
-        if not self._use_presence:
+        if not self.hs.config.server.presence_enabled:
             return 200, {"presence": "offline"}
 
         if requester.user != user:
@@ -96,7 +94,7 @@ class PresenceStatusRestServlet(RestServlet):
         except Exception:
             raise SynapseError(400, "Unable to parse state")
 
-        if self._use_presence:
+        if self.hs.config.server.track_presence:
             await self.presence_handler.set_state(user, requester.device_id, state)
 
         return 200, {}

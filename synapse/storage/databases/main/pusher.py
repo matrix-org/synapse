@@ -371,18 +371,20 @@ class PusherWorkerStore(SQLBaseStore):
     async def get_throttle_params_by_room(
         self, pusher_id: int
     ) -> Dict[str, ThrottleParams]:
-        res = await self.db_pool.simple_select_list(
-            "pusher_throttle",
-            {"pusher": pusher_id},
-            ["room_id", "last_sent_ts", "throttle_ms"],
-            desc="get_throttle_params_by_room",
+        res = cast(
+            List[Tuple[str, Optional[int], Optional[int]]],
+            await self.db_pool.simple_select_list(
+                "pusher_throttle",
+                {"pusher": pusher_id},
+                ["room_id", "last_sent_ts", "throttle_ms"],
+                desc="get_throttle_params_by_room",
+            ),
         )
 
         params_by_room = {}
-        for row in res:
-            params_by_room[row["room_id"]] = ThrottleParams(
-                row["last_sent_ts"],
-                row["throttle_ms"],
+        for room_id, last_sent_ts, throttle_ms in res:
+            params_by_room[room_id] = ThrottleParams(
+                last_sent_ts or 0, throttle_ms or 0
             )
 
         return params_by_room
@@ -599,7 +601,7 @@ class PusherBackgroundUpdatesStore(SQLBaseStore):
                 (last_pusher_id, batch_size),
             )
 
-            rows = txn.fetchall()
+            rows = cast(List[Tuple[int, Optional[str], Optional[str]]], txn.fetchall())
             if len(rows) == 0:
                 return 0
 
@@ -615,7 +617,7 @@ class PusherBackgroundUpdatesStore(SQLBaseStore):
                 txn=txn,
                 table="pushers",
                 key_names=("id",),
-                key_values=[row[0] for row in rows],
+                key_values=[(row[0],) for row in rows],
                 value_names=("device_id", "access_token"),
                 # If there was already a device_id on the pusher, we only want to clear
                 # the access_token column, so we keep the existing device_id. Otherwise,

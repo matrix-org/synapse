@@ -43,9 +43,11 @@ from typing import (
 from unittest.mock import Mock
 
 import attr
+from incremental import Version
 from typing_extensions import ParamSpec
 from zope.interface import implementer
 
+import twisted
 from twisted.internet import address, tcp, threads, udp
 from twisted.internet._resolver import SimpleResolverComplexifier
 from twisted.internet.defer import Deferred, fail, maybeDeferred, succeed
@@ -86,7 +88,7 @@ from synapse.module_api.callbacks.third_party_event_rules_callbacks import (
 from synapse.server import HomeServer
 from synapse.storage import DataStore
 from synapse.storage.database import LoggingDatabaseConnection
-from synapse.storage.engines import PostgresEngine, create_engine
+from synapse.storage.engines import create_engine
 from synapse.storage.prepare_database import prepare_database
 from synapse.types import ISynapseReactor, JsonDict
 from synapse.util import Clock
@@ -473,6 +475,16 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
                 if name not in lookups:
                     return fail(DNSLookupError("OH NO: unknown %s" % (name,)))
                 return succeed(lookups[name])
+
+        # In order for the TLS protocol tests to work, modify _get_default_clock
+        # on newer Twisted versions to use the test reactor's clock.
+        #
+        # This is *super* dirty since it is never undone and relies on the next
+        # test to overwrite it.
+        if twisted.version > Version("Twisted", 23, 8, 0):
+            from twisted.protocols import tls
+
+            tls._get_default_clock = lambda: self
 
         self.nameResolver = SimpleResolverComplexifier(FakeResolver())
         super().__init__()
@@ -962,7 +974,7 @@ def setup_test_homeserver(
         database_config = {
             "name": "psycopg2",
             "args": {
-                "database": test_db,
+                "dbname": test_db,
                 "host": POSTGRES_HOST,
                 "password": POSTGRES_PASSWORD,
                 "user": POSTGRES_USER,
@@ -1017,18 +1029,15 @@ def setup_test_homeserver(
 
     # Create the database before we actually try and connect to it, based off
     # the template database we generate in setupdb()
-    if isinstance(db_engine, PostgresEngine):
-        import psycopg2.extensions
-
+    if USE_POSTGRES_FOR_TESTS:
         db_conn = db_engine.module.connect(
-            database=POSTGRES_BASE_DB,
+            dbname=POSTGRES_BASE_DB,
             user=POSTGRES_USER,
             host=POSTGRES_HOST,
             port=POSTGRES_PORT,
             password=POSTGRES_PASSWORD,
         )
-        assert isinstance(db_conn, psycopg2.extensions.connection)
-        db_conn.autocommit = True
+        db_engine.attempt_to_set_autocommit(db_conn, True)
         cur = db_conn.cursor()
         cur.execute("DROP DATABASE IF EXISTS %s;" % (test_db,))
         cur.execute(
@@ -1053,13 +1062,12 @@ def setup_test_homeserver(
 
     hs.setup()
 
-    if isinstance(db_engine, PostgresEngine):
+    if USE_POSTGRES_FOR_TESTS:
         database_pool = hs.get_datastores().databases[0]
 
         # We need to do cleanup on PostgreSQL
         def cleanup() -> None:
             import psycopg2
-            import psycopg2.extensions
 
             # Close all the db pools
             database_pool._db_pool.close()
@@ -1068,14 +1076,13 @@ def setup_test_homeserver(
 
             # Drop the test database
             db_conn = db_engine.module.connect(
-                database=POSTGRES_BASE_DB,
+                dbname=POSTGRES_BASE_DB,
                 user=POSTGRES_USER,
                 host=POSTGRES_HOST,
                 port=POSTGRES_PORT,
                 password=POSTGRES_PASSWORD,
             )
-            assert isinstance(db_conn, psycopg2.extensions.connection)
-            db_conn.autocommit = True
+            db_engine.attempt_to_set_autocommit(db_conn, True)
             cur = db_conn.cursor()
 
             # Try a few times to drop the DB. Some things may hold on to the

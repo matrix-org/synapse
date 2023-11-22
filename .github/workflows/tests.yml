@@ -37,15 +37,18 @@ jobs:
             - 'Cargo.toml'
             - 'Cargo.lock'
             - '.rustfmt.toml'
+            - '.github/workflows/tests.yml'
 
           trial:
             - 'synapse/**'
             - 'tests/**'
             - 'rust/**'
+            - '.ci/scripts/calculate_jobs.py'
             - 'Cargo.toml'
             - 'Cargo.lock'
             - 'pyproject.toml'
             - 'poetry.lock'
+            - '.github/workflows/tests.yml'
 
           integration:
             - 'synapse/**'
@@ -56,7 +59,9 @@ jobs:
             - 'pyproject.toml'
             - 'poetry.lock'
             - 'docker/**'
+            - '.ci/**'
             - 'scripts-dev/complement.sh'
+            - '.github/workflows/tests.yml'
 
           linting:
             - 'synapse/**'
@@ -70,6 +75,7 @@ jobs:
             - 'mypy.ini'
             - 'pyproject.toml'
             - 'poetry.lock'
+            - '.github/workflows/tests.yml'
 
   check-sampleconfig:
     runs-on: ubuntu-latest
@@ -627,14 +633,18 @@ jobs:
         uses: dtolnay/rust-toolchain@1.61.0
       - uses: Swatinem/rust-cache@v2
 
-      - uses: actions/setup-go@v4
-
       - name: Prepare Complement's Prerequisites
         run: synapse/.ci/scripts/setup_complement_prerequisites.sh
 
+      - uses: actions/setup-go@v4
+        with:
+          cache-dependency-path: complement/go.sum
+          go-version-file: complement/go.mod
+
+        # use p=1 concurrency as GHA boxes are underpowered and don't like running tons of synapses at once.
       - run: |
           set -o pipefail
-          COMPLEMENT_DIR=`pwd`/complement synapse/scripts-dev/complement.sh -json 2>&1 | synapse/.ci/scripts/gotestfmt
+          COMPLEMENT_DIR=`pwd`/complement synapse/scripts-dev/complement.sh -p 1 -json 2>&1 | synapse/.ci/scripts/gotestfmt
         shell: bash
         env:
           POSTGRES: ${{ (matrix.database == 'Postgres') && 1 || '' }}

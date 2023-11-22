@@ -93,7 +93,7 @@ class EventRestServlet(RestServlet):
         event = await self.event_handler.get_event(requester.user, None, event_id)
 
         if event:
-            result = self._event_serializer.serialize_event(
+            result = await self._event_serializer.serialize_event(
                 event,
                 self.clock.time_msec(),
                 config=SerializeEventConfig(requester=requester),

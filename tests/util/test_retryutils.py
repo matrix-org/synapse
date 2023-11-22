@@ -11,6 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from unittest import mock
+
+from synapse.notifier import Notifier
+from synapse.replication.tcp.handler import ReplicationCommandHandler
 from synapse.util.retryutils import NotRetryingDestination, get_retry_limiter
 
 from tests.unittest import HomeserverTestCase
@@ -108,6 +112,77 @@ class RetryLimiterTestCase(HomeserverTestCase):
 
         new_timings = self.get_success(store.get_destination_retry_timings("test_dest"))
         self.assertIsNone(new_timings)
+
+    def test_notifier_replication(self) -> None:
+        """Ensure the notifier/replication client is called only when expected."""
+        store = self.hs.get_datastores().main
+
+        notifier = mock.Mock(spec=Notifier)
+        replication_client = mock.Mock(spec=ReplicationCommandHandler)
+
+        limiter = self.get_success(
+            get_retry_limiter(
+                "test_dest",
+                self.clock,
+                store,
+                notifier=notifier,
+                replication_client=replication_client,
+            )
+        )
+
+        # The server is already up, nothing should occur.
+        self.pump(1)
+        with limiter:
+            pass
+        self.pump()
+
+        new_timings = self.get_success(store.get_destination_retry_timings("test_dest"))
+        self.assertIsNone(new_timings)
+        notifier.notify_remote_server_up.assert_not_called()
+        replication_client.send_remote_server_up.assert_not_called()
+
+        # Attempt again, but return an error. This will cause new retry timings, but
+        # should not trigger server up notifications.
+        self.pump(1)
+        try:
+            with limiter:
+                raise AssertionError("argh")
+        except AssertionError:
+            pass
+        self.pump()
+
+        new_timings = self.get_success(store.get_destination_retry_timings("test_dest"))
+        # The exact retry timings are tested separately.
+        self.assertIsNotNone(new_timings)
+        notifier.notify_remote_server_up.assert_not_called()
+        replication_client.send_remote_server_up.assert_not_called()
+
+        # A second failing request should be treated as the above.
+        self.pump(1)
+        try:
+            with limiter:
+                raise AssertionError("argh")
+        except AssertionError:
+            pass
+        self.pump()
+
+        new_timings = self.get_success(store.get_destination_retry_timings("test_dest"))
+        # The exact retry timings are tested separately.
+        self.assertIsNotNone(new_timings)
+        notifier.notify_remote_server_up.assert_not_called()
+        replication_client.send_remote_server_up.assert_not_called()
+
+        # A final successful attempt should generate a server up notification.
+        self.pump(1)
+        with limiter:
+            pass
+        self.pump()
+
+        new_timings = self.get_success(store.get_destination_retry_timings("test_dest"))
+        # The exact retry timings are tested separately.
+        self.assertIsNone(new_timings)
+        notifier.notify_remote_server_up.assert_called_once_with("test_dest")
+        replication_client.send_remote_server_up.assert_called_once_with("test_dest")
 
     def test_max_retry_interval(self) -> None:
         """Test that `destination_max_retry_interval` setting works as expected"""

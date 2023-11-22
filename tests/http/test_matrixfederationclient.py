@@ -70,7 +70,7 @@ class FederationClientTests(HomeserverTestCase):
         """
 
         @defer.inlineCallbacks
-        def do_request() -> Generator["Deferred[object]", object, object]:
+        def do_request() -> Generator["Deferred[Any]", object, object]:
             with LoggingContext("one") as context:
                 fetch_d = defer.ensureDeferred(
                     self.cl.get_json("testserv:8008", "foo/bar")
@@ -368,7 +368,8 @@ class FederationClientTests(HomeserverTestCase):
         """
         If a connection is made to a client but the client rejects it due to
         requiring a trailing slash. We need to retry the request with a
-        trailing slash. Workaround for Synapse <= v0.99.3, explained in #3622.
+        trailing slash. Workaround for Synapse <= v0.99.3, explained in
+        https://github.com/matrix-org/synapse/issues/3622.
         """
         d = defer.ensureDeferred(
             self.cl.get_json("testserv:8008", "foo/bar", try_trailing_slash_on_400=True)

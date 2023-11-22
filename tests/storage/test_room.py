@@ -42,16 +42,9 @@ class RoomStoreTestCase(HomeserverTestCase):
         )
 
     def test_get_room(self) -> None:
-        res = self.get_success(self.store.get_room(self.room.to_string()))
-        assert res is not None
-        self.assertLessEqual(
-            {
-                "room_id": self.room.to_string(),
-                "creator": self.u_creator.to_string(),
-                "is_public": True,
-            }.items(),
-            res.items(),
-        )
+        room = self.get_success(self.store.get_room(self.room.to_string()))
+        assert room is not None
+        self.assertTrue(room[0])
 
     def test_get_room_unknown_room(self) -> None:
         self.assertIsNone(self.get_success(self.store.get_room("!uknown:test")))
@@ -59,14 +52,9 @@ class RoomStoreTestCase(HomeserverTestCase):
     def test_get_room_with_stats(self) -> None:
         res = self.get_success(self.store.get_room_with_stats(self.room.to_string()))
         assert res is not None
-        self.assertLessEqual(
-            {
-                "room_id": self.room.to_string(),
-                "creator": self.u_creator.to_string(),
-                "public": True,
-            }.items(),
-            res.items(),
-        )
+        self.assertEqual(res.room_id, self.room.to_string())
+        self.assertEqual(res.creator, self.u_creator.to_string())
+        self.assertTrue(res.public)
 
     def test_get_room_with_stats_unknown_room(self) -> None:
         self.assertIsNone(

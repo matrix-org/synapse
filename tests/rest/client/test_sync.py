@@ -642,7 +642,7 @@ class SyncCacheTestCase(unittest.HomeserverTestCase):
     def test_noop_sync_does_not_tightloop(self) -> None:
         """If the sync times out, we shouldn't cache the result
 
-        Essentially a regression test for #8518.
+        Essentially a regression test for https://github.com/matrix-org/synapse/issues/8518.
         """
         self.user_id = self.register_user("kermit", "monkey")
         self.tok = self.login("kermit", "monkey")

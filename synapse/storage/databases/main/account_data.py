@@ -94,7 +94,10 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
                 hs.get_replication_notifier(),
                 "room_account_data",
                 "stream_id",
-                extra_tables=[("room_tags_revisions", "stream_id")],
+                extra_tables=[
+                    ("account_data", "stream_id"),
+                    ("room_tags_revisions", "stream_id"),
+                ],
                 is_writer=self._instance_name in hs.config.worker.writers.account_data,
             )
 
@@ -283,16 +286,20 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
 
         def get_account_data_for_room_txn(
             txn: LoggingTransaction,
-        ) -> Dict[str, JsonDict]:
-            rows = self.db_pool.simple_select_list_txn(
-                txn,
-                "room_account_data",
-                {"user_id": user_id, "room_id": room_id},
-                ["account_data_type", "content"],
+        ) -> Dict[str, JsonMapping]:
+            rows = cast(
+                List[Tuple[str, str]],
+                self.db_pool.simple_select_list_txn(
+                    txn,
+                    table="room_account_data",
+                    keyvalues={"user_id": user_id, "room_id": room_id},
+                    retcols=["account_data_type", "content"],
+                ),
             )
 
             return {
-                row["account_data_type"]: db_to_json(row["content"]) for row in rows
+                account_data_type: db_to_json(content)
+                for account_data_type, content in rows
             }
 
         return await self.db_pool.runInteraction(
@@ -740,8 +747,16 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
         )
 
         # Invalidate the cache for any ignored users which were added or removed.
-        for ignored_user_id in previously_ignored_users ^ currently_ignored_users:
-            self._invalidate_cache_and_stream(txn, self.ignored_by, (ignored_user_id,))
+        self._invalidate_cache_and_stream_bulk(
+            txn,
+            self.ignored_by,
+            [
+                (ignored_user_id,)
+                for ignored_user_id in (
+                    previously_ignored_users ^ currently_ignored_users
+                )
+            ],
+        )
         self._invalidate_cache_and_stream(txn, self.ignored_users, (user_id,))
 
     async def remove_account_data_for_user(
@@ -817,10 +832,14 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
                 )
 
                 # Invalidate the cache for ignored users which were removed.
-                for ignored_user_id in previously_ignored_users:
-                    self._invalidate_cache_and_stream(
-                        txn, self.ignored_by, (ignored_user_id,)
-                    )
+                self._invalidate_cache_and_stream_bulk(
+                    txn,
+                    self.ignored_by,
+                    [
+                        (ignored_user_id,)
+                        for ignored_user_id in previously_ignored_users
+                    ],
+                )
 
                 # Invalidate for this user the cache tracking ignored users.
                 self._invalidate_cache_and_stream(txn, self.ignored_users, (user_id,))

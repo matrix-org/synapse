@@ -213,7 +213,8 @@ class CallbacksTestCase(unittest.HomeserverTestCase):
         after_callback, exception_callback = self._run_interaction(_test_txn)
 
         # Calling both `after_callback`s when the first attempt failed is rather
-        # surprising (#12184). Let's document the behaviour in a test.
+        # surprising (https://github.com/matrix-org/synapse/issues/12184).
+        # Let's document the behaviour in a test.
         after_callback.assert_has_calls(
             [
                 call(123, 456, extra=789),
