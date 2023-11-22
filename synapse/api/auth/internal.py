@@ -148,7 +148,7 @@ class InternalAuth(BaseAuth):
                             errcode=Codes.EXPIRED_ACCOUNT,
                         )
 
-                await self._record_request(request, requester)
+            await self._record_request(request, requester)
 
             if requester.is_guest and not allow_guest:
                 raise AuthError(

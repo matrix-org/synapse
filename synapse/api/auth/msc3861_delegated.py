@@ -226,7 +226,7 @@ class MSC3861DelegatedAuth(BaseAuth):
             # TODO: we probably want to assert the allow_guest inside this call
             # so that we don't provision the user if they don't have enough permission:
             requester = await self.get_user_by_access_token(access_token, allow_expired)
-            await self._record_request(request, requester)
+        await self._record_request(request, requester)
 
         if not allow_guest and requester.is_guest:
             raise OAuthInsufficientScopeError([SCOPE_MATRIX_API])
