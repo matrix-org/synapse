@@ -29,6 +29,7 @@ from twisted.test.proto_helpers import MemoryReactor
 from twisted.web.http_headers import Headers
 from twisted.web.iweb import IResponse
 
+from synapse.api.auth.msc3861_delegated import MSC3861DelegatedAuth
 from synapse.api.errors import (
     AuthError,
     Codes,
@@ -46,7 +47,7 @@ from synapse.util import Clock
 from tests.server import FakeChannel
 from tests.test_utils import FakeResponse, get_awaitable_result
 from tests.unittest import HomeserverTestCase, override_config, skip_unless
-from tests.utils import HAS_AUTHLIB, mock_getRawHeaders
+from tests.utils import HAS_AUTHLIB, checked_cast, mock_getRawHeaders
 
 # These are a few constants that are used as config parameters in the tests.
 SERVER_NAME = "test"
@@ -132,7 +133,7 @@ class MSC3861OAuthDelegation(HomeserverTestCase):
 
         hs = self.setup_test_homeserver(proxied_http_client=self.http_client)
 
-        self.auth = hs.get_auth()
+        self.auth = checked_cast(MSC3861DelegatedAuth, hs.get_auth())
 
         return hs
 
@@ -760,7 +761,7 @@ class MSC3861OAuthDelegation(HomeserverTestCase):
         req = SynapseRequest(channel, self.site)  # type: ignore[arg-type]
         req.client.host = MAS_IPV4_ADDR
         req.requestHeaders.addRawHeader(
-            "Authorization", f"Bearer {self.hs.get_auth()._admin_token}"
+            "Authorization", f"Bearer {self.auth._admin_token}"
         )
         req.requestHeaders.addRawHeader("User-Agent", MAS_USER_AGENT)
         req.content = BytesIO(b"")
