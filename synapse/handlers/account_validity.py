@@ -17,7 +17,6 @@ import email.utils
 import logging
 from typing import TYPE_CHECKING, List, Optional, Tuple
 
-from synapse.api.constants import LoginType
 from synapse.api.errors import AuthError, StoreError, SynapseError
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.types import UserID
@@ -100,7 +99,7 @@ class AccountValidityHandler:
             await callback(user_id)
 
     async def on_user_login(
-        self, user_id: str, auth_provider_type: LoginType, auth_provider_id: str
+        self, user_id: str, auth_provider_type: Optional[str], auth_provider_id: Optional[str]
     ) -> None:
         """Tell third-party modules about a user logins.
 

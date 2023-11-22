@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 # Types for callbacks to be registered via the module api
 IS_USER_EXPIRED_CALLBACK = Callable[[str], Awaitable[Optional[bool]]]
 ON_USER_REGISTRATION_CALLBACK = Callable[[str], Awaitable]
-ON_USER_LOGIN_CALLBACK = Callable[[str], Awaitable]
+ON_USER_LOGIN_CALLBACK = Callable[[str, Optional[str], Optional[str]], Awaitable]
 # Temporary hooks to allow for a transition from `/_matrix/client` endpoints
 # to `/_synapse/client/account_validity`. See `register_callbacks` below.
 ON_LEGACY_SEND_MAIL_CALLBACK = Callable[[str], Awaitable]
