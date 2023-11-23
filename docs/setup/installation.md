@@ -496,6 +496,16 @@ Cross-Origin Resource Sharing (CORS) headers. A recommended value would be
 `Access-Control-Allow-Origin: *` which would allow all browser based clients to
 view it.
 
+Synapse will serve it once you set `public_baseurl` in your `homeserver.yaml`.
+
+Just like:
+
+```yaml
+public_baseurl: "https://<matrix.example.com>"
+```
+
+Alternatively, you can set your reverse proxy to serve it.
+
 In nginx this would be something like:
 
 ```nginx
@@ -506,14 +516,11 @@ location /.well-known/matrix/client {
 }
 ```
 
-You should also ensure the `public_baseurl` option in `homeserver.yaml` is set
+You should always ensure the `public_baseurl` option in `homeserver.yaml` is set
 correctly. `public_baseurl` should be set to the URL that clients will use to
-connect to your server. This is the same URL you put for the `m.homeserver`
-`base_url` above.
-
-```yaml
-public_baseurl: "https://<matrix.example.com>"
-```
+connect to your server. If you use reverse proxy to serve client Well-Known URI,
+you should ensure the URL you put for the `public_baseurl` in `homeserver.yaml`
+and `m.homeserver` `base_url` in your reverse proxy config must be the same.
 
 ### Email
 
