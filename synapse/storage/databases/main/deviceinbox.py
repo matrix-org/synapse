@@ -94,7 +94,10 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                     notifier=hs.get_replication_notifier(),
                     stream_name="to_device",
                     instance_name=self._instance_name,
-                    tables=[("device_inbox", "instance_name", "stream_id")],
+                    tables=[
+                        ("device_inbox", "instance_name", "stream_id"),
+                        ("device_federation_outbox", "instance_name", "stream_id"),
+                    ],
                     sequence_name="device_inbox_sequence",
                     writers=hs.config.worker.writers.to_device,
                 )
@@ -102,7 +105,11 @@ class DeviceInboxWorkerStore(SQLBaseStore):
         else:
             self._can_write_to_device = True
             self._device_inbox_id_gen = StreamIdGenerator(
-                db_conn, hs.get_replication_notifier(), "device_inbox", "stream_id"
+                db_conn,
+                hs.get_replication_notifier(),
+                "device_inbox",
+                "stream_id",
+                extra_tables=[("device_federation_outbox", "stream_id")],
             )
 
         max_device_inbox_id = self._device_inbox_id_gen.get_current_token()
