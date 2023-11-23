@@ -3815,6 +3815,8 @@ Sub-options for this setting include:
 * `system_mxid_display_name`: set the display name of the "notices" user
 * `system_mxid_avatar_url`: set the avatar for the "notices" user
 * `room_name`: set the room name of the server notices room
+* `room_avatar_url`: set the room avatar URL of the server notices room
+* `room_topic`: set the room topic of the server notices room
 
 Example configuration:
 ```yaml
@@ -3823,6 +3825,8 @@ server_notices:
   system_mxid_display_name: "Server Notices"
   system_mxid_avatar_url: "mxc://server.com/oumMVlgDnLYFaPVkExemNVVZ"
   room_name: "Server Notices"
+  room_avatar_url: "mxc://server.com/oumMVlgDnLYFaPVkExemNVVZ"
+  room_topic: "Room used by your server admin to notice you of important information"
 ```
 ---
 ### `enable_room_list_search`
