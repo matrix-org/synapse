@@ -30,6 +30,13 @@ from synapse.storage.database import LoggingDatabaseConnection
 from synapse.storage.engines import create_engine
 from synapse.storage.prepare_database import prepare_database
 
+try:
+    import authlib  # noqa: F401
+
+    HAS_AUTHLIB = True
+except ImportError:
+    HAS_AUTHLIB = False
+
 # set this to True to run the tests against postgres instead of sqlite.
 #
 # When running under postgres, we first create a base database with the name
