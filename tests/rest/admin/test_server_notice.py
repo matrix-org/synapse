@@ -477,6 +477,30 @@ class ServerNoticeTestCase(unittest.HomeserverTestCase):
         # second room has new ID
         self.assertNotEqual(first_room_id, second_room_id)
 
+    @override_config(
+        {"server_notices": {"system_mxid_localpart": "notices", "auto_join": True}}
+    )
+    def test_auto_join(self) -> None:
+        """
+        Tests that the user get automatically joined to the notice room
+        when `auto_join` setting is used.
+        """
+        self._check_invite_and_join_status(self.other_user, 0, 0)
+
+        server_notice_request_content = {
+            "user_id": self.other_user,
+            "content": {"msgtype": "m.text", "body": "test msg one"},
+        }
+
+        self.make_request(
+            "POST",
+            self.url,
+            access_token=self.admin_user_tok,
+            content=server_notice_request_content,
+        )
+
+        self._check_invite_and_join_status(self.other_user, 0, 1)
+
     @override_config({"server_notices": {"system_mxid_localpart": "notices"}})
     def test_update_notice_user_name_when_changed(self) -> None:
         """
