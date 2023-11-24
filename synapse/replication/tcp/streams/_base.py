@@ -621,7 +621,7 @@ class ToDeviceStream(_StreamFromIdGen):
         super().__init__(
             hs.get_instance_name(),
             store.get_all_new_device_messages,
-            store._device_inbox_id_gen,
+            store._to_device_msg_id_gen,
         )
 
 
