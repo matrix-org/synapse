@@ -62,7 +62,7 @@ jobs:
         with:
           python-version: "3.x"
 
-      - run: "pip install 'GitPython>=3.1.20'"
+      - run: "pip install 'packaging>=20.0' 'GitPython>=3.1.20'"
 
       - name: Build the documentation
         # mdbook will only create an index.html if we're including docs/README.md in SUMMARY.md.
