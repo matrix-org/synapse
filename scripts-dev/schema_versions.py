@@ -117,30 +117,40 @@ def calculate_version_chart() -> str:
     schema_version = None
     schema_compat_version = None
 
-    # Map of schema version -> Synapse versions at that schema.
+    # Map of schema version -> Synapse versions which are at that schema version.
     schema_versions = defaultdict(list)
+    # Map of schema version -> Synapse versions which are compatible with that
+    # schema version.
+    schema_compat_versions = defaultdict(list)
 
     # Find ranges of versions which are compatible with a schema version.
     #
     # There are two modes of operation:
     #
-    # 1. If schema_compat_version is None, then Synapse can only move to a new
-    #    version with schema_version >= its current version.
-    # 2. If schema_compat_version is *not* None, then Synapse can move to a new
-    #    version with schema version >= schema_compat_version.
+    # 1. Pre-schema_compat_version (i.e. schema_compat_version of None), then
+    #    Synapse is compatible up/downgrading to a version with
+    #    schema_version >= its current version.
+    #
+    # 2. Post-schema_compat_version (i.e. schema_compat_version is *not* None),
+    #    then Synapse is compatible up/downgrading to a version with
+    #    schema version >= schema_compat_version.
+    #
+    #    This is more generous and avoids versions that cannot be rolled back.
     #
     # See https://github.com/matrix-org/synapse/pull/9933 which was included in v1.37.0.
     for tag in get_tags(repo):
         schema_version, schema_compat_version = get_schema_versions(tag)
 
         # If a schema compat version is given, prefer that over the schema version.
-        schema_versions[schema_compat_version or schema_version].append(tag.name)
+        schema_versions[schema_version].append(tag.name)
+        schema_compat_versions[schema_compat_version or schema_version].append(tag.name)
 
-    # Generate a table of which maps a version to the version it can be rolled back to.
-    result = "| Synapse version | Backwards compatible version |\n"
-    result += "|-----------------|------------------------------|\n"
-    for synapse_versions in schema_versions.values():
-        result += f"| {synapse_versions[-1]: ^15} | {synapse_versions[0]: ^28} |\n"
+    # Generate a table which maps the latest Synapse version compatible with each
+    # schema version.
+    result = "| Compatible versions | Earliest version |\n"
+    result += "|{'-' * (19 + 2)}|{'-' * (18 + 2)|\n"
+    for schema_version, synapse_versions in schema_compat_versions.items():
+        result += f"| {synapse_versions[0] + ' - ' + synapse_versions[-1]: ^19} | {schema_versions[schema_version][0]: ^18} |\n"
 
     return result
 
