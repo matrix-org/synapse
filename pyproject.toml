@@ -321,7 +321,7 @@ all = [
 # This helps prevents merge conflicts when running a batch of dependabot updates.
 isort = ">=5.10.1"
 black = ">=22.7.0"
-ruff = "0.1.4"
+ruff = "0.1.6"
 # Type checking only works with the pydantic.v1 compat module from pydantic v2
 pydantic = "^2"
 
