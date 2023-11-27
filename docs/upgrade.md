@@ -88,7 +88,7 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
-Generally Synapse database schemas are compatiblea cross the following versions.
+Generally Synapse database schemas are compatible across the following versions.
 The left column is the latest Synapse version which can be rolled back to the right
 column. E.g. Synapse versions v1.13.0 through v1.44.0 can be rolled back safely to
 v1.13.0.
