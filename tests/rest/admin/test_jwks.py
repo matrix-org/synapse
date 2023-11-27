@@ -19,13 +19,7 @@ from twisted.web.resource import Resource
 from synapse.rest.synapse.client import build_synapse_client_resource_tree
 
 from tests.unittest import HomeserverTestCase, override_config, skip_unless
-
-try:
-    import authlib  # noqa: F401
-
-    HAS_AUTHLIB = True
-except ImportError:
-    HAS_AUTHLIB = False
+from tests.utils import HAS_AUTHLIB
 
 
 @skip_unless(HAS_AUTHLIB, "requires authlib")

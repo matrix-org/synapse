@@ -27,6 +27,8 @@ from synapse.api.errors import (
     UnstableSpecAuthError,
 )
 from synapse.appservice import ApplicationService
+from synapse.http import get_request_user_agent
+from synapse.http.site import SynapseRequest
 from synapse.logging.opentracing import trace
 from synapse.types import Requester, create_requester
 from synapse.util.cancellation import cancellable
@@ -44,6 +46,9 @@ class BaseAuth:
         self.hs = hs
         self.store = hs.get_datastores().main
         self._storage_controllers = hs.get_storage_controllers()
+
+        self._track_appservice_user_ips = hs.config.appservice.track_appservice_user_ips
+        self._track_puppeted_user_ips = hs.config.api.track_puppeted_user_ips
 
     async def check_user_in_room(
         self,
@@ -349,3 +354,46 @@ class BaseAuth:
         return create_requester(
             effective_user_id, app_service=app_service, device_id=effective_device_id
         )
+
+    async def _record_request(
+        self, request: SynapseRequest, requester: Requester
+    ) -> None:
+        """Record that this request was made.
+
+        This updates the client_ips and monthly_active_user tables.
+        """
+        ip_addr = request.get_client_ip_if_available()
+
+        if ip_addr and (not requester.app_service or self._track_appservice_user_ips):
+            user_agent = get_request_user_agent(request)
+            access_token = self.get_access_token_from_request(request)
+
+            # XXX(quenting): I'm 95% confident that we could skip setting the
+            # device_id to "dummy-device" for appservices, and that the only impact
+            # would be some rows which whould not deduplicate in the 'user_ips'
+            # table during the transition
+            recorded_device_id = (
+                "dummy-device"
+                if requester.device_id is None and requester.app_service is not None
+                else requester.device_id
+            )
+            await self.store.insert_client_ip(
+                user_id=requester.authenticated_entity,
+                access_token=access_token,
+                ip=ip_addr,
+                user_agent=user_agent,
+                device_id=recorded_device_id,
+            )
+
+            # Track also the puppeted user client IP if enabled and the user is puppeting
+            if (
+                requester.user.to_string() != requester.authenticated_entity
+                and self._track_puppeted_user_ips
+            ):
+                await self.store.insert_client_ip(
+                    user_id=requester.user.to_string(),
+                    access_token=access_token,
+                    ip=ip_addr,
+                    user_agent=user_agent,
+                    device_id=requester.device_id,
+                )

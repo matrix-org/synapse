@@ -1,1 +1,0 @@
-Fix sending out of order `POSITION` over replication, causing additional database load.

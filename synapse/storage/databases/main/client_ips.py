@@ -589,6 +589,27 @@ class ClientIpWorkerStore(ClientIpBackgroundUpdateStore, MonthlyActiveUsersWorke
         device_id: Optional[str],
         now: Optional[int] = None,
     ) -> None:
+        """Record that `user_id` used `access_token` from this `ip` address.
+
+        This method does two things.
+
+        1. It queues up a row to be upserted into the `client_ips` table. These happen
+           periodically; see _update_client_ips_batch.
+        2. It immediately records this user as having taken action for the purposes of
+           MAU tracking.
+
+        Any DB writes take place on the background tasks worker, falling back to the
+        main process. If we're not that worker, this method emits a replication payload
+        to run this logic on that worker.
+
+        Two caveats to note:
+
+         - We only take action once per LAST_SEEN_GRANULARITY, to avoid spamming the
+           DB with writes.
+         - Requests using the sliding-sync proxy's user agent are excluded, as its
+           requests are not directly driven by end-users. This is a hack and we're not
+           very proud of it.
+        """
         # The sync proxy continuously triggers /sync even if the user is not
         # present so should be excluded from user_ips entries.
         if user_agent == "sync-v3-proxy-":

@@ -630,6 +630,12 @@ class UserRegisterServlet(RestServlet):
         if not hmac.compare_digest(want_mac.encode("ascii"), got_mac.encode("ascii")):
             raise SynapseError(HTTPStatus.FORBIDDEN, "HMAC incorrect")
 
+        should_issue_refresh_token = body.get("refresh_token", False)
+        if not isinstance(should_issue_refresh_token, bool):
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST, "refresh_token must be a boolean"
+            )
+
         # Reuse the parts of RegisterRestServlet to reduce code duplication
         from synapse.rest.client.register import RegisterRestServlet
 
@@ -645,7 +651,9 @@ class UserRegisterServlet(RestServlet):
             approved=True,
         )
 
-        result = await register._create_registration_details(user_id, body)
+        result = await register._create_registration_details(
+            user_id, body, should_issue_refresh_token=should_issue_refresh_token
+        )
         return HTTPStatus.OK, result
 
 

@@ -30,13 +30,7 @@ from synapse.types import JsonDict, Requester, create_requester
 from tests import unittest
 from tests.http.server._base import make_request_with_cancellation_test
 from tests.unittest import override_config
-
-try:
-    import authlib  # noqa: F401
-
-    HAS_AUTHLIB = True
-except ImportError:
-    HAS_AUTHLIB = False
+from tests.utils import HAS_AUTHLIB
 
 
 class KeyQueryTestCase(unittest.HomeserverTestCase):
