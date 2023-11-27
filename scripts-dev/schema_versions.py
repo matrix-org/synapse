@@ -13,6 +13,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""A script to calculate which versions of Synapse have backwards-compatible
+database schemas. It creates a Markdown table of Synapse versions and the earliest
+compatible version.
+
+It is compatible with the mdbook protocol for preprocessors (see
+https://rust-lang.github.io/mdBook/for_developers/preprocessors.html#implementing-a-preprocessor-with-a-different-language):
+
+Exit 0 to denote support for all renderers:
+
+    ./scripts-dev/schema_versions.py supports <mdbook renderer>
+
+Parse a JSON list from stdin and add the table to the proper documetnation page:
+
+    ./scripts-dev/schema_versions.py
+
+Additionally, the script supports dumping the table to stdout for debugging:
+
+    ./scripts-dev/schema_versions.py dump
+"""
+
 import io
 import json
 import sys
@@ -129,6 +149,8 @@ if __name__ == "__main__":
     if len(sys.argv) == 3 and sys.argv[1] == "supports":
         # We don't care about the renderer which is being used, which is the second argument.
         sys.exit(0)
+    elif len(sys.argv) == 2 and sys.argv[1] == "dump":
+        print(calculate_version_chart())
     else:
         # Expect JSON data on stdin.
         context, book = json.load(sys.stdin)
