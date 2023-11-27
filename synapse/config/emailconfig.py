@@ -294,6 +294,9 @@ class EmailConfig(Config):
             self.email_riot_base_url = email_config.get(
                 "client_base_url", email_config.get("riot_base_url", None)
             )
+            self.delay_before_mail_ms = Config.parse_duration(
+                email_config.get("delay_before_mail", "10m")
+            )
 
         if self.root.account_validity.account_validity_renew_by_email_enabled:
             expiry_template_html = email_config.get(
