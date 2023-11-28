@@ -566,7 +566,7 @@ listeners:
   # Note that x_forwarded will default to true, when using a UNIX socket. Please see
   # https://matrix-org.github.io/synapse/latest/reverse_proxy.html.
   #
-  - path: /var/run/synapse/main_public.sock
+  - path: /run/synapse/main_public.sock
     type: http
     resources:
       - names: [client, federation]
@@ -4215,9 +4215,9 @@ Example configuration(#2, for UNIX sockets):
 ```yaml
 instance_map:
   main:
-    path: /var/run/synapse/main_replication.sock
+    path: /run/synapse/main_replication.sock
   worker1:
-    path: /var/run/synapse/worker1_replication.sock
+    path: /run/synapse/worker1_replication.sock
 ```
 ---
 ### `stream_writers`
@@ -4403,13 +4403,13 @@ Example configuration(#2, using UNIX sockets with a `replication` listener):
 ```yaml
 worker_listeners:
   - type: http
-    path: /var/run/synapse/worker_public.sock
-    resources:
-      - names: [client, federation]
-  - type: http
-    path: /var/run/synapse/worker_replication.sock
+    path: /run/synapse/worker_replication.sock
     resources:
       - names: [replication]
+  - type: http
+    path: /run/synapse/worker_public.sock
+    resources:
+      - names: [client, federation]
 ```
 ---
 ### `worker_manhole`
