@@ -114,9 +114,6 @@ def get_tags(repo: git.Repo) -> Iterator[git.Tag]:
 def calculate_version_chart() -> str:
     repo = git.Repo(path=".")
 
-    schema_version = None
-    schema_compat_version = None
-
     # Map of schema version -> Synapse versions which are at that schema version.
     schema_versions = defaultdict(list)
     # Map of schema version -> Synapse versions which are compatible with that
