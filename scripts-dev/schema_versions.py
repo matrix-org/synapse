@@ -147,7 +147,7 @@ def calculate_version_chart() -> str:
 
     # Generate a table which maps the latest Synapse version compatible with each
     # schema version.
-    result = "| Compatible versions | Earliest version |\n"
+    result = f"| {'Versions': ^19} | Compatible version |\n"
     result += f"|{'-' * (19 + 2)}|{'-' * (18 + 2)}|\n"
     for schema_version, synapse_versions in schema_compat_versions.items():
         result += f"| {synapse_versions[0] + ' – ' + synapse_versions[-1]: ^19} | {schema_versions[schema_version][0]: ^18} |\n"
