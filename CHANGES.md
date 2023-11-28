@@ -1,4 +1,4 @@
-# Synapse 1.97.0rc1 (2023-11-21)
+# Synapse 1.97.0 (2023-11-28)
 
 Synapse will soon be forked by Element under an AGPLv3.0 licence (with CLA, for
 proprietary dual licensing). You can read more about this here:
@@ -9,6 +9,12 @@ proprietary dual licensing). You can read more about this here:
 The Matrix.org Foundation copy of the project will be archived. Any changes needed
 by server administrators will be communicated via our usual announcements channels, 
 but we are striving to make this as seamless as possible.
+
+
+No significant changes since 1.97.0rc1.
+
+
+# Synapse 1.97.0rc1 (2023-11-21)
 
 ### Features
 
