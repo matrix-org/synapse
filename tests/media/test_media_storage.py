@@ -248,6 +248,7 @@ class MediaRepoTests(unittest.HomeserverTestCase):
             retry_on_dns_fail: bool = True,
             max_size: Optional[int] = None,
             ignore_backoff: bool = False,
+            follow_redirects: bool = False,
         ) -> "Deferred[Tuple[int, Dict[bytes, List[bytes]]]]":
             """A mock for MatrixFederationHttpClient.get_file."""
 
@@ -325,7 +326,8 @@ class MediaRepoTests(unittest.HomeserverTestCase):
             self.fetches[0][2], "/_matrix/media/v3/download/" + self.media_id
         )
         self.assertEqual(
-            self.fetches[0][3], {"allow_remote": "false", "timeout_ms": "20000"}
+            self.fetches[0][3],
+            {"allow_remote": "false", "timeout_ms": "20000", "allow_redirect": "true"},
         )
 
         headers = {
