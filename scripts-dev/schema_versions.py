@@ -51,6 +51,11 @@ SCHEMA_VERSION_FILES = (
 )
 
 
+# Skip versions of Synapse < v1.0, they're old and essentially not
+# compatible with today's federation.
+OLDEST_SHOWN_VERSION = version.parse("v1.0")
+
+
 def get_schema_versions(tag: git.Tag) -> Tuple[Optional[int], Optional[int]]:
     """Get the schema and schema compat versions for a tag."""
     schema_version = None
@@ -103,6 +108,10 @@ def get_tags(repo: git.Repo) -> Iterator[git.Tag]:
 
         # Skip pre- and post-release versions.
         if tag_version.is_prerelease or tag_version.is_postrelease or tag_version.local:
+            continue
+
+        # Skip old versions.
+        if tag_version < OLDEST_SHOWN_VERSION:
             continue
 
         tags.append((tag_version, tag))
