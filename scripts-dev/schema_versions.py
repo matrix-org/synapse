@@ -150,7 +150,7 @@ def calculate_version_chart() -> str:
     result = "| Compatible versions | Earliest version |\n"
     result += "|{'-' * (19 + 2)}|{'-' * (18 + 2)|\n"
     for schema_version, synapse_versions in schema_compat_versions.items():
-        result += f"| {synapse_versions[0] + ' - ' + synapse_versions[-1]: ^19} | {schema_versions[schema_version][0]: ^18} |\n"
+        result += f"| {synapse_versions[0] + ' – ' + synapse_versions[-1]: ^19} | {schema_versions[schema_version][0]: ^18} |\n"
 
     return result
 
