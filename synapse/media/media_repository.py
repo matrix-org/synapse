@@ -77,7 +77,7 @@ class MediaRepository:
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.auth = hs.get_auth()
-        self.client = hs.get_federation_transport_client()
+        self.client = hs.get_federation_client()
         self.clock = hs.get_clock()
         self.server_name = hs.hostname
         self.store = hs.get_datastores().main
@@ -645,7 +645,7 @@ class MediaRepository:
 
         with self.media_storage.store_into_file(file_info) as (f, fname, finish):
             try:
-                length, headers = await self.client.download_media_r0(
+                length, headers = await self.client.download_media(
                     server_name,
                     media_id,
                     output_stream=f,

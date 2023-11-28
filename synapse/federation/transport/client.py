@@ -829,6 +829,30 @@ class TransportLayerClient:
             },
         )
 
+    async def download_media_v3(
+        self,
+        destination: str,
+        media_id: str,
+        output_stream: BinaryIO,
+        max_size: int,
+        max_timeout_ms: int,
+    ) -> Tuple[int, Dict[bytes, List[bytes]]]:
+        path = f"/_matrix/media/v3/download/{destination}/{media_id}"
+
+        return await self.client.get_file(
+            destination,
+            path,
+            output_stream=output_stream,
+            max_size=max_size,
+            args={
+                # tell the remote server to 404 if it doesn't
+                # recognise the server_name, to make sure we don't
+                # end up with a routing loop.
+                "allow_remote": "false",
+                "timeout_ms": str(max_timeout_ms),
+            },
+        )
+
 
 def _create_path(federation_prefix: str, path: str, *args: str) -> str:
     """
