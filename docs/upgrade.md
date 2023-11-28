@@ -88,6 +88,15 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
+Generally Synapse database schemas are compatible across multiple versions, once
+a version of Synapse is deployed you may not be able to rollback automatically.
+The following table gives the version ranges and the earliest version they can
+be rolled back to. E.g. Synapse versions v1.58.0 through v1.61.1 can be rolled
+back safely to v1.57.0, but starting with v1.62.0 it is only safe to rollback to
+v1.61.0.
+
+<!-- REPLACE_WITH_SCHEMA_VERSIONS -->
+
 # Upgrading to v1.93.0
 
 ## Minimum supported Rust version
