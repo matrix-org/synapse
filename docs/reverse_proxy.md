@@ -181,7 +181,7 @@ frontend matrix-federation
 backend matrix
   server matrix 127.0.0.1:8008
 ```
-Example configuration(#2, using a UNIX socket). The configuration before the `backend` part is the same.
+Example configuration, if using a UNIX socket. The configuration lines regarding the frontends do not need to be modified.
 ```
 backend matrix
   server matrix unix@/run/synapse/main_public.sock
