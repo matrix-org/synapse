@@ -39,7 +39,7 @@ jobs:
 
       - name: Semantic checks (ruff)
         continue-on-error: true
-        run: poetry run ruff .
+        run: poetry run ruff --fix .
 
       - run: cargo clippy --all-features --fix -- -D warnings
         continue-on-error: true
