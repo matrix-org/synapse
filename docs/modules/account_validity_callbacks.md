@@ -45,7 +45,7 @@ If multiple modules implement this callback, Synapse runs them all in order.
 
 ### `on_user_login`
 
-_First introduced in Synapse < TODO >
+_First introduced in Synapse v1.98.0_
 
 ```python
 async def on_user_login(user_id: str, auth_provider_type: str, auth_provider_id: str) -> None
