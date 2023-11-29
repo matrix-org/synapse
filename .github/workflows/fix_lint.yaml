@@ -48,3 +48,5 @@ jobs:
         continue-on-error: true
 
       - uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+            commit_message: "Attempt to fix linting"
