@@ -209,7 +209,6 @@ class ServerNoticesManager:
         if self._config.servernotices.server_notices_room_topic:
             room_config["topic"] = self._config.servernotices.server_notices_room_topic
 
-
         # `ignore_forced_encryption` is used to bypass `encryption_enabled_by_default_for_room_type`
         # setting if it set, since the server notices will not be encrypted anyway.
         room_id, _, _ = await self._room_creation_handler.create_room(
