@@ -1887,7 +1887,9 @@ class FederationClient(FederationBase):
                 raise
 
         logger.debug(
-            "Couldn't download media with the v3 API, falling back to the r0 API"
+            "Couldn't download media %s/%s with the v3 API, falling back to the r0 API",
+            destination,
+            media_id,
         )
 
         return await self.transport_layer.download_media_r0(
