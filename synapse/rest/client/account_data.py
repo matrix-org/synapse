@@ -19,8 +19,8 @@ from synapse.api.constants import AccountDataTypes, ReceiptTypes
 from synapse.api.errors import AuthError, Codes, NotFoundError, SynapseError
 from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
-from synapse.types import JsonDict, JsonMapping, RoomID
 from synapse.http.site import SynapseRequest
+from synapse.types import JsonDict, JsonMapping, RoomID
 
 from ._base import client_patterns
 
