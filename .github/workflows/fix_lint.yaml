@@ -7,22 +7,13 @@ on:
   workflow_dispatch:
 
 jobs:
-  fixup:
-    name: Fix up
+  fixup_lint:
+    name: Fix lint
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@master
-        with:
-          # We use nightly so that `fmt` correctly groups together imports, and
-          # clippy correctly fixes up the benchmarks.
-          toolchain: nightly-2022-12-01
-          components: rustfmt
-      - uses: Swatinem/rust-cache@v2
 
       - name: Setup Poetry
         uses: matrix-org/setup-python-poetry@v1
@@ -41,12 +32,34 @@ jobs:
         continue-on-error: true
         run: poetry run ruff --fix .
 
+      - uses: reviewdog/action-suggester@v1
+        with:
+          tool_name: lint
+
+
+  fixup_rust:
+    name: Fix rust
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          # We use nightly so that `fmt` correctly groups together imports, and
+          # clippy correctly fixes up the benchmarks.
+          toolchain: nightly-2022-12-01
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+
       - run: cargo clippy --all-features --fix -- -D warnings
         continue-on-error: true
 
       - run: cargo fmt
         continue-on-error: true
 
-      - uses: stefanzweifel/git-auto-commit-action@v5
+      - uses: reviewdog/action-suggester@v1
         with:
-            commit_message: "Attempt to fix linting"
+          tool_name: rust
