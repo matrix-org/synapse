@@ -850,7 +850,7 @@ class TransportLayerClient:
                 # end up with a routing loop.
                 "allow_remote": "false",
                 "timeout_ms": str(max_timeout_ms),
-                # Matix 1.7 allows for this to redirect to another URL, this should
+                # Matrix 1.7 allows for this to redirect to another URL, this should
                 # just be ignored for an old homeserver, so always provide it.
                 "allow_redirect": "true",
             },
