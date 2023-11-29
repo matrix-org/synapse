@@ -13,7 +13,8 @@
  * limitations under the License.
  */
 
--- Clean up left over rows from bug #11833, which was fixed in #12770.
+-- Clean up left over rows from bug https://github.com/matrix-org/synapse/issues/11833,
+-- which was fixed in https://github.com/matrix-org/synapse/pull/12770.
 DELETE FROM federation_inbound_events_staging WHERE room_id not in (
     SELECT room_id FROM rooms
 );

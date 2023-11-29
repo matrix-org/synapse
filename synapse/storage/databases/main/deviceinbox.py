@@ -87,25 +87,32 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                 self._instance_name in hs.config.worker.writers.to_device
             )
 
-            self._device_inbox_id_gen: AbstractStreamIdGenerator = (
+            self._to_device_msg_id_gen: AbstractStreamIdGenerator = (
                 MultiWriterIdGenerator(
                     db_conn=db_conn,
                     db=database,
                     notifier=hs.get_replication_notifier(),
                     stream_name="to_device",
                     instance_name=self._instance_name,
-                    tables=[("device_inbox", "instance_name", "stream_id")],
+                    tables=[
+                        ("device_inbox", "instance_name", "stream_id"),
+                        ("device_federation_outbox", "instance_name", "stream_id"),
+                    ],
                     sequence_name="device_inbox_sequence",
                     writers=hs.config.worker.writers.to_device,
                 )
             )
         else:
             self._can_write_to_device = True
-            self._device_inbox_id_gen = StreamIdGenerator(
-                db_conn, hs.get_replication_notifier(), "device_inbox", "stream_id"
+            self._to_device_msg_id_gen = StreamIdGenerator(
+                db_conn,
+                hs.get_replication_notifier(),
+                "device_inbox",
+                "stream_id",
+                extra_tables=[("device_federation_outbox", "stream_id")],
             )
 
-        max_device_inbox_id = self._device_inbox_id_gen.get_current_token()
+        max_device_inbox_id = self._to_device_msg_id_gen.get_current_token()
         device_inbox_prefill, min_device_inbox_id = self.db_pool.get_cache_dict(
             db_conn,
             "device_inbox",
@@ -145,8 +152,8 @@ class DeviceInboxWorkerStore(SQLBaseStore):
     ) -> None:
         if stream_name == ToDeviceStream.NAME:
             # If replication is happening than postgres must be being used.
-            assert isinstance(self._device_inbox_id_gen, MultiWriterIdGenerator)
-            self._device_inbox_id_gen.advance(instance_name, token)
+            assert isinstance(self._to_device_msg_id_gen, MultiWriterIdGenerator)
+            self._to_device_msg_id_gen.advance(instance_name, token)
             for row in rows:
                 if row.entity.startswith("@"):
                     self._device_inbox_stream_cache.entity_has_changed(
@@ -162,11 +169,11 @@ class DeviceInboxWorkerStore(SQLBaseStore):
         self, stream_name: str, instance_name: str, token: int
     ) -> None:
         if stream_name == ToDeviceStream.NAME:
-            self._device_inbox_id_gen.advance(instance_name, token)
+            self._to_device_msg_id_gen.advance(instance_name, token)
         super().process_replication_position(stream_name, instance_name, token)
 
     def get_to_device_stream_token(self) -> int:
-        return self._device_inbox_id_gen.get_current_token()
+        return self._to_device_msg_id_gen.get_current_token()
 
     async def get_messages_for_user_devices(
         self,
@@ -450,14 +457,12 @@ class DeviceInboxWorkerStore(SQLBaseStore):
         user_id: str,
         device_id: Optional[str],
         up_to_stream_id: int,
-        limit: Optional[int] = None,
     ) -> int:
         """
         Args:
             user_id: The recipient user_id.
             device_id: The recipient device_id.
             up_to_stream_id: Where to delete messages up to.
-            limit: maximum number of messages to delete
 
         Returns:
             The number of messages deleted.
@@ -478,31 +483,21 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                 log_kv({"message": "No changes in cache since last check"})
                 return 0
 
-        def delete_messages_for_device_txn(txn: LoggingTransaction) -> int:
-            limit_statement = "" if limit is None else f"LIMIT {limit}"
-            sql = f"""
-                DELETE FROM device_inbox WHERE user_id = ? AND device_id = ? AND stream_id <= (
-                  SELECT MAX(stream_id) FROM (
-                    SELECT stream_id FROM device_inbox
-                    WHERE user_id = ? AND device_id = ? AND stream_id <= ?
-                    ORDER BY stream_id
-                    {limit_statement}
-                  ) AS q1
-                )
-                """
-            txn.execute(sql, (user_id, device_id, user_id, device_id, up_to_stream_id))
-            return txn.rowcount
-
-        count = await self.db_pool.runInteraction(
-            "delete_messages_for_device", delete_messages_for_device_txn
-        )
+        from_stream_id = None
+        count = 0
+        while True:
+            from_stream_id, loop_count = await self.delete_messages_for_device_between(
+                user_id,
+                device_id,
+                from_stream_id=from_stream_id,
+                to_stream_id=up_to_stream_id,
+                limit=1000,
+            )
+            count += loop_count
+            if from_stream_id is None:
+                break
 
         log_kv({"message": f"deleted {count} messages for device", "count": count})
-
-        # In this case we don't know if we hit the limit or the delete is complete
-        # so let's not update the cache.
-        if count == limit:
-            return count
 
         # Update the cache, ensuring that we only ever increase the value
         updated_last_deleted_stream_id = self._last_device_delete_cache.get(
@@ -513,6 +508,74 @@ class DeviceInboxWorkerStore(SQLBaseStore):
         )
 
         return count
+
+    @trace
+    async def delete_messages_for_device_between(
+        self,
+        user_id: str,
+        device_id: Optional[str],
+        from_stream_id: Optional[int],
+        to_stream_id: int,
+        limit: int,
+    ) -> Tuple[Optional[int], int]:
+        """Delete N device messages between the stream IDs, returning the
+        highest stream ID deleted (or None if all messages in the range have
+        been deleted) and the number of messages deleted.
+
+        This is more efficient than `delete_messages_for_device` when calling in
+        a loop to batch delete messages.
+        """
+
+        # Keeping track of a lower bound of stream ID where we've deleted
+        # everything below makes the queries much faster. Otherwise, every time
+        # we scan for rows to delete we'd re-scan across all the rows that have
+        # previously deleted (until the next table VACUUM).
+
+        if from_stream_id is None:
+            # Minimum device stream ID is 1.
+            from_stream_id = 0
+
+        def delete_messages_for_device_between_txn(
+            txn: LoggingTransaction,
+        ) -> Tuple[Optional[int], int]:
+            txn.execute(
+                """
+                SELECT MAX(stream_id) FROM (
+                    SELECT stream_id FROM device_inbox
+                    WHERE user_id = ? AND device_id = ?
+                        AND ? < stream_id AND stream_id <= ?
+                    ORDER BY stream_id
+                    LIMIT ?
+                ) AS d
+                """,
+                (user_id, device_id, from_stream_id, to_stream_id, limit),
+            )
+            row = txn.fetchone()
+            if row is None or row[0] is None:
+                return None, 0
+
+            (max_stream_id,) = row
+
+            txn.execute(
+                """
+                DELETE FROM device_inbox
+                WHERE user_id = ? AND device_id = ?
+                AND ? < stream_id AND stream_id <= ?
+                """,
+                (user_id, device_id, from_stream_id, max_stream_id),
+            )
+
+            num_deleted = txn.rowcount
+            if num_deleted < limit:
+                return None, num_deleted
+
+            return max_stream_id, num_deleted
+
+        return await self.db_pool.runInteraction(
+            "delete_messages_for_device_between",
+            delete_messages_for_device_between_txn,
+            db_autocommit=True,  # We don't need to run in a transaction
+        )
 
     @trace
     async def get_new_device_msgs_for_remote(
@@ -745,7 +808,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                                 msg.get(EventContentFields.TO_DEVICE_MSGID),
                             )
 
-        async with self._device_inbox_id_gen.get_next() as stream_id:
+        async with self._to_device_msg_id_gen.get_next() as stream_id:
             now_ms = self._clock.time_msec()
             await self.db_pool.runInteraction(
                 "add_messages_to_device_inbox", add_messages_txn, now_ms, stream_id
@@ -757,7 +820,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                     destination, stream_id
                 )
 
-        return self._device_inbox_id_gen.get_current_token()
+        return self._to_device_msg_id_gen.get_current_token()
 
     async def add_messages_from_remote_to_device_inbox(
         self,
@@ -801,7 +864,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                 txn, stream_id, local_messages_by_user_then_device
             )
 
-        async with self._device_inbox_id_gen.get_next() as stream_id:
+        async with self._to_device_msg_id_gen.get_next() as stream_id:
             now_ms = self._clock.time_msec()
             await self.db_pool.runInteraction(
                 "add_messages_from_remote_to_device_inbox",

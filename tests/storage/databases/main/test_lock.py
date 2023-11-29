@@ -66,9 +66,9 @@ class LockTestCase(unittest.HomeserverTestCase):
 
         # Run the tasks to completion.
         # To work around `Linearizer`s using a different reactor to sleep when
-        # contended (#12841), we call `runUntilCurrent` on
-        # `twisted.internet.reactor`, which is a different reactor to that used
-        # by the homeserver.
+        # contended (https://github.com/matrix-org/synapse/issues/12841), we call
+        # `runUntilCurrent` on `twisted.internet.reactor`, which is a different
+        # reactor to that used by the homeserver.
         assert isinstance(reactor, ReactorBase)
         self.get_success(task1)
         reactor.runUntilCurrent()
@@ -217,9 +217,9 @@ class ReadWriteLockTestCase(unittest.HomeserverTestCase):
 
         # Run the tasks to completion.
         # To work around `Linearizer`s using a different reactor to sleep when
-        # contended (#12841), we call `runUntilCurrent` on
-        # `twisted.internet.reactor`, which is a different reactor to that used
-        # by the homeserver.
+        # contended (https://github.com/matrix-org/synapse/issues/12841), we call
+        # `runUntilCurrent` on `twisted.internet.reactor`, which is a different
+        # reactor to that used by the homeserver.
         assert isinstance(reactor, ReactorBase)
         self.get_success(task1)
         reactor.runUntilCurrent()
@@ -269,9 +269,9 @@ class ReadWriteLockTestCase(unittest.HomeserverTestCase):
 
         # Run the tasks to completion.
         # To work around `Linearizer`s using a different reactor to sleep when
-        # contended (#12841), we call `runUntilCurrent` on
-        # `twisted.internet.reactor`, which is a different reactor to that used
-        # by the homeserver.
+        # contended (https://github.com/matrix-org/synapse/issues/12841), we call
+        # `runUntilCurrent` on `twisted.internet.reactor`, which is a different
+        # reactor to that used by the homeserver.
         assert isinstance(reactor, ReactorBase)
         self.get_success(task1)
         reactor.runUntilCurrent()

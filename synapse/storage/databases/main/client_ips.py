@@ -465,18 +465,15 @@ class ClientIpWorkerStore(ClientIpBackgroundUpdateStore, MonthlyActiveUsersWorke
         #
         # This works by finding the max last_seen that is less than the given
         # time, but has no more than N rows before it, deleting all rows with
-        # a lesser last_seen time. (We COALESCE so that the sub-SELECT always
-        # returns exactly one row).
+        # a lesser last_seen time. (We use an `IN` clause to force postgres to
+        # use the index, otherwise it tends to do a seq scan).
         sql = """
             DELETE FROM user_ips
-            WHERE last_seen <= (
-                SELECT COALESCE(MAX(last_seen), -1)
-                FROM (
-                    SELECT last_seen FROM user_ips
-                    WHERE last_seen <= ?
-                    ORDER BY last_seen ASC
-                    LIMIT 5000
-                ) AS u
+            WHERE last_seen IN (
+                SELECT last_seen FROM user_ips
+                WHERE last_seen <= ?
+                ORDER BY last_seen ASC
+                LIMIT 5000
             )
         """
 
@@ -508,21 +505,24 @@ class ClientIpWorkerStore(ClientIpBackgroundUpdateStore, MonthlyActiveUsersWorke
         if device_id is not None:
             keyvalues["device_id"] = device_id
 
-        res = await self.db_pool.simple_select_list(
-            table="devices",
-            keyvalues=keyvalues,
-            retcols=("user_id", "ip", "user_agent", "device_id", "last_seen"),
+        res = cast(
+            List[Tuple[str, Optional[str], Optional[str], str, Optional[int]]],
+            await self.db_pool.simple_select_list(
+                table="devices",
+                keyvalues=keyvalues,
+                retcols=("user_id", "ip", "user_agent", "device_id", "last_seen"),
+            ),
         )
 
         return {
-            (d["user_id"], d["device_id"]): DeviceLastConnectionInfo(
-                user_id=d["user_id"],
-                device_id=d["device_id"],
-                ip=d["ip"],
-                user_agent=d["user_agent"],
-                last_seen=d["last_seen"],
+            (user_id, device_id): DeviceLastConnectionInfo(
+                user_id=user_id,
+                device_id=device_id,
+                ip=ip,
+                user_agent=user_agent,
+                last_seen=last_seen,
             )
-            for d in res
+            for user_id, ip, user_agent, device_id, last_seen in res
         }
 
     async def _get_user_ip_and_agents_from_database(
@@ -586,6 +586,27 @@ class ClientIpWorkerStore(ClientIpBackgroundUpdateStore, MonthlyActiveUsersWorke
         device_id: Optional[str],
         now: Optional[int] = None,
     ) -> None:
+        """Record that `user_id` used `access_token` from this `ip` address.
+
+        This method does two things.
+
+        1. It queues up a row to be upserted into the `client_ips` table. These happen
+           periodically; see _update_client_ips_batch.
+        2. It immediately records this user as having taken action for the purposes of
+           MAU tracking.
+
+        Any DB writes take place on the background tasks worker, falling back to the
+        main process. If we're not that worker, this method emits a replication payload
+        to run this logic on that worker.
+
+        Two caveats to note:
+
+         - We only take action once per LAST_SEEN_GRANULARITY, to avoid spamming the
+           DB with writes.
+         - Requests using the sliding-sync proxy's user agent are excluded, as its
+           requests are not directly driven by end-users. This is a hack and we're not
+           very proud of it.
+        """
         # The sync proxy continuously triggers /sync even if the user is not
         # present so should be excluded from user_ips entries.
         if user_agent == "sync-v3-proxy-":

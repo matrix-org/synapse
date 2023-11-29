@@ -21,11 +21,13 @@ from typing import (
     Dict,
     Iterable,
     List,
+    Literal,
     Optional,
     Set,
     Tuple,
     TypeVar,
     Union,
+    overload,
 )
 
 import attr
@@ -44,6 +46,7 @@ from synapse.metrics import LaterGauge
 from synapse.streams.config import PaginationConfig
 from synapse.types import (
     JsonDict,
+    MultiWriterStreamToken,
     PersistedEventPosition,
     RoomStreamToken,
     StrCollection,
@@ -127,7 +130,7 @@ class _NotifierUserStream:
     def notify(
         self,
         stream_key: StreamKeyType,
-        stream_id: Union[int, RoomStreamToken],
+        stream_id: Union[int, RoomStreamToken, MultiWriterStreamToken],
         time_now_ms: int,
     ) -> None:
         """Notify any listeners for this user of a new event from an
@@ -452,10 +455,48 @@ class Notifier:
         except Exception:
             logger.exception("Error pusher pool of event")
 
+    @overload
+    def on_new_event(
+        self,
+        stream_key: Literal[StreamKeyType.ROOM],
+        new_token: RoomStreamToken,
+        users: Optional[Collection[Union[str, UserID]]] = None,
+        rooms: Optional[StrCollection] = None,
+    ) -> None:
+        ...
+
+    @overload
+    def on_new_event(
+        self,
+        stream_key: Literal[StreamKeyType.RECEIPT],
+        new_token: MultiWriterStreamToken,
+        users: Optional[Collection[Union[str, UserID]]] = None,
+        rooms: Optional[StrCollection] = None,
+    ) -> None:
+        ...
+
+    @overload
+    def on_new_event(
+        self,
+        stream_key: Literal[
+            StreamKeyType.ACCOUNT_DATA,
+            StreamKeyType.DEVICE_LIST,
+            StreamKeyType.PRESENCE,
+            StreamKeyType.PUSH_RULES,
+            StreamKeyType.TO_DEVICE,
+            StreamKeyType.TYPING,
+            StreamKeyType.UN_PARTIAL_STATED_ROOMS,
+        ],
+        new_token: int,
+        users: Optional[Collection[Union[str, UserID]]] = None,
+        rooms: Optional[StrCollection] = None,
+    ) -> None:
+        ...
+
     def on_new_event(
         self,
         stream_key: StreamKeyType,
-        new_token: Union[int, RoomStreamToken],
+        new_token: Union[int, RoomStreamToken, MultiWriterStreamToken],
         users: Optional[Collection[Union[str, UserID]]] = None,
         rooms: Optional[StrCollection] = None,
     ) -> None:

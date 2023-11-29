@@ -42,3 +42,6 @@ additional-js = [
     "docs/website_files/version.js",
 ]
 theme = "docs/website_files/theme"
+
+[preprocessor.schema_versions]
+command = "./scripts-dev/schema_versions.py"

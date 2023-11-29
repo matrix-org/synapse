@@ -1,4 +1,4 @@
-/* Copyright 2014-2016 OpenMarket Ltd
+/* Copyright 2023 The Matrix.org Foundation C.I.C
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,14 +13,5 @@
  * limitations under the License.
  */
 
--- we used to create a table called server_tls_certificates, but this is no
--- longer used, and is removed in delta 54.
-
-CREATE TABLE IF NOT EXISTS server_signature_keys(
-  server_name TEXT, -- Server name.
-  key_id TEXT, -- Key version.
-  from_server TEXT, -- Which key server the key was fetched form.
-  ts_added_ms BIGINT, -- When the key was added.
-  verify_key bytea, -- NACL verification key.
-  UNIQUE (server_name, key_id)
-);
+INSERT INTO background_updates (ordering, update_name, progress_json) VALUES
+    (8306, 'event_push_summary_index_room_id', '{}');

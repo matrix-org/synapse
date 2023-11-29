@@ -88,7 +88,7 @@ from synapse.types import (
 )
 from synapse.types.state import StateFilter
 from synapse.util.async_helpers import Linearizer, concurrently_execute
-from synapse.util.iterutils import batch_iter, partition
+from synapse.util.iterutils import batch_iter, partition, sorted_topologically_batched
 from synapse.util.retryutils import NotRetryingDestination
 from synapse.util.stringutils import shortstr
 
@@ -748,7 +748,7 @@ class FederationEventHandler:
         # fetching fresh state for the room if the missing event
         # can't be found, which slightly reduces our security.
         # it may also increase our DAG extremity count for the room,
-        # causing additional state resolution?  See #1760.
+        # causing additional state resolution?  See https://github.com/matrix-org/synapse/issues/1760.
         # However, fetching state doesn't hold the linearizer lock
         # apparently.
         #
@@ -1669,14 +1669,13 @@ class FederationEventHandler:
 
         # XXX: it might be possible to kick this process off in parallel with fetching
         # the events.
-        while event_map:
-            # build a list of events whose auth events are not in the queue.
-            roots = tuple(
-                ev
-                for ev in event_map.values()
-                if not any(aid in event_map for aid in ev.auth_event_ids())
-            )
 
+        # We need to persist an event's auth events before the event.
+        auth_graph = {
+            ev: [event_map[e_id] for e_id in ev.auth_event_ids() if e_id in event_map]
+            for ev in event_map.values()
+        }
+        for roots in sorted_topologically_batched(event_map.values(), auth_graph):
             if not roots:
                 # if *none* of the remaining events are ready, that means
                 # we have a loop. This either means a bug in our logic, or that
@@ -1697,9 +1696,6 @@ class FederationEventHandler:
             )
 
             await self._auth_and_persist_outliers_inner(room_id, roots)
-
-            for ev in roots:
-                del event_map[ev.event_id]
 
     async def _auth_and_persist_outliers_inner(
         self, room_id: str, fetched_events: Collection[EventBase]

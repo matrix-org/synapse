@@ -83,6 +83,12 @@ INLINE_CONTENT_TYPES = [
     "audio/x-flac",
 ]
 
+# Default timeout_ms for download and thumbnail requests
+DEFAULT_MAX_TIMEOUT_MS = 20_000
+
+# Maximum allowed timeout_ms for download and thumbnail requests
+MAXIMUM_ALLOWED_MAX_TIMEOUT_MS = 60_000
+
 
 def respond_404(request: SynapseRequest) -> None:
     assert request.path is not None

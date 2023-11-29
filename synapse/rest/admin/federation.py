@@ -85,7 +85,19 @@ class ListDestinationsRestServlet(RestServlet):
         destinations, total = await self._store.get_destinations_paginate(
             start, limit, destination, order_by, direction
         )
-        response = {"destinations": destinations, "total": total}
+        response = {
+            "destinations": [
+                {
+                    "destination": r[0],
+                    "retry_last_ts": r[1],
+                    "retry_interval": r[2],
+                    "failure_ts": r[3],
+                    "last_successful_stream_ordering": r[4],
+                }
+                for r in destinations
+            ],
+            "total": total,
+        }
         if (start + limit) < total:
             response["next_token"] = str(start + len(destinations))
 

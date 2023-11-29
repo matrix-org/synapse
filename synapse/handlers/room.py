@@ -269,7 +269,7 @@ class RoomCreationHandler:
         self,
         requester: Requester,
         old_room_id: str,
-        old_room: Dict[str, Any],
+        old_room: Tuple[bool, str, bool],
         new_room_id: str,
         new_version: RoomVersion,
         tombstone_event: EventBase,
@@ -279,7 +279,7 @@ class RoomCreationHandler:
         Args:
             requester: the user requesting the upgrade
             old_room_id: the id of the room to be replaced
-            old_room: a dict containing room information for the room to be replaced,
+            old_room: a tuple containing room information for the room to be replaced,
                 as returned by `RoomWorkerStore.get_room`.
             new_room_id: the id of the replacement room
             new_version: the version to upgrade the room to
@@ -299,7 +299,7 @@ class RoomCreationHandler:
         await self.store.store_room(
             room_id=new_room_id,
             room_creator_user_id=user_id,
-            is_public=old_room["is_public"],
+            is_public=old_room[0],
             room_version=new_version,
         )
 
@@ -698,6 +698,7 @@ class RoomCreationHandler:
         config: JsonDict,
         ratelimit: bool = True,
         creator_join_profile: Optional[JsonDict] = None,
+        ignore_forced_encryption: bool = False,
     ) -> Tuple[str, Optional[RoomAlias], int]:
         """Creates a new room.
 
@@ -714,6 +715,8 @@ class RoomCreationHandler:
                 derived from the user's profile. If set, should contain the
                 values to go in the body of the 'join' event (typically
                 `avatar_url` and/or `displayname`.
+            ignore_forced_encryption:
+                Ignore encryption forced by `encryption_enabled_by_default_for_room_type` setting.
 
         Returns:
             A 3-tuple containing:
@@ -1015,6 +1018,7 @@ class RoomCreationHandler:
         room_alias: Optional[RoomAlias] = None,
         power_level_content_override: Optional[JsonDict] = None,
         creator_join_profile: Optional[JsonDict] = None,
+        ignore_forced_encryption: bool = False,
     ) -> Tuple[int, str, int]:
         """Sends the initial events into a new room. Sends the room creation, membership,
         and power level events into the room sequentially, then creates and batches up the
@@ -1049,6 +1053,8 @@ class RoomCreationHandler:
             creator_join_profile:
                 Set to override the displayname and avatar for the creating
                 user in this room.
+            ignore_forced_encryption:
+                Ignore encryption forced by `encryption_enabled_by_default_for_room_type` setting.
 
         Returns:
             A tuple containing the stream ID, event ID and depth of the last
@@ -1251,7 +1257,7 @@ class RoomCreationHandler:
             )
             events_to_send.append((event, context))
 
-        if config["encrypted"]:
+        if config["encrypted"] and not ignore_forced_encryption:
             encryption_event, encryption_context = await create_event(
                 EventTypes.RoomEncryption,
                 {"algorithm": RoomEncryptionAlgorithms.DEFAULT},
@@ -1939,9 +1945,10 @@ class RoomShutdownHandler:
         else:
             logger.info("Shutting down room %r", room_id)
 
-        users = await self.store.get_users_in_room(room_id)
-        for user_id in users:
-            if not self.hs.is_mine_id(user_id):
+        users = await self.store.get_local_users_related_to_room(room_id)
+        for user_id, membership in users:
+            # If the user is not in the room (or is banned), nothing to do.
+            if membership not in (Membership.JOIN, Membership.INVITE, Membership.KNOCK):
                 continue
 
             logger.info("Kicking %r from %r...", user_id, room_id)

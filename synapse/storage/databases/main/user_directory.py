@@ -20,7 +20,6 @@ from typing import (
     Collection,
     Iterable,
     List,
-    Mapping,
     Optional,
     Sequence,
     Set,
@@ -833,13 +832,25 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             "delete_all_from_user_dir", _delete_all_from_user_dir_txn
         )
 
-    async def _get_user_in_directory(self, user_id: str) -> Optional[Mapping[str, str]]:
-        return await self.db_pool.simple_select_one(
-            table="user_directory",
-            keyvalues={"user_id": user_id},
-            retcols=("display_name", "avatar_url"),
-            allow_none=True,
-            desc="get_user_in_directory",
+    async def _get_user_in_directory(
+        self, user_id: str
+    ) -> Optional[Tuple[Optional[str], Optional[str]]]:
+        """
+        Fetch the user information in the user directory.
+
+        Returns:
+            None if the user is unknown, otherwise a tuple of display name and
+            avatar URL (both of which may be None).
+        """
+        return cast(
+            Optional[Tuple[Optional[str], Optional[str]]],
+            await self.db_pool.simple_select_one(
+                table="user_directory",
+                keyvalues={"user_id": user_id},
+                retcols=("display_name", "avatar_url"),
+                allow_none=True,
+                desc="get_user_in_directory",
+            ),
         )
 
     async def update_user_directory_stream_pos(self, stream_id: Optional[int]) -> None:
@@ -1145,15 +1156,19 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
             raise Exception("Unrecognized database engine")
 
         results = cast(
-            List[UserProfile],
-            await self.db_pool.execute(
-                "search_user_dir", self.db_pool.cursor_to_dict, sql, *args
-            ),
+            List[Tuple[str, Optional[str], Optional[str]]],
+            await self.db_pool.execute("search_user_dir", sql, *args),
         )
 
         limited = len(results) > limit
 
-        return {"limited": limited, "results": results[0:limit]}
+        return {
+            "limited": limited,
+            "results": [
+                {"user_id": r[0], "display_name": r[1], "avatar_url": r[2]}
+                for r in results[0:limit]
+            ],
+        }
 
 
 def _filter_text_for_index(text: str) -> str:

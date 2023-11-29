@@ -14,7 +14,7 @@
  */
 
 -- Start a background job to cleanup extremities that were incorrectly added
--- by bug #5269.
+-- by bug https://github.com/matrix-org/synapse/issues/5269.
 INSERT INTO background_updates (update_name, progress_json) VALUES
   ('delete_soft_failed_extremities', '{}');
 

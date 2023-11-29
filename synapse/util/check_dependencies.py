@@ -189,7 +189,8 @@ def check_requirements(extra: Optional[str] = None) -> None:
                 errors.append(_not_installed(requirement, extra))
         else:
             if dist.version is None:
-                # This shouldn't happen---it suggests a borked virtualenv. (See #12223)
+                # This shouldn't happen---it suggests a borked virtualenv. (See
+                # https://github.com/matrix-org/synapse/issues/12223)
                 # Try to give a vaguely helpful error message anyway.
                 # Type-ignore: the annotations don't reflect reality: see
                 #     https://github.com/python/typeshed/issues/7513

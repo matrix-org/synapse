@@ -318,7 +318,9 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         self.assertEqual(
             self.fetches[0][2], "/_matrix/media/r0/download/" + self.media_id
         )
-        self.assertEqual(self.fetches[0][3], {"allow_remote": "false"})
+        self.assertEqual(
+            self.fetches[0][3], {"allow_remote": "false", "timeout_ms": "20000"}
+        )
 
         headers = {
             b"Content-Length": [b"%d" % (len(self.test_image.data))],
@@ -504,7 +506,7 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         origin, media_id = self.media_id.split("/")
         info = self.get_success(self.store.get_cached_remote_media(origin, media_id))
         assert info is not None
-        file_id = info["filesystem_id"]
+        file_id = info.filesystem_id
 
         thumbnail_dir = self.media_repo.filepaths.remote_media_thumbnail_dir(
             origin, file_id
