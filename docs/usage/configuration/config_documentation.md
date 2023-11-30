@@ -3815,8 +3815,10 @@ Sub-options for this setting include:
 * `system_mxid_display_name`: set the display name of the "notices" user
 * `system_mxid_avatar_url`: set the avatar for the "notices" user
 * `room_name`: set the room name of the server notices room
-* `room_avatar_url`: set the room avatar URL of the server notices room
-* `room_topic`: set the room topic of the server notices room
+* `room_avatar_url`: set the room avatar of the server notices room _Added in Synapse 1.98.0._
+* `room_topic`: set the room topic of the server notices room _Added in Synapse 1.98.0._
+
+Note that it will only be updated when a new notice event is sent.
 
 Example configuration:
 ```yaml
