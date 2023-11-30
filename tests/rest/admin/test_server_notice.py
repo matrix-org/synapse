@@ -485,8 +485,10 @@ class ServerNoticeTestCase(unittest.HomeserverTestCase):
         Tests that the user get automatically joined to the notice room
         when `auto_join` setting is used.
         """
+        # user has no room memberships
         self._check_invite_and_join_status(self.other_user, 0, 0)
 
+        # send server notice
         server_notice_request_content = {
             "user_id": self.other_user,
             "content": {"msgtype": "m.text", "body": "test msg one"},
@@ -499,6 +501,7 @@ class ServerNoticeTestCase(unittest.HomeserverTestCase):
             content=server_notice_request_content,
         )
 
+        # user has joined the room
         self._check_invite_and_join_status(self.other_user, 0, 1)
 
     @override_config({"server_notices": {"system_mxid_localpart": "notices"}})
