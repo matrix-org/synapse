@@ -175,6 +175,13 @@ any of the subsequent implementations of this callback.</p>
 operations to keep track of them. (e.g. add them to a database table). The user is
 represented by their Matrix user ID.</p>
 <p>If multiple modules implement this callback, Synapse runs them all in order.</p>
+<h3 id="on_user_login"><a class="header" href="#on_user_login"><code>on_user_login</code></a></h3>
+<p><em>First introduced in Synapse v1.98.0</em></p>
+<pre><code class="language-python">async def on_user_login(user_id: str, auth_provider_type: str, auth_provider_id: str) -&gt; None
+</code></pre>
+<p>Called after successfully login or registration of a user for cases when module needs to perform extra operations after auth.
+represented by their Matrix user ID.</p>
+<p>If multiple modules implement this callback, Synapse runs them all in order.</p>
 
                     </main>
 
