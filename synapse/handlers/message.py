@@ -693,13 +693,9 @@ class EventCreationHandler:
         if require_consent and not is_exempt:
             await self.assert_accepted_privacy_policy(requester)
 
-        # Save the access token ID, the device ID and the transaction ID in the event
-        # internal metadata. This is useful to determine if we should echo the
-        # transaction_id in events.
+        # Save the the device ID and the transaction ID in the event internal metadata.
+        # This is useful to determine if we should echo the transaction_id in events.
         # See `synapse.events.utils.EventClientSerializer.serialize_event`
-        if requester.access_token_id is not None:
-            builder.internal_metadata.token_id = requester.access_token_id
-
         if requester.device_id is not None:
             builder.internal_metadata.device_id = requester.device_id
 
