@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, Tuple
 
 from synapse.api.errors import Codes, SynapseError
 from synapse.http.server import HttpServer
-from synapse.http.servlet import RestServlet, parse_json_object_from_request
+from synapse.http.servlet import RestServlet, parse_boolean, parse_json_object_from_request
 from synapse.http.site import SynapseRequest
 from synapse.rest.client._base import client_patterns
 from synapse.types import JsonDict, UserID
@@ -36,13 +36,9 @@ def _read_propagate(hs: "HomeServer", request: SynapseRequest) -> bool:
     if hs.config.experimental.msc4069_profile_inhibit_propagation:
         do_propagate = request.args.get(b"org.matrix.msc4069.propagate")
         if do_propagate is not None:
-            do_propagate = do_propagate[0].lower()
-            if do_propagate not in [b"true", b"false"]:
-                raise SynapseError(
-                    400, "'propagate' is malformed", errcode=Codes.INVALID_PARAM
-                )
-            else:
-                propagate = do_propagate == b"true"
+            propagate = parse_boolean(
+                request, "org.matrix.msc4069.propagate", default=False
+            )
     return propagate
 
 
