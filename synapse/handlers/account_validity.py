@@ -99,7 +99,10 @@ class AccountValidityHandler:
             await callback(user_id)
 
     async def on_user_login(
-        self, user_id: str, auth_provider_type: Optional[str], auth_provider_id: Optional[str]
+        self,
+        user_id: str,
+        auth_provider_type: Optional[str],
+        auth_provider_id: Optional[str],
     ) -> None:
         """Tell third-party modules about a user logins.
 
