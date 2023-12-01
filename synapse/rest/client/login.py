@@ -115,6 +115,7 @@ class LoginRestServlet(RestServlet):
         self.registration_handler = hs.get_registration_handler()
         self._sso_handler = hs.get_sso_handler()
         self._spam_checker = hs.get_module_api_callbacks().spam_checker
+        self._account_validity_handler = hs.get_account_validity_handler()
 
         self._well_known_builder = WellKnownBuilder(hs)
         self._address_ratelimiter = Ratelimiter(
@@ -468,6 +469,13 @@ class LoginRestServlet(RestServlet):
             access_token=access_token,
             home_server=self.hs.hostname,
             device_id=device_id,
+        )
+
+        # execute the callback
+        await self._account_validity_handler.on_user_login(
+            user_id,
+            auth_provider_type=login_submission.get("type"),
+            auth_provider_id=auth_provider_id,
         )
 
         if valid_until_ms is not None:
