@@ -1,0 +1,1 @@
+ALTER TABLE room_memberships REPLICA IDENTITY USING INDEX room_memberships_event_id_key;

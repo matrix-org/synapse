@@ -1,0 +1,1 @@
+ALTER TABLE room_alias_servers REPLICA IDENTITY FULL;

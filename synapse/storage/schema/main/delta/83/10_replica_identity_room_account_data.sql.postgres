@@ -1,0 +1,1 @@
+ALTER TABLE room_account_data REPLICA IDENTITY USING INDEX room_account_data_uniqueness;
