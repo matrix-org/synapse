@@ -3817,6 +3817,7 @@ Sub-options for this setting include:
 * `room_name`: set the room name of the server notices room
 * `auto_join`: boolean. If true, the user will be automatically joined to the room instead of being invited.
   Defaults to false. _Added in Synapse 1.98.0._
+
 Example configuration:
 ```yaml
 server_notices:
