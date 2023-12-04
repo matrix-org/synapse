@@ -52,6 +52,10 @@ if strtobool(os.environ.get("SYNAPSE_ASYNC_IO_REACTOR", "0")):
 
     import asyncio
 
+    import uvloop
+
+    asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+
     from twisted.internet import asyncioreactor
 
     asyncioreactor.install(asyncio.get_event_loop())
