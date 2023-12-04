@@ -129,6 +129,7 @@ class ProfileHandler:
         new_displayname: str,
         by_admin: bool = False,
         deactivation: bool = False,
+        propagate: bool = True,
     ) -> None:
         """Set the displayname of a user
 
@@ -138,6 +139,7 @@ class ProfileHandler:
             new_displayname: The displayname to give this user.
             by_admin: Whether this change was made by an administrator.
             deactivation: Whether this change was made while deactivating the user.
+            propagate: Whether this change also applies to the user's membership events.
         """
         if not self.hs.is_mine(target_user):
             raise SynapseError(400, "User is not hosted on this homeserver")
@@ -188,7 +190,8 @@ class ProfileHandler:
             target_user.to_string(), profile, by_admin, deactivation
         )
 
-        await self._update_join_states(requester, target_user)
+        if propagate:
+            await self._update_join_states(requester, target_user)
 
     async def get_avatar_url(self, target_user: UserID) -> Optional[str]:
         if self.hs.is_mine(target_user):
@@ -221,6 +224,7 @@ class ProfileHandler:
         new_avatar_url: str,
         by_admin: bool = False,
         deactivation: bool = False,
+        propagate: bool = True,
     ) -> None:
         """Set a new avatar URL for a user.
 
@@ -230,6 +234,7 @@ class ProfileHandler:
             new_avatar_url: The avatar URL to give this user.
             by_admin: Whether this change was made by an administrator.
             deactivation: Whether this change was made while deactivating the user.
+            propagate: Whether this change also applies to the user's membership events.
         """
         if not self.hs.is_mine(target_user):
             raise SynapseError(400, "User is not hosted on this homeserver")
@@ -278,7 +283,8 @@ class ProfileHandler:
             target_user.to_string(), profile, by_admin, deactivation
         )
 
-        await self._update_join_states(requester, target_user)
+        if propagate:
+            await self._update_join_states(requester, target_user)
 
     @cached()
     async def check_avatar_size_and_mime_type(self, mxc: str) -> bool:

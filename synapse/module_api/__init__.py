@@ -80,6 +80,7 @@ from synapse.module_api.callbacks.account_validity_callbacks import (
     ON_LEGACY_ADMIN_REQUEST,
     ON_LEGACY_RENEW_CALLBACK,
     ON_LEGACY_SEND_MAIL_CALLBACK,
+    ON_USER_LOGIN_CALLBACK,
     ON_USER_REGISTRATION_CALLBACK,
 )
 from synapse.module_api.callbacks.spamchecker_callbacks import (
@@ -334,6 +335,7 @@ class ModuleApi:
         *,
         is_user_expired: Optional[IS_USER_EXPIRED_CALLBACK] = None,
         on_user_registration: Optional[ON_USER_REGISTRATION_CALLBACK] = None,
+        on_user_login: Optional[ON_USER_LOGIN_CALLBACK] = None,
         on_legacy_send_mail: Optional[ON_LEGACY_SEND_MAIL_CALLBACK] = None,
         on_legacy_renew: Optional[ON_LEGACY_RENEW_CALLBACK] = None,
         on_legacy_admin_request: Optional[ON_LEGACY_ADMIN_REQUEST] = None,
@@ -345,6 +347,7 @@ class ModuleApi:
         return self._callbacks.account_validity.register_callbacks(
             is_user_expired=is_user_expired,
             on_user_registration=on_user_registration,
+            on_user_login=on_user_login,
             on_legacy_send_mail=on_legacy_send_mail,
             on_legacy_renew=on_legacy_renew,
             on_legacy_admin_request=on_legacy_admin_request,

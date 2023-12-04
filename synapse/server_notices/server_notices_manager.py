@@ -178,6 +178,8 @@ class ServerNoticesManager:
                 "avatar_url": self._config.servernotices.server_notices_mxid_avatar_url,
             }
 
+        # `ignore_forced_encryption` is used to bypass `encryption_enabled_by_default_for_room_type`
+        # setting if it set, since the server notices will not be encrypted anyway.
         room_id, _, _ = await self._room_creation_handler.create_room(
             requester,
             config={
@@ -187,6 +189,7 @@ class ServerNoticesManager:
             },
             ratelimit=False,
             creator_join_profile=join_profile,
+            ignore_forced_encryption=True,
         )
 
         self.maybe_get_notice_room_for_user.invalidate((user_id,))
@@ -221,13 +224,26 @@ class ServerNoticesManager:
             if room.room_id == room_id:
                 return
 
+        user_id_obj = UserID.from_string(user_id)
         await self._room_member_handler.update_membership(
             requester=requester,
-            target=UserID.from_string(user_id),
+            target=user_id_obj,
             room_id=room_id,
             action="invite",
             ratelimit=False,
         )
+
+        if self._config.servernotices.server_notices_auto_join:
+            user_requester = create_requester(
+                user_id, authenticated_entity=self._server_name
+            )
+            await self._room_member_handler.update_membership(
+                requester=user_requester,
+                target=user_id_obj,
+                room_id=room_id,
+                action="join",
+                ratelimit=False,
+            )
 
     async def _update_notice_user_profile_if_changed(
         self,

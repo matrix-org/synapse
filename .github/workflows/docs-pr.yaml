@@ -6,6 +6,7 @@ on:
       - docs/**
       - book.toml
       - .github/workflows/docs-pr.yaml
+      - scripts-dev/schema_versions.py
 
 jobs:
   pages:
@@ -13,11 +14,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Fetch all history so that the schema_versions script works.
+          fetch-depth: 0
 
       - name: Setup mdbook
         uses: peaceiris/actions-mdbook@adeb05db28a0c0004681db83893d56c0388ea9ea # v1.2.0
         with:
           mdbook-version: '0.4.17'
+
+      - name: Setup python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.x"
+
+      - run: "pip install 'packaging>=20.0' 'GitPython>=3.1.20'"
 
       - name: Build the documentation
         # mdbook will only create an index.html if we're including docs/README.md in SUMMARY.md.
