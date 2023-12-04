@@ -419,3 +419,7 @@ class ExperimentalConfig(Config):
         self.msc4028_push_encrypted_events = experimental.get(
             "msc4028_push_encrypted_events", False
         )
+
+        self.msc4069_profile_inhibit_propagation = experimental.get(
+            "msc4069_profile_inhibit_propagation", False
+        )
