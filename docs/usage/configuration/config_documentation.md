@@ -3815,6 +3815,8 @@ Sub-options for this setting include:
 * `system_mxid_display_name`: set the display name of the "notices" user
 * `system_mxid_avatar_url`: set the avatar for the "notices" user
 * `room_name`: set the room name of the server notices room
+* `auto_join`: boolean. If true, the user will be automatically joined to the room instead of being invited.
+  Defaults to false. _Added in Synapse 1.98.0._
 
 Example configuration:
 ```yaml
@@ -3823,6 +3825,7 @@ server_notices:
   system_mxid_display_name: "Server Notices"
   system_mxid_avatar_url: "mxc://server.com/oumMVlgDnLYFaPVkExemNVVZ"
   room_name: "Server Notices"
+  auto_join: true
 ```
 ---
 ### `enable_room_list_search`

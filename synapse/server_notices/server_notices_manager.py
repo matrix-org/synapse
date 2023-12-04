@@ -224,13 +224,26 @@ class ServerNoticesManager:
             if room.room_id == room_id:
                 return
 
+        user_id_obj = UserID.from_string(user_id)
         await self._room_member_handler.update_membership(
             requester=requester,
-            target=UserID.from_string(user_id),
+            target=user_id_obj,
             room_id=room_id,
             action="invite",
             ratelimit=False,
         )
+
+        if self._config.servernotices.server_notices_auto_join:
+            user_requester = create_requester(
+                user_id, authenticated_entity=self._server_name
+            )
+            await self._room_member_handler.update_membership(
+                requester=user_requester,
+                target=user_id_obj,
+                room_id=room_id,
+                action="join",
+                ratelimit=False,
+            )
 
     async def _update_notice_user_profile_if_changed(
         self,

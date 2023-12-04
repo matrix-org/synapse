@@ -48,6 +48,7 @@ class ServerNoticesConfig(Config):
         self.server_notices_mxid_display_name: Optional[str] = None
         self.server_notices_mxid_avatar_url: Optional[str] = None
         self.server_notices_room_name: Optional[str] = None
+        self.server_notices_auto_join: bool = False
 
     def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         c = config.get("server_notices")
@@ -62,3 +63,4 @@ class ServerNoticesConfig(Config):
         self.server_notices_mxid_avatar_url = c.get("system_mxid_avatar_url", None)
         # todo: i18n
         self.server_notices_room_name = c.get("room_name", "Server Notices")
+        self.server_notices_auto_join = c.get("auto_join", False)
