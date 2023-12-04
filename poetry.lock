@@ -2691,17 +2691,17 @@ test = ["cython", "filelock", "html5lib", "pytest (>=4.6)"]
 
 [[package]]
 name = "sphinx-autodoc2"
-version = "0.4.2"
+version = "0.5.0"
 description = "Analyse a python project and create documentation for it."
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "sphinx-autodoc2-0.4.2.tar.gz", hash = "sha256:06da226a25a4339e173b34bb0e590e0ba9b4570b414796140aee1939d09acb3a"},
-    {file = "sphinx_autodoc2-0.4.2-py3-none-any.whl", hash = "sha256:00835ba8c980b9c510ea794c3e2060e5a254a74c6c22badc9bfd3642dc1034b4"},
+    {file = "sphinx_autodoc2-0.5.0-py3-none-any.whl", hash = "sha256:e867013b1512f9d6d7e6f6799f8b537d6884462acd118ef361f3f619a60b5c9e"},
+    {file = "sphinx_autodoc2-0.5.0.tar.gz", hash = "sha256:7d76044aa81d6af74447080182b6868c7eb066874edc835e8ddf810735b6565a"},
 ]
 
 [package.dependencies]
-astroid = ">=2.7"
+astroid = ">=2.7,<4"
 tomli = {version = "*", markers = "python_version < \"3.11\""}
 typing-extensions = "*"
 
@@ -2709,7 +2709,7 @@ typing-extensions = "*"
 cli = ["typer[all]"]
 docs = ["furo", "myst-parser", "sphinx (>=4.0.0)"]
 sphinx = ["sphinx (>=4.0.0)"]
-testing = ["pytest", "pytest-cov", "pytest-regressions", "sphinx (>=4.0.0)"]
+testing = ["pytest", "pytest-cov", "pytest-regressions", "sphinx (>=4.0.0,<7)"]
 
 [[package]]
 name = "sphinx-basic-ng"
@@ -3432,4 +3432,4 @@ user-search = ["pyicu"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.8.0"
-content-hash = "2924e80a14b32b430e70bafbd2b00893a365d9c3836c026296f4af0b9579e604"
+content-hash = "57716a9580b3493c3d2038492a6d4c36d1d16a79c5a0880b6eadcaf681503d3a"
