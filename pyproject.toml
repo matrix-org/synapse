@@ -370,7 +370,7 @@ optional = true
 
 [tool.poetry.group.dev-docs.dependencies]
 sphinx = {version = "^6.1", python = "^3.8"}
-sphinx-autodoc2 = {version = "^0.4.2", python = "^3.8"}
+sphinx-autodoc2 = {version = ">=0.4.2,<0.6.0", python = "^3.8"}
 myst-parser = {version = "^1.0.0", python = "^3.8"}
 furo = ">=2022.12.7,<2024.0.0"
 
