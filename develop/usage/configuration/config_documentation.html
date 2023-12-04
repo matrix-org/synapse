@@ -635,7 +635,7 @@ for <a href="../../workers.html">workers</a> and containers without listener e.g
   # Note that x_forwarded will default to true, when using a UNIX socket. Please see
   # https://matrix-org.github.io/synapse/latest/reverse_proxy.html.
   #
-  - path: /var/run/synapse/main_public.sock
+  - path: /run/synapse/main_public.sock
     type: http
     resources:
       - names: [client, federation]
@@ -3769,9 +3769,9 @@ declared inside the <code>listener</code> block for a <code>replication</code> l
 <p>Example configuration(#2, for UNIX sockets):</p>
 <pre><code class="language-yaml">instance_map:
   main:
-    path: /var/run/synapse/main_replication.sock
+    path: /run/synapse/main_replication.sock
   worker1:
-    path: /var/run/synapse/worker1_replication.sock
+    path: /run/synapse/worker1_replication.sock
 </code></pre>
 <hr />
 <h3 id="stream_writers"><a class="header" href="#stream_writers"><code>stream_writers</code></a></h3>
@@ -3930,13 +3930,13 @@ requests from other workers.</p>
 <p>Example configuration(#2, using UNIX sockets with a <code>replication</code> listener):</p>
 <pre><code class="language-yaml">worker_listeners:
   - type: http
-    path: /var/run/synapse/worker_public.sock
-    resources:
-      - names: [client, federation]
-  - type: http
-    path: /var/run/synapse/worker_replication.sock
+    path: /run/synapse/worker_replication.sock
     resources:
       - names: [replication]
+  - type: http
+    path: /run/synapse/worker_public.sock
+    resources:
+      - names: [client, federation]
 </code></pre>
 <hr />
 <h3 id="worker_manhole"><a class="header" href="#worker_manhole"><code>worker_manhole</code></a></h3>

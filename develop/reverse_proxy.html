@@ -297,6 +297,10 @@ frontend matrix-federation
 backend matrix
   server matrix 127.0.0.1:8008
 </code></pre>
+<p>Example configuration, if using a UNIX socket. The configuration lines regarding the frontends do not need to be modified.</p>
+<pre><code>backend matrix
+  server matrix unix@/run/synapse/main_public.sock
+</code></pre>
 <p><a href="delegate.html">Delegation</a> example:</p>
 <pre><code>frontend https
   acl matrix-well-known-client-path path /.well-known/matrix/client
