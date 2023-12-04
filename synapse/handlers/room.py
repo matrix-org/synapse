@@ -549,7 +549,7 @@ class RoomCreationHandler:
         except (TypeError, ValueError):
             ban = 50
         needed_power_level = max(
-            state_default_int, ban, max(event_power_levels.values())
+            state_default_int, ban, max(event_power_levels.values(), default=0)
         )
 
         # Get the user's current power level, this matches the logic in get_user_power_level,
