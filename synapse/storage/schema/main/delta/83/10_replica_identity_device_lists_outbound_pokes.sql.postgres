@@ -1,0 +1,1 @@
+ALTER TABLE device_lists_outbound_pokes REPLICA IDENTITY FULL;

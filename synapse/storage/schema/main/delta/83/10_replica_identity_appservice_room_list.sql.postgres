@@ -1,0 +1,1 @@
+ALTER TABLE appservice_room_list REPLICA IDENTITY USING INDEX appservice_room_list_idx;

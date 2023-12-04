@@ -1,0 +1,1 @@
+ALTER TABLE state_events REPLICA IDENTITY USING INDEX state_events_event_id_key;

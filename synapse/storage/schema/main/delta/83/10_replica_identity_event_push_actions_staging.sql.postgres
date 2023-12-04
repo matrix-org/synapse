@@ -1,0 +1,1 @@
+ALTER TABLE event_push_actions_staging REPLICA IDENTITY FULL;

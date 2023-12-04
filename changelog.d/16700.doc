@@ -1,0 +1,1 @@
+Switch the example UNIX socket paths to /run. Add HAProxy example configuration for UNIX sockets.

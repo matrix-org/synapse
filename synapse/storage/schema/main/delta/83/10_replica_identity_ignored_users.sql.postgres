@@ -1,0 +1,1 @@
+ALTER TABLE ignored_users REPLICA IDENTITY USING INDEX ignored_users_uniqueness;
