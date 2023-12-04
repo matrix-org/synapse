@@ -7019,6 +7019,8 @@ notices.</p>
 <li><code>system_mxid_display_name</code>: set the display name of the &quot;notices&quot; user</li>
 <li><code>system_mxid_avatar_url</code>: set the avatar for the &quot;notices&quot; user</li>
 <li><code>room_name</code>: set the room name of the server notices room</li>
+<li><code>auto_join</code>: boolean. If true, the user will be automatically joined to the room instead of being invited.
+Defaults to false. <em>Added in Synapse 1.98.0.</em></li>
 </ul>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">server_notices:
@@ -7026,6 +7028,7 @@ notices.</p>
   system_mxid_display_name: &quot;Server Notices&quot;
   system_mxid_avatar_url: &quot;mxc://server.com/oumMVlgDnLYFaPVkExemNVVZ&quot;
   room_name: &quot;Server Notices&quot;
+  auto_join: true
 </code></pre>
 <hr />
 <h3 id="enable_room_list_search"><a class="header" href="#enable_room_list_search"><code>enable_room_list_search</code></a></h3>
@@ -9409,12 +9412,14 @@ section, which should look like this:</p>
    system_mxid_display_name: &quot;Server Notices&quot;
    system_mxid_avatar_url: &quot;mxc://server.com/oumMVlgDnLYFaPVkExemNVVZ&quot;
    room_name: &quot;Server Notices&quot;
+   auto_join: true
 </code></pre>
 <p>The only compulsory setting is <code>system_mxid_localpart</code>, which defines the user
 id of the Server Notices user, as above. <code>room_name</code> defines the name of the
 room which will be created.</p>
 <p><code>system_mxid_display_name</code> and <code>system_mxid_avatar_url</code> can be used to set the
 displayname and avatar of the Server Notices user.</p>
+<p><code>auto_join</code> will autojoin users to the notices room instead of sending an invite.</p>
 <h2 id="sending-notices"><a class="header" href="#sending-notices">Sending notices</a></h2>
 <p>To send server notices to users you can use the
 <a href="admin_api/server_notices.html">admin_api</a>.</p>
