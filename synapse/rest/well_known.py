@@ -44,15 +44,9 @@ class WellKnownBuilder:
                 "base_url": self._config.registration.default_identity_server
             }
 
-        # We use the MSC3861 values as they are used by multiple MSCs
-        if self._config.experimental.msc3861.enabled:
-            result["org.matrix.msc2965.authentication"] = {
-                "issuer": self._config.experimental.msc3861.issuer
-            }
-            if self._config.experimental.msc3861.account_management_url is not None:
-                result["org.matrix.msc2965.authentication"][
-                    "account"
-                ] = self._config.experimental.msc3861.account_management_url
+        discovery_data = self._config.experimental.get_msc2965_discovery_data()
+        if discovery_data is not None:
+            result["org.matrix.msc2965.authentication"] = discovery_data
 
         if self._config.server.extra_well_known_client_content:
             for (

@@ -423,3 +423,14 @@ class ExperimentalConfig(Config):
         self.msc4069_profile_inhibit_propagation = experimental.get(
             "msc4069_profile_inhibit_propagation", False
         )
+
+    def get_msc2965_discovery_data(self) -> Optional[JsonDict]:
+        # We use the MSC3861 values as they are used by multiple MSCs
+        if not self.msc3861.enabled:
+            return None
+
+        result = {"issuer": self.msc3861.issuer}
+        if self.msc3861.account_management_url is not None:
+            result["account"] = self.msc3861.account_management_url
+
+        return result
