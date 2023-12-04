@@ -1,1 +1,0 @@
-More efficiently handle no-op `POSITION` over replication.

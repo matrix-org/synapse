@@ -18,6 +18,7 @@ import urllib
 from typing import (
     TYPE_CHECKING,
     Any,
+    BinaryIO,
     Callable,
     Collection,
     Dict,
@@ -802,6 +803,58 @@ class TransportLayerClient:
 
         return await self.client.post_json(
             destination=destination, path=path, data={"user_ids": user_ids}
+        )
+
+    async def download_media_r0(
+        self,
+        destination: str,
+        media_id: str,
+        output_stream: BinaryIO,
+        max_size: int,
+        max_timeout_ms: int,
+    ) -> Tuple[int, Dict[bytes, List[bytes]]]:
+        path = f"/_matrix/media/r0/download/{destination}/{media_id}"
+
+        return await self.client.get_file(
+            destination,
+            path,
+            output_stream=output_stream,
+            max_size=max_size,
+            args={
+                # tell the remote server to 404 if it doesn't
+                # recognise the server_name, to make sure we don't
+                # end up with a routing loop.
+                "allow_remote": "false",
+                "timeout_ms": str(max_timeout_ms),
+            },
+        )
+
+    async def download_media_v3(
+        self,
+        destination: str,
+        media_id: str,
+        output_stream: BinaryIO,
+        max_size: int,
+        max_timeout_ms: int,
+    ) -> Tuple[int, Dict[bytes, List[bytes]]]:
+        path = f"/_matrix/media/v3/download/{destination}/{media_id}"
+
+        return await self.client.get_file(
+            destination,
+            path,
+            output_stream=output_stream,
+            max_size=max_size,
+            args={
+                # tell the remote server to 404 if it doesn't
+                # recognise the server_name, to make sure we don't
+                # end up with a routing loop.
+                "allow_remote": "false",
+                "timeout_ms": str(max_timeout_ms),
+                # Matrix 1.7 allows for this to redirect to another URL, this should
+                # just be ignored for an old homeserver, so always provide it.
+                "allow_redirect": "true",
+            },
+            follow_redirects=True,
         )
 
 

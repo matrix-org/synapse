@@ -1,0 +1,1 @@
+Raise poetry-core upper bound to <=1.8.1. This allows contributors to import Synapse after `poetry install`ing with Poetry 1.6 and above. Contributed by Mo Balaa.

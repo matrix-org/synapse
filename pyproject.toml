@@ -96,7 +96,7 @@ module-name = "synapse.synapse_rust"
 
 [tool.poetry]
 name = "matrix-synapse"
-version = "1.96.1"
+version = "1.97.0"
 description = "Homeserver for the Matrix decentralised comms protocol"
 authors = ["Matrix.org Team and Contributors <packages@matrix.org>"]
 license = "Apache-2.0"
@@ -321,7 +321,7 @@ all = [
 # This helps prevents merge conflicts when running a batch of dependabot updates.
 isort = ">=5.10.1"
 black = ">=22.7.0"
-ruff = "0.1.4"
+ruff = "0.1.6"
 # Type checking only works with the pydantic.v1 compat module from pydantic v2
 pydantic = "^2"
 
@@ -382,7 +382,7 @@ furo = ">=2022.12.7,<2024.0.0"
 # runtime errors caused by build system changes.
 # We are happy to raise these upper bounds upon request,
 # provided we check that it's safe to do so (i.e. that CI passes).
-requires = ["poetry-core>=1.1.0,<=1.7.0", "setuptools_rust>=1.3,<=1.8.1"]
+requires = ["poetry-core>=1.1.0,<=1.8.1", "setuptools_rust>=1.3,<=1.8.1"]
 build-backend = "poetry.core.masonry.api"
 
 

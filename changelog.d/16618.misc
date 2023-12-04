@@ -1,1 +1,0 @@
-Use `dbname` instead of the deprecated `database` connection parameter for psycopg2.

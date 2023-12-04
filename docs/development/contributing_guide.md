@@ -66,7 +66,7 @@ Of their installation methods, we recommend
 
 ```shell
 pip install --user pipx
-pipx install poetry==1.5.2  # Problems with Poetry 1.6, see https://github.com/matrix-org/synapse/issues/16147
+pipx install poetry==1.5.1  # Problems with Poetry 1.6, see https://github.com/matrix-org/synapse/issues/16147
 ```
 
 but see poetry's [installation instructions](https://python-poetry.org/docs/#installation)

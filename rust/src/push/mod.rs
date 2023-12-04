@@ -296,8 +296,7 @@ impl<'source> FromPyObject<'source> for JsonValue {
             match l.iter().map(SimpleJsonValue::extract).collect() {
                 Ok(a) => Ok(JsonValue::Array(a)),
                 Err(e) => Err(PyTypeError::new_err(format!(
-                    "Can't convert to JsonValue::Array: {}",
-                    e
+                    "Can't convert to JsonValue::Array: {e}"
                 ))),
             }
         } else if let Ok(v) = SimpleJsonValue::extract(ob) {

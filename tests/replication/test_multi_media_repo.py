@@ -133,7 +133,7 @@ class MediaRepoShardTestCase(BaseMultiWorkerStreamTestCase):
         self.assertEqual(request.method, b"GET")
         self.assertEqual(
             request.path,
-            f"/_matrix/media/r0/download/{target}/{media_id}".encode(),
+            f"/_matrix/media/v3/download/{target}/{media_id}".encode(),
         )
         self.assertEqual(
             request.requestHeaders.getRawHeaders(b"host"), [target.encode("utf-8")]

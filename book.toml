@@ -37,3 +37,6 @@ additional-css = [
 ]
 additional-js = ["docs/website_files/table-of-contents.js"]
 theme = "docs/website_files/theme"
+
+[preprocessor.schema_versions]
+command = "./scripts-dev/schema_versions.py"

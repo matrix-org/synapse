@@ -1,0 +1,52 @@
+# A helper workflow to automatically fixup any linting errors on a PR. Must be
+# triggered manually.
+
+name: Attempt to automatically fix linting errors
+
+on:
+  workflow_dispatch:
+
+jobs:
+  fixup:
+    name: Fix up
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          # We use nightly so that `fmt` correctly groups together imports, and
+          # clippy correctly fixes up the benchmarks.
+          toolchain: nightly-2022-12-01
+          components: rustfmt
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Setup Poetry
+        uses: matrix-org/setup-python-poetry@v1
+        with:
+          install-project: "false"
+
+      - name: Import order (isort)
+        continue-on-error: true
+        run: poetry run isort .
+
+      - name: Code style (black)
+        continue-on-error: true
+        run: poetry run black .
+
+      - name: Semantic checks (ruff)
+        continue-on-error: true
+        run: poetry run ruff --fix .
+
+      - run: cargo clippy --all-features --fix -- -D warnings
+        continue-on-error: true
+
+      - run: cargo fmt
+        continue-on-error: true
+
+      - uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+            commit_message: "Attempt to fix linting"
