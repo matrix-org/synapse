@@ -31,7 +31,7 @@ but we are striving to make this as seamless as possible.
 ### Improved Documentation
 
 - Add schema rollback information to documentation. ([\#16661](https://github.com/matrix-org/synapse/issues/16661))
-- Fix poetry version typo in [contributors' guide](https://matrix-org.github.io/synapse/latest/development/contributing_guide.html). ([\#16695](https://github.com/matrix-org/synapse/issues/16695))
+- Fix poetry version typo in the [contributors' guide](https://matrix-org.github.io/synapse/latest/development/contributing_guide.html). ([\#16695](https://github.com/matrix-org/synapse/issues/16695))
 - Switch the example UNIX socket paths to `/run`. Add HAProxy example configuration for UNIX sockets. ([\#16700](https://github.com/matrix-org/synapse/issues/16700))
 - Add documentation for how to validate the configuration file with `synapse.config` script. ([\#16714](https://github.com/matrix-org/synapse/issues/16714))
 
