@@ -1,1 +1,0 @@
-Adds on_user_login ModuleAPI callback allowing to execute custom code after (on) Auth.
