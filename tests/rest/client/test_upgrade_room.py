@@ -246,6 +246,34 @@ class UpgradeRoomTest(unittest.HomeserverTestCase):
         # We should now have an integer power level.
         self.assertEqual(new_power_levels["users"][self.creator], 100, new_power_levels)
 
+    def test_events_field_missing(self) -> None:
+        """Regression test for https://github.com/matrix-org/synapse/issues/16715."""
+        # Create a new room.
+        room_id = self.helper.create_room_as(
+            self.creator, tok=self.creator_token, room_version="10"
+        )
+        self.helper.join(room_id, self.other, tok=self.other_token)
+
+        # Retrieve the room's current power levels.
+        power_levels = self.helper.get_state(
+            room_id,
+            "m.room.power_levels",
+            tok=self.creator_token,
+        )
+
+        # Remove the events field and re-set the power levels.
+        del power_levels["events"]
+        self.helper.send_state(
+            room_id,
+            "m.room.power_levels",
+            body=power_levels,
+            tok=self.creator_token,
+        )
+
+        # Upgrade the room. Check the homeserver reports success.
+        channel = self._upgrade_room(room_id=room_id)
+        self.assertEqual(200, channel.code, channel.result)
+
     def test_space(self) -> None:
         """Test upgrading a space."""
 
