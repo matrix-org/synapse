@@ -1,0 +1,1 @@
+ALTER TABLE blocked_rooms REPLICA IDENTITY USING INDEX blocked_rooms_idx;

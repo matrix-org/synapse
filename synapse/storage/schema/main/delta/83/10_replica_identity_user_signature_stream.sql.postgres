@@ -1,0 +1,1 @@
+ALTER TABLE user_signature_stream REPLICA IDENTITY USING INDEX user_signature_stream_idx;

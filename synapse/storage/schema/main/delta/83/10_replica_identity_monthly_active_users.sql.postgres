@@ -1,0 +1,1 @@
+ALTER TABLE monthly_active_users REPLICA IDENTITY USING INDEX monthly_active_users_users;

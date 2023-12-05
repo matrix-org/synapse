@@ -1,0 +1,1 @@
+ALTER TABLE devices REPLICA IDENTITY USING INDEX device_uniqueness;

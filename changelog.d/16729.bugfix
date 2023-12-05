@@ -1,0 +1,1 @@
+Fix GET /_synapse/admin/v1/federation/destinations returning null (instead of 0) for `retry_last_ts` and `retry_interval`.

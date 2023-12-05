@@ -89,8 +89,8 @@ class ListDestinationsRestServlet(RestServlet):
             "destinations": [
                 {
                     "destination": r[0],
-                    "retry_last_ts": r[1],
-                    "retry_interval": r[2],
+                    "retry_last_ts": r[1] or 0,
+                    "retry_interval": r[2] or 0,
                     "failure_ts": r[3],
                     "last_successful_stream_ordering": r[4],
                 }

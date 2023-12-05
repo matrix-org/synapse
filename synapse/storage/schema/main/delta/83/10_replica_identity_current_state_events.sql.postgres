@@ -1,0 +1,1 @@
+ALTER TABLE current_state_events REPLICA IDENTITY USING INDEX current_state_events_event_id_key;

@@ -1,0 +1,1 @@
+ALTER TABLE sessions REPLICA IDENTITY USING INDEX sessions_session_type_session_id_key;

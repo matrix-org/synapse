@@ -1,0 +1,1 @@
+ALTER TABLE erased_users REPLICA IDENTITY USING INDEX erased_users_user;
