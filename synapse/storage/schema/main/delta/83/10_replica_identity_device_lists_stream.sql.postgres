@@ -1,1 +1,0 @@
-ALTER TABLE device_lists_stream REPLICA IDENTITY FULL;

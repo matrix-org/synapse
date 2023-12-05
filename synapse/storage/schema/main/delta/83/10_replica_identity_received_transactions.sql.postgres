@@ -1,1 +1,0 @@
-ALTER TABLE received_transactions REPLICA IDENTITY FULL;

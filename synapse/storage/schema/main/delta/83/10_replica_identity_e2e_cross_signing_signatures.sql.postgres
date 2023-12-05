@@ -1,1 +1,0 @@
-ALTER TABLE e2e_cross_signing_signatures REPLICA IDENTITY FULL;

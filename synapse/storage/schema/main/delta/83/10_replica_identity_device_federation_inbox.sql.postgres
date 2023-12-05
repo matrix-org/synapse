@@ -1,1 +1,0 @@
-ALTER TABLE device_federation_inbox REPLICA IDENTITY FULL;

@@ -1,1 +1,0 @@
-ALTER TABLE local_current_membership REPLICA IDENTITY USING INDEX local_current_membership_idx;

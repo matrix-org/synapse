@@ -1,1 +1,0 @@
-ALTER TABLE threepid_guest_access_tokens REPLICA IDENTITY FULL;

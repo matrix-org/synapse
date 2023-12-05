@@ -1,1 +1,0 @@
-Fix a bug introduced in Synapse 1.7.2 where rooms whose power levels lacked an `events` field could not be upgraded.

@@ -1,1 +1,0 @@
-ALTER TABLE current_state_delta_stream REPLICA IDENTITY FULL;

@@ -1,1 +1,0 @@
-ALTER TABLE local_media_repository REPLICA IDENTITY FULL;

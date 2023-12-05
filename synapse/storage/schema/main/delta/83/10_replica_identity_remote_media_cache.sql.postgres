@@ -1,1 +1,0 @@
-ALTER TABLE remote_media_cache REPLICA IDENTITY FULL;

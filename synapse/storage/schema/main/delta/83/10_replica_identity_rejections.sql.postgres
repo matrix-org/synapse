@@ -1,1 +1,0 @@
-ALTER TABLE rejections REPLICA IDENTITY USING INDEX rejections_event_id_key;

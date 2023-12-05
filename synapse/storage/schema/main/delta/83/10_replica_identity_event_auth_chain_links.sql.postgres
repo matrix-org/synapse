@@ -1,1 +1,0 @@
-ALTER TABLE event_auth_chain_links REPLICA IDENTITY FULL;

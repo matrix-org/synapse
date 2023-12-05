@@ -1,1 +1,0 @@
-ALTER TABLE server_signature_keys REPLICA IDENTITY FULL;

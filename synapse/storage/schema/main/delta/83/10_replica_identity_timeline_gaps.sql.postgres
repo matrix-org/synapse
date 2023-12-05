@@ -1,1 +1,0 @@
-ALTER TABLE timeline_gaps REPLICA IDENTITY FULL;

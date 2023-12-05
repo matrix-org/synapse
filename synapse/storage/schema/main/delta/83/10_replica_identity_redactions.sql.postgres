@@ -1,1 +1,0 @@
-ALTER TABLE redactions REPLICA IDENTITY USING INDEX redactions_event_id_key;

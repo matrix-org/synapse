@@ -1,1 +1,0 @@
-ALTER TABLE state_groups_state REPLICA IDENTITY FULL;

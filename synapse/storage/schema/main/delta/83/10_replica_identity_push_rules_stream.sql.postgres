@@ -1,1 +1,0 @@
-ALTER TABLE push_rules_stream REPLICA IDENTITY FULL;

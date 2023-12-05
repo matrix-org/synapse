@@ -1,1 +1,0 @@
-ALTER TABLE registration_tokens REPLICA IDENTITY USING INDEX registration_tokens_token_key;
