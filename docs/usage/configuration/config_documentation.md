@@ -33,6 +33,23 @@ In addition, configuration options referring to size use the following suffixes:
 For example, setting `max_avatar_size: 10M` means that Synapse will not accept files larger than 10,485,760 bytes
 for a user avatar.
 
+## Config Validation
+
+The configuration file can be validated with the following command:
+```bash
+python -m synapse.config read <config key to print> -c <path to config>
+```
+
+To validate the entire file, omit `read <config key to print>`:
+```bash
+python -m synapse.config -c <path to config>
+```
+
+To see how to set other options, check the help reference:
+```bash
+python -m synapse.config --help
+```
+
 ### YAML
 The configuration file is a [YAML](https://yaml.org/) file, which means that certain syntax rules
 apply if you want your config file to be read properly. A few helpful things to know:

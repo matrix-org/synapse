@@ -1,1 +1,0 @@
-ALTER TABLE insertion_event_edges REPLICA IDENTITY FULL;
