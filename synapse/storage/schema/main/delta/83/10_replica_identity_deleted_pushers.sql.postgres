@@ -1,1 +1,0 @@
-ALTER TABLE deleted_pushers REPLICA IDENTITY FULL;

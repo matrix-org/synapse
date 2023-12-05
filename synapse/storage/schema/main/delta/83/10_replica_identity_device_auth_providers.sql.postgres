@@ -1,1 +1,0 @@
-ALTER TABLE device_auth_providers REPLICA IDENTITY FULL;

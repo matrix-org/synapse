@@ -1,1 +1,0 @@
-ALTER TABLE account_data REPLICA IDENTITY USING INDEX account_data_uniqueness;

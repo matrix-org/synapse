@@ -39,7 +39,6 @@ but we are striving to make this as seamless as possible.
 
 - Clean-up unused tables. ([\#16522](https://github.com/matrix-org/synapse/issues/16522))
 - Reduce a little database load while processing state auth chains. ([\#16552](https://github.com/matrix-org/synapse/issues/16552))
-- Add a Postgres `REPLICA IDENTITY` to tables that do not have an implicit one. This should allow use of Postgres logical replication. ([\#16658](https://github.com/matrix-org/synapse/issues/16658), [\#16730](https://github.com/matrix-org/synapse/issues/16730))
 - Reduce database load of pruning old `user_ips`. ([\#16667](https://github.com/matrix-org/synapse/issues/16667))
 - Reduce DB load when forget on leave setting is disabled. ([\#16668](https://github.com/matrix-org/synapse/issues/16668))
 - Ignore `encryption_enabled_by_default_for_room_type` setting when creating server notices room, since the notices will be send unencrypted anyway. ([\#16677](https://github.com/matrix-org/synapse/issues/16677))

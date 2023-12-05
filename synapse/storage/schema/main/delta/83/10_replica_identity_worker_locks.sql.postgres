@@ -1,1 +1,0 @@
-ALTER TABLE worker_locks REPLICA IDENTITY USING INDEX worker_locks_key;

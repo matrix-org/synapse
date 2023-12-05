@@ -1,1 +1,0 @@
-ALTER TABLE local_media_repository_url_cache REPLICA IDENTITY FULL;

@@ -1,1 +1,0 @@
-ALTER TABLE user_directory_search REPLICA IDENTITY USING INDEX user_directory_search_user_idx;
