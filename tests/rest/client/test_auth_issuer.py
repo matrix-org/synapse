@@ -21,7 +21,7 @@ ISSUER = "https://account.example.com/"
 ACCOUNT_MANAGEMENT_URL = "https://account.example.com/myaccount/"
 
 
-class AccountDataTestCase(HomeserverTestCase):
+class AuthIssuerTestCase(HomeserverTestCase):
     servlets = [
         auth_issuer.register_servlets,
     ]
