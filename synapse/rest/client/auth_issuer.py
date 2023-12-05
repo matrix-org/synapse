@@ -31,9 +31,7 @@ logger = logging.getLogger(__name__)
 
 class AuthIssuerServlet(RestServlet):
     """
-    Handles Client / Server API authentication in any situations where it
-    cannot be handled in the normal flow (with requests to the same endpoint).
-    Current use is for web fallback auth.
+    Advertises what OpenID Connect issuer clients should use to authorise users.
     """
 
     PATTERNS = client_patterns(
