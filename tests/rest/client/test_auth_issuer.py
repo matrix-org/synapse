@@ -15,7 +15,8 @@ from http import HTTPStatus
 
 from synapse.rest.client import auth_issuer
 
-from tests.unittest import HomeserverTestCase, override_config
+from tests.unittest import HomeserverTestCase, override_config, skip_unless
+from tests.utils import HAS_AUTHLIB
 
 ISSUER = "https://account.example.com/"
 
@@ -33,6 +34,7 @@ class AuthIssuerTestCase(HomeserverTestCase):
         )
         self.assertEqual(channel.code, HTTPStatus.NOT_FOUND)
 
+    @skip_unless(HAS_AUTHLIB, "requires authlib")
     @override_config(
         {
             "disable_registration": True,
