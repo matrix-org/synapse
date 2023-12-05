@@ -45,8 +45,9 @@ class AuthIssuerServlet(RestServlet):
         self._config = hs.config
 
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
-        discovery_data = self._config.experimental.get_msc2965_discovery_data()
-        if discovery_data is None:
+        if self._config.experimental.msc3861.enabled:
+            return 200, {"issuer": self._config.experimental.msc3861.issuer}
+        else:
             # Wouldn't expect this to be reached: the servelet shouldn't have been
             # registered. Still, fail gracefully if we are registered for some reason.
             raise SynapseError(
@@ -54,7 +55,6 @@ class AuthIssuerServlet(RestServlet):
                 "OIDC discovery has not been configured on this homeserver",
                 Codes.NOT_FOUND,
             )
-        return 200, discovery_data
 
 
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:

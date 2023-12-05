@@ -18,7 +18,6 @@ from synapse.rest.client import auth_issuer
 from tests.unittest import HomeserverTestCase, override_config
 
 ISSUER = "https://account.example.com/"
-ACCOUNT_MANAGEMENT_URL = "https://account.example.com/myaccount/"
 
 
 class AuthIssuerTestCase(HomeserverTestCase):
@@ -41,7 +40,6 @@ class AuthIssuerTestCase(HomeserverTestCase):
                 "msc3861": {
                     "enabled": True,
                     "issuer": ISSUER,
-                    "account_management_url": ACCOUNT_MANAGEMENT_URL,
                     "client_id": "David Lister",
                     "client_auth_method": "client_secret_post",
                     "client_secret": "Who shot Mister Burns?",
@@ -49,13 +47,11 @@ class AuthIssuerTestCase(HomeserverTestCase):
             },
         }
     )
-    def test_returns_discovery_data_when_oidc_enabled(self) -> None:
+    def test_returns_issuer_when_oidc_enabled(self) -> None:
         # Make an unauthenticated request for the discovery info.
         channel = self.make_request(
             "GET",
             "/_matrix/client/unstable/org.matrix.msc2965/auth_issuer",
         )
         self.assertEqual(channel.code, HTTPStatus.OK)
-        self.assertEqual(
-            channel.json_body, {"issuer": ISSUER, "account": ACCOUNT_MANAGEMENT_URL}
-        )
+        self.assertEqual(channel.json_body, {"issuer": ISSUER})
