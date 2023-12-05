@@ -3749,6 +3749,16 @@ messages from the database after 5 minutes, rather than 5 months.</p>
 </ul>
 <p>For example, setting <code>max_avatar_size: 10M</code> means that Synapse will not accept files larger than 10,485,760 bytes
 for a user avatar.</p>
+<h2 id="config-validation"><a class="header" href="#config-validation">Config Validation</a></h2>
+<p>The configuration file can be validated with the following command:</p>
+<pre><code class="language-bash">python -m synapse.config read &lt;config key to print&gt; -c &lt;path to config&gt;
+</code></pre>
+<p>To validate the entire file, omit <code>read &lt;config key to print&gt;</code>:</p>
+<pre><code class="language-bash">python -m synapse.config -c &lt;path to config&gt;
+</code></pre>
+<p>To see how to set other options, check the help reference:</p>
+<pre><code class="language-bash">python -m synapse.config --help
+</code></pre>
 <h3 id="yaml"><a class="header" href="#yaml">YAML</a></h3>
 <p>The configuration file is a <a href="https://yaml.org/">YAML</a> file, which means that certain syntax rules
 apply if you want your config file to be read properly. A few helpful things to know:</p>
