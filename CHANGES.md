@@ -61,7 +61,7 @@ but we are striving to make this as seamless as possible.
 * Bump prometheus-client from 0.18.0 to 0.19.0. ([\#16691](https://github.com/matrix-org/synapse/issues/16691))
 * Bump pyasn1 from 0.5.0 to 0.5.1. ([\#16689](https://github.com/matrix-org/synapse/issues/16689))
 * Bump pydantic from 2.4.2 to 2.5.1. ([\#16663](https://github.com/matrix-org/synapse/issues/16663))
-- Bump pyo3 (0.19.2→0.20.0), pythonize (0.19.0→0.20.0) and pyo3-log (0.8.1→0.9.0). ([\#16673](https://github.com/matrix-org/synapse/issues/16673))
+* Bump pyo3 (0.19.2→0.20.0), pythonize (0.19.0→0.20.0) and pyo3-log (0.8.1→0.9.0). ([\#16673](https://github.com/matrix-org/synapse/issues/16673))
 * Bump pyopenssl from 23.2.0 to 23.3.0. ([\#16662](https://github.com/matrix-org/synapse/issues/16662))
 * Bump ruff from 0.1.4 to 0.1.6. ([\#16690](https://github.com/matrix-org/synapse/issues/16690))
 * Bump sentry-sdk from 1.32.0 to 1.35.0. ([\#16666](https://github.com/matrix-org/synapse/issues/16666))
