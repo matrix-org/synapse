@@ -77,7 +77,7 @@ class MediaRepository:
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.auth = hs.get_auth()
-        self.client = hs.get_federation_http_client()
+        self.client = hs.get_federation_client()
         self.clock = hs.get_clock()
         self.server_name = hs.hostname
         self.store = hs.get_datastores().main
@@ -644,22 +644,13 @@ class MediaRepository:
         file_info = FileInfo(server_name=server_name, file_id=file_id)
 
         with self.media_storage.store_into_file(file_info) as (f, fname, finish):
-            request_path = "/".join(
-                ("/_matrix/media/r0/download", server_name, media_id)
-            )
             try:
-                length, headers = await self.client.get_file(
+                length, headers = await self.client.download_media(
                     server_name,
-                    request_path,
+                    media_id,
                     output_stream=f,
                     max_size=self.max_upload_size,
-                    args={
-                        # tell the remote server to 404 if it doesn't
-                        # recognise the server_name, to make sure we don't
-                        # end up with a routing loop.
-                        "allow_remote": "false",
-                        "timeout_ms": str(max_timeout_ms),
-                    },
+                    max_timeout_ms=max_timeout_ms,
                 )
             except RequestSendFailed as e:
                 logger.warning(

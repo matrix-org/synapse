@@ -98,6 +98,22 @@ class AccountValidityHandler:
         for callback in self._module_api_callbacks.on_user_registration_callbacks:
             await callback(user_id)
 
+    async def on_user_login(
+        self,
+        user_id: str,
+        auth_provider_type: Optional[str],
+        auth_provider_id: Optional[str],
+    ) -> None:
+        """Tell third-party modules about a user logins.
+
+        Args:
+            user_id: The mxID of the user.
+            auth_provider_type: The type of login.
+            auth_provider_id: The ID of the auth provider.
+        """
+        for callback in self._module_api_callbacks.on_user_login_callbacks:
+            await callback(user_id, auth_provider_type, auth_provider_id)
+
     @wrap_as_background_process("send_renewals")
     async def _send_renewal_emails(self) -> None:
         """Gets the list of users whose account is expiring in the amount of time

@@ -1,1 +1,0 @@
-Ignore `encryption_enabled_by_default_for_room_type` setting when creating server notices room, since the notices will be send unencrypted anyway.

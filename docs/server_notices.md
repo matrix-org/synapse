@@ -48,6 +48,7 @@ server_notices:
    room_name: "Server Notices"
    room_avatar_url: "mxc://server.com/oumMVlgDnLYFaPVkExemNVVZ"
    room_topic: "Room used by your server admin to notice you of important information"
+   auto_join: true
 ```
 
 The only compulsory setting is `system_mxid_localpart`, which defines the user
@@ -56,6 +57,8 @@ room which will be created, `room_avatar_url` its avatar and `room_topic` its to
 
 `system_mxid_display_name` and `system_mxid_avatar_url` can be used to set the
 displayname and avatar of the Server Notices user.
+
+`auto_join` will autojoin users to the notices room instead of sending an invite.
 
 ## Sending notices
 

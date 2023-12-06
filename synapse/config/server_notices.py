@@ -58,6 +58,7 @@ class ServerNoticesConfig(Config):
         self.server_notices_room_name: Optional[str] = None
         self.server_notices_room_avatar_url: Optional[str] = None
         self.server_notices_room_topic: Optional[str] = None
+        self.server_notices_auto_join: bool = False
 
     def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         c = config.get("server_notices")
@@ -74,3 +75,4 @@ class ServerNoticesConfig(Config):
         self.server_notices_room_name = c.get("room_name", "Server Notices")
         self.server_notices_room_avatar_url = c.get("room_avatar_url", None)
         self.server_notices_room_topic = c.get("room_topic", None)
+        self.server_notices_auto_join = c.get("auto_join", False)
