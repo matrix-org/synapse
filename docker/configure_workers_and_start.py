@@ -450,21 +450,22 @@ def merge_worker_template_configs(
     )
 
 
-def insert_worker_name_for_worker_config(
-    existing_template: WorkerTemplate, worker_name: str
+def instantiate_worker_template(
+    template: WorkerTemplate, worker_name: str
 ) -> Dict[str, Any]:
-    """Insert a given worker name into the worker's configuration dict.
+    """Given a worker template, instantiate it into a worker configuration
+    (which is currently represented as a dictionary).
 
     Args:
-        existing_template: The WorkerTemplate that is imported into shared_config.
-        worker_name: The name of the worker to insert.
-    Returns: Copy of the dict with newly inserted worker name
+        template: The WorkerTemplate to template
+        worker_name: The name of the worker to use.
+    Returns: worker configuration dictionary
     """
-    dict_to_edit = dataclasses.asdict(existing_template)
-    dict_to_edit["shared_extra_conf"] = existing_template.shared_extra_conf(worker_name)
-    dict_to_edit["endpoint_patterns"] = sorted(existing_template.endpoint_patterns)
-    dict_to_edit["listener_resources"] = sorted(existing_template.listener_resources)
-    return dict_to_edit
+    worker_config_dict = dataclasses.asdict(template)
+    worker_config_dict["shared_extra_conf"] = template.shared_extra_conf(worker_name)
+    worker_config_dict["endpoint_patterns"] = sorted(template.endpoint_patterns)
+    worker_config_dict["listener_resources"] = sorted(template.listener_resources)
+    return worker_config_dict
 
 
 def apply_requested_multiplier_for_worker(worker_types: List[str]) -> List[str]:
@@ -781,7 +782,7 @@ def generate_worker_files(
             )
 
         # Replace placeholder names in the config template with the actual worker name.
-        worker_config: Dict[str, Any] = insert_worker_name_for_worker_config(
+        worker_config: Dict[str, Any] = instantiate_worker_template(
             worker_template, worker_name
         )
 
