@@ -89,6 +89,14 @@ MARKER_FILE_PATH = "/conf/workers_have_been_configured"
 
 @dataclass
 class WorkerTemplate:
+    """
+    A definition of individual settings for a specific worker type.
+    A worker name can be fed into the template in order to generate a config.
+
+    These worker templates can be merged with `merge_worker_template_configs`
+    in order for a single worker to be made from multiple templates.
+    """
+
     listener_resources: Set[str] = field(default_factory=set)
     endpoint_patterns: Set[str] = field(default_factory=set)
     # (worker_name) -> {config}
