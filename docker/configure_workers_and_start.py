@@ -358,7 +358,8 @@ def merge_into(dest: Any, new: Any) -> None:
 
 def merged(a: Dict[str, Any], b: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Merges `b` into `a` and returns `a`.
+    Merges `b` into `a` and returns `a`. Here because we can't use `merge_into`
+    in a lamba conveniently.
     """
     merge_into(a, b)
     return a
