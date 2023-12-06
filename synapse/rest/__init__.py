@@ -22,6 +22,7 @@ from synapse.rest.client import (
     account_validity,
     appservice_ping,
     auth,
+    auth_issuer,
     capabilities,
     devices,
     directory,
@@ -148,3 +149,4 @@ class ClientRestResource(JsonResource):
             mutual_rooms.register_servlets(hs, client_resource)
             login_token_request.register_servlets(hs, client_resource)
             rendezvous.register_servlets(hs, client_resource)
+            auth_issuer.register_servlets(hs, client_resource)
