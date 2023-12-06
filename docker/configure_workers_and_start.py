@@ -420,42 +420,33 @@ def add_worker_to_instance_map(
 
 
 def merge_worker_template_configs(
-    existing_template: WorkerTemplate,
-    to_be_merged_template: WorkerTemplate,
+    left: WorkerTemplate,
+    right: WorkerTemplate,
 ) -> WorkerTemplate:
-    """When given an existing dict of worker template configuration consisting with both
-        dicts and lists, merge new template data from WORKERS_CONFIG(or create) and
-        return new dict.
+    """Merges two templates together, returning a new template that includes
+    the listeners, endpoint patterns and configuration from both.
 
-    Args:
-        existing_template: Either an existing worker template or a fresh blank one.
-        to_be_merged_template: The template from WORKERS_CONFIGS to be merged into
-            existing_dict.
-    Returns: The newly merged together dict values.
+    Does not mutate the input templates.
     """
-    # copy existing_template without any replacements
-    new_template: WorkerTemplate = dataclasses.replace(existing_template)
 
-    # add listener resources from the other set
-    new_template.listener_resources |= to_be_merged_template.listener_resources
-
-    # add endpoint patterns from the other set
-    new_template.endpoint_patterns |= to_be_merged_template.endpoint_patterns
-
-    # merge dictionaries; the worker name will be replaced later
-    new_template.shared_extra_conf = lambda worker_name: merged(
-        existing_template.shared_extra_conf(worker_name),
-        to_be_merged_template.shared_extra_conf(worker_name),
+    return WorkerTemplate(
+        # include listener resources from both
+        listener_resources=left.listener_resources | right.listener_resources,
+        # include endpoint patterns from both
+        endpoint_patterns=left.endpoint_patterns | right.endpoint_patterns,
+        # merge shared config dictionaries; the worker name will be replaced later
+        shared_extra_conf=lambda worker_name: merged(
+            left.shared_extra_conf(worker_name),
+            right.shared_extra_conf(worker_name),
+        ),
+        # There is only one worker type that has a 'worker_extra_conf' and it is
+        # the media_repo. Since duplicate worker types on the same worker don't
+        # work, this is fine.
+        worker_extra_conf=(left.worker_extra_conf + right.worker_extra_conf),
+        # (This is unused, but in principle sharding this hybrid worker type
+        # would be allowed if both constituent types are shardable)
+        sharding_allowed=left.sharding_allowed and right.sharding_allowed,
     )
-
-    # There is only one worker type that has a 'worker_extra_conf' and it is
-    # the media_repo. Since duplicate worker types on the same worker don't
-    # work, this is fine.
-    new_template.worker_extra_conf = (
-        new_template.worker_extra_conf + to_be_merged_template.worker_extra_conf
-    )
-
-    return new_template
 
 
 def insert_worker_name_for_worker_config(
