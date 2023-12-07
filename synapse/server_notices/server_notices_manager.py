@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Optional
 
 from synapse.api.constants import EventTypes, Membership, RoomCreationPreset
 from synapse.events import EventBase
-from synapse.types import Requester, StreamKeyType, UserID, create_requester
+from synapse.types import JsonDict, Requester, StreamKeyType, UserID, create_requester
 from synapse.util.caches.descriptors import cached
 
 if TYPE_CHECKING:
@@ -199,7 +199,7 @@ class ServerNoticesManager:
                 "avatar_url": self._config.servernotices.server_notices_mxid_avatar_url,
             }
 
-        room_config = {
+        room_config: JsonDict = {
             "preset": RoomCreationPreset.PRIVATE_CHAT,
             "power_level_content_override": {"users_default": -10},
         }
@@ -208,6 +208,16 @@ class ServerNoticesManager:
             room_config["name"] = self._config.servernotices.server_notices_room_name
         if self._config.servernotices.server_notices_room_topic:
             room_config["topic"] = self._config.servernotices.server_notices_room_topic
+        if self._config.servernotices.server_notices_room_avatar_url:
+            room_config["initial_state"] = [
+                {
+                    "type": EventTypes.RoomAvatar,
+                    "state_key": "",
+                    "content": {
+                        "url": self._config.servernotices.server_notices_room_avatar_url,
+                    },
+                }
+            ]
 
         # `ignore_forced_encryption` is used to bypass `encryption_enabled_by_default_for_room_type`
         # setting if it set, since the server notices will not be encrypted anyway.
@@ -218,18 +228,6 @@ class ServerNoticesManager:
             creator_join_profile=join_profile,
             ignore_forced_encryption=True,
         )
-
-        # Room avatar can't be set at creation time so let's just send an event for that
-        if self._config.servernotices.server_notices_room_avatar_url:
-            await self._update_room_info(
-                requester,
-                room_id,
-                EventTypes.RoomAvatar,
-                "url",
-                self._config.servernotices.server_notices_room_avatar_url,
-                # Since we just created the room there is no need to check current value
-                if_changed=False,
-            )
 
         self.maybe_get_notice_room_for_user.invalidate((user_id,))
 
