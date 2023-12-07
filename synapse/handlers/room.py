@@ -549,7 +549,7 @@ class RoomCreationHandler:
         except (TypeError, ValueError):
             ban = 50
         needed_power_level = max(
-            state_default_int, ban, max(event_power_levels.values())
+            state_default_int, ban, max(event_power_levels.values(), default=0)
         )
 
         # Get the user's current power level, this matches the logic in get_user_power_level,
@@ -698,6 +698,7 @@ class RoomCreationHandler:
         config: JsonDict,
         ratelimit: bool = True,
         creator_join_profile: Optional[JsonDict] = None,
+        ignore_forced_encryption: bool = False,
     ) -> Tuple[str, Optional[RoomAlias], int]:
         """Creates a new room.
 
@@ -714,6 +715,8 @@ class RoomCreationHandler:
                 derived from the user's profile. If set, should contain the
                 values to go in the body of the 'join' event (typically
                 `avatar_url` and/or `displayname`.
+            ignore_forced_encryption:
+                Ignore encryption forced by `encryption_enabled_by_default_for_room_type` setting.
 
         Returns:
             A 3-tuple containing:
@@ -1015,6 +1018,7 @@ class RoomCreationHandler:
         room_alias: Optional[RoomAlias] = None,
         power_level_content_override: Optional[JsonDict] = None,
         creator_join_profile: Optional[JsonDict] = None,
+        ignore_forced_encryption: bool = False,
     ) -> Tuple[int, str, int]:
         """Sends the initial events into a new room. Sends the room creation, membership,
         and power level events into the room sequentially, then creates and batches up the
@@ -1049,6 +1053,8 @@ class RoomCreationHandler:
             creator_join_profile:
                 Set to override the displayname and avatar for the creating
                 user in this room.
+            ignore_forced_encryption:
+                Ignore encryption forced by `encryption_enabled_by_default_for_room_type` setting.
 
         Returns:
             A tuple containing the stream ID, event ID and depth of the last
@@ -1251,7 +1257,7 @@ class RoomCreationHandler:
             )
             events_to_send.append((event, context))
 
-        if config["encrypted"]:
+        if config["encrypted"] and not ignore_forced_encryption:
             encryption_event, encryption_context = await create_event(
                 EventTypes.RoomEncryption,
                 {"algorithm": RoomEncryptionAlgorithms.DEFAULT},

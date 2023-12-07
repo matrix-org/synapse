@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 # Types for callbacks to be registered via the module api
 IS_USER_EXPIRED_CALLBACK = Callable[[str], Awaitable[Optional[bool]]]
 ON_USER_REGISTRATION_CALLBACK = Callable[[str], Awaitable]
+ON_USER_LOGIN_CALLBACK = Callable[[str, Optional[str], Optional[str]], Awaitable]
 # Temporary hooks to allow for a transition from `/_matrix/client` endpoints
 # to `/_synapse/client/account_validity`. See `register_callbacks` below.
 ON_LEGACY_SEND_MAIL_CALLBACK = Callable[[str], Awaitable]
@@ -33,6 +34,7 @@ class AccountValidityModuleApiCallbacks:
     def __init__(self) -> None:
         self.is_user_expired_callbacks: List[IS_USER_EXPIRED_CALLBACK] = []
         self.on_user_registration_callbacks: List[ON_USER_REGISTRATION_CALLBACK] = []
+        self.on_user_login_callbacks: List[ON_USER_LOGIN_CALLBACK] = []
         self.on_legacy_send_mail_callback: Optional[ON_LEGACY_SEND_MAIL_CALLBACK] = None
         self.on_legacy_renew_callback: Optional[ON_LEGACY_RENEW_CALLBACK] = None
 
@@ -44,6 +46,7 @@ class AccountValidityModuleApiCallbacks:
         self,
         is_user_expired: Optional[IS_USER_EXPIRED_CALLBACK] = None,
         on_user_registration: Optional[ON_USER_REGISTRATION_CALLBACK] = None,
+        on_user_login: Optional[ON_USER_LOGIN_CALLBACK] = None,
         on_legacy_send_mail: Optional[ON_LEGACY_SEND_MAIL_CALLBACK] = None,
         on_legacy_renew: Optional[ON_LEGACY_RENEW_CALLBACK] = None,
         on_legacy_admin_request: Optional[ON_LEGACY_ADMIN_REQUEST] = None,
@@ -54,6 +57,9 @@ class AccountValidityModuleApiCallbacks:
 
         if on_user_registration is not None:
             self.on_user_registration_callbacks.append(on_user_registration)
+
+        if on_user_login is not None:
+            self.on_user_login_callbacks.append(on_user_login)
 
         # The builtin account validity feature exposes 3 endpoints (send_mail, renew, and
         # an admin one). As part of moving the feature into a module, we need to change

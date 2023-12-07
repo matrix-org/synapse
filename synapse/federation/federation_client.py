@@ -21,6 +21,7 @@ from typing import (
     TYPE_CHECKING,
     AbstractSet,
     Awaitable,
+    BinaryIO,
     Callable,
     Collection,
     Container,
@@ -1861,6 +1862,43 @@ class FederationClient(FederationBase):
         filtered_failures = list(filter(filter_user_id, failures))
 
         return filtered_statuses, filtered_failures
+
+    async def download_media(
+        self,
+        destination: str,
+        media_id: str,
+        output_stream: BinaryIO,
+        max_size: int,
+        max_timeout_ms: int,
+    ) -> Tuple[int, Dict[bytes, List[bytes]]]:
+        try:
+            return await self.transport_layer.download_media_v3(
+                destination,
+                media_id,
+                output_stream=output_stream,
+                max_size=max_size,
+                max_timeout_ms=max_timeout_ms,
+            )
+        except HttpResponseException as e:
+            # If an error is received that is due to an unrecognised endpoint,
+            # fallback to the r0 endpoint. Otherwise, consider it a legitimate error
+            # and raise.
+            if not is_unknown_endpoint(e):
+                raise
+
+        logger.debug(
+            "Couldn't download media %s/%s with the v3 API, falling back to the r0 API",
+            destination,
+            media_id,
+        )
+
+        return await self.transport_layer.download_media_r0(
+            destination,
+            media_id,
+            output_stream=output_stream,
+            max_size=max_size,
+            max_timeout_ms=max_timeout_ms,
+        )
 
 
 @attr.s(frozen=True, slots=True, auto_attribs=True)

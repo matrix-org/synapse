@@ -465,18 +465,15 @@ class ClientIpWorkerStore(ClientIpBackgroundUpdateStore, MonthlyActiveUsersWorke
         #
         # This works by finding the max last_seen that is less than the given
         # time, but has no more than N rows before it, deleting all rows with
-        # a lesser last_seen time. (We COALESCE so that the sub-SELECT always
-        # returns exactly one row).
+        # a lesser last_seen time. (We use an `IN` clause to force postgres to
+        # use the index, otherwise it tends to do a seq scan).
         sql = """
             DELETE FROM user_ips
-            WHERE last_seen <= (
-                SELECT COALESCE(MAX(last_seen), -1)
-                FROM (
-                    SELECT last_seen FROM user_ips
-                    WHERE last_seen <= ?
-                    ORDER BY last_seen ASC
-                    LIMIT 5000
-                ) AS u
+            WHERE last_seen IN (
+                SELECT last_seen FROM user_ips
+                WHERE last_seen <= ?
+                ORDER BY last_seen ASC
+                LIMIT 5000
             )
         """
 
