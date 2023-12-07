@@ -33,7 +33,6 @@ logger = logging.getLogger(__name__)
 # THROTTLE is the minimum time between mail notifications sent for a given room.
 # Each room maintains its own throttle counter, but each new mail notification
 # sends the pending notifications for all rooms.
-THROTTLE_START_MS = 10 * 60 * 1000
 THROTTLE_MAX_MS = 24 * 60 * 60 * 1000  # 24h
 # THROTTLE_MULTIPLIER = 6              # 10 mins, 1 hour, 6 hours, 24 hours
 THROTTLE_MULTIPLIER = 144  # 10 mins, 24 hours - i.e. jump straight to 1 day
@@ -298,10 +297,10 @@ class EmailPusher(Pusher):
         current_throttle_ms = self.get_room_throttle_ms(room_id)
 
         if gap > THROTTLE_RESET_AFTER_MS:
-            new_throttle_ms = THROTTLE_START_MS
+            new_throttle_ms = self._delay_before_mail_ms
         else:
             if current_throttle_ms == 0:
-                new_throttle_ms = THROTTLE_START_MS
+                new_throttle_ms = self._delay_before_mail_ms
             else:
                 new_throttle_ms = min(
                     current_throttle_ms * THROTTLE_MULTIPLIER, THROTTLE_MAX_MS
