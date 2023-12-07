@@ -76,7 +76,7 @@ class EmailPusher(Pusher):
         except ValueError:
             raise PusherConfigException("Invalid email")
 
-        self._delay_before_mail_ms = self.hs.config.email.delay_before_mail_ms
+        self._delay_before_mail_ms = self.hs.config.email.notif_delay_before_mail_ms
 
     def on_started(self, should_check_for_notifs: bool) -> None:
         """Called when this pusher has been started.
