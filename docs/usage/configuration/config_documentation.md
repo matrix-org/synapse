@@ -663,8 +663,11 @@ This setting has the following sub-options:
    has missed. Disabled by default.
 * `notif_for_new_users`: Set to false to disable automatic subscription to email
    notifications for new users. Enabled by default.
-* `delay_before_mail`: Time we always wait before ever emailing about a notification
-   (to give the user a chance to respond to other push or notice the window). Defaults to 10 minutes.
+* `delay_before_mail`: The time to wait before emailing about a notification.
+  This gives the user a chance to view the message via push or an open client.
+  Defaults to 10 minutes.
+
+   *New in Synapse 1.98.0._
 * `client_base_url`: Custom URL for client links within the email notifications. By default
    links will be based on "https://matrix.to". (This setting used to be called `riot_base_url`;
    the old name is still supported for backwards-compatibility but is now deprecated.)
