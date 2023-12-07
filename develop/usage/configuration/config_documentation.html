@@ -548,12 +548,12 @@ will not be created). Defaults to <code>None</code>.
 <li><strong>Note</strong>: The use of both <code>path</code> and <code>port</code> options for the same <code>listener</code> is not
 compatible.</li>
 <li>The <code>x_forwarded</code> option defaults to true  when using Unix sockets and can be omitted.</li>
-<li>Other options that would not make sense to use with a UNIX socket, such as 
+<li>Other options that would not make sense to use with a UNIX socket, such as
 <code>bind_addresses</code> and <code>tls</code> will be ignored and can be removed.</li>
 </ul>
 </li>
 <li><code>mode</code>: The file permissions to set on the UNIX socket. Defaults to <code>666</code></li>
-<li><strong>Note:</strong> Must be set as <code>type: http</code> (does not support <code>metrics</code> and <code>manhole</code>). 
+<li><strong>Note:</strong> Must be set as <code>type: http</code> (does not support <code>metrics</code> and <code>manhole</code>).
 Also make sure that <code>metrics</code> is not included in <code>resources</code> -&gt; <code>names</code></li>
 </ul>
 <p>Valid resource names are:</p>
@@ -2559,7 +2559,7 @@ per older versions of the Matrix specification. Defaults to false. Set to true t
 access tokens via a query parameter.</p>
 <p>**Enabling this option is considered insecure and is not recommended. **</p>
 <p>Example configuration:</p>
-<pre><code class="language-yaml">use_appservice_legacy_authorization: true 
+<pre><code class="language-yaml">use_appservice_legacy_authorization: true
 </code></pre>
 <hr />
 <h3 id="macaroon_secret_key"><a class="header" href="#macaroon_secret_key"><code>macaroon_secret_key</code></a></h3>
@@ -3245,7 +3245,7 @@ validation will fail without configuring audiences.</li>
 <li><code>enabled</code>: Defaults to true.
 Set to false to disable password authentication.
 Set to <code>only_for_reauth</code> to allow users with existing passwords to use them
-to log in and reauthenticate, whilst preventing new users from setting passwords.</li>
+to reauthenticate (not log in), whilst preventing new users from setting passwords.</li>
 <li><code>localdb_enabled</code>: Set to false to disable authentication against the local password
 database. This is ignored if <code>enabled</code> is false, and is only useful
 if you have other <code>password_providers</code>. Defaults to true.</li>
@@ -3486,7 +3486,7 @@ alias creation on this server.</p>
 <p>This setting is an optional list of 0 or more rules. By default, no list is
 provided, meaning that all alias creations are permitted.</p>
 <p>Otherwise, requests to create aliases are matched against each rule in order.
-The first rule that matches decides if the request is allowed or denied. If no 
+The first rule that matches decides if the request is allowed or denied. If no
 rule matches, the request is denied. In particular, this means that configuring
 an empty list of rules will deny every alias creation request.</p>
 <p>Each rule is a YAML object containing four fields, each of which is an optional string:</p>
@@ -3497,7 +3497,7 @@ an empty list of rules will deny every alias creation request.</p>
 <li><code>action</code>: either <code>allow</code> or <code>deny</code>. What to do with the request if the rule matches. Defaults to <code>allow</code>.</li>
 </ul>
 <p>Each of the glob patterns is optional, defaulting to <code>*</code> (&quot;match anything&quot;).
-Note that the patterns match against fully qualified IDs, e.g. against 
+Note that the patterns match against fully qualified IDs, e.g. against
 <code>@alice:example.com</code>, <code>#room:example.com</code> and <code>!abcdefghijk:example.com</code> instead
 of <code>alice</code>, <code>room</code> and <code>abcedgghijk</code>.</p>
 <p>Example configuration:</p>
@@ -3523,7 +3523,7 @@ alias_creation_rules:
 alias_creation_rules:
   - user_id: &quot;@bad_user:example.com&quot;
     action: deny
-    
+
   - action: allow
 </code></pre>
 <pre><code class="language-yaml"># Prevent aliases being created which point to a specific room.
@@ -3585,7 +3585,7 @@ room_list_publication_rules:
 room_list_publication_rules:
   - user_id: &quot;@bad_user:example.com&quot;
     action: deny
-    
+
   - action: allow
 </code></pre>
 <pre><code class="language-yaml"># Prevent publication of a specific room.
@@ -3928,7 +3928,7 @@ giving each worker a unique <code>worker_name</code>.</p>
 must be declared, in the same way as the <a href="#listeners"><code>listeners</code> option</a>
 in the shared config.</p>
 <p>Workers declared in <a href="#stream_writers"><code>stream_writers</code></a> and <a href="#instance_map"><code>instance_map</code></a>
-will need to include a <code>replication</code> listener here, in order to accept internal HTTP 
+will need to include a <code>replication</code> listener here, in order to accept internal HTTP
 requests from other workers.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">worker_listeners:
