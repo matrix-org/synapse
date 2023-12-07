@@ -61,6 +61,7 @@ class MetricsConfig(Config):
             check_requirements("sentry")
 
             self.sentry_dsn = config["sentry"].get("dsn")
+            self.sentry_environment = config["sentry"].get("environment")
             if not self.sentry_dsn:
                 raise ConfigError(
                     "sentry.dsn field is required when sentry integration is enabled"

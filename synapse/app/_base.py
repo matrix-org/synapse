@@ -662,9 +662,14 @@ def setup_sentry(hs: "HomeServer") -> None:
 
     import sentry_sdk
 
+    # Set a default environment if it's not configured
+    default_environment = ""
+    environment = hs.config.metrics.sentry_environment or default_environment
+
     sentry_sdk.init(
         dsn=hs.config.metrics.sentry_dsn,
         release=SYNAPSE_VERSION,
+        environment=environment
     )
 
     # We set some default tags that give some context to this instance
