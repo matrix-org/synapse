@@ -3832,12 +3832,12 @@ Sub-options for this setting include:
 * `system_mxid_display_name`: set the display name of the "notices" user
 * `system_mxid_avatar_url`: set the avatar for the "notices" user
 * `room_name`: set the room name of the server notices room
-* `room_avatar_url`: set the room avatar of the server notices room _Added in Synapse 1.98.0._
-* `room_topic`: set the room topic of the server notices room _Added in Synapse 1.98.0._
+* `room_avatar_url`: optional string. The room avatar to use for server notice rooms. If set to the empty string `""`, notice rooms will not be given an avatar. Defaults to the empty string. _Added in Synapse 1.99.0._
+* `room_topic`: optional string. The topic to use for server notice rooms. If set to the empty string `""`, notice rooms will not be given a topic. Defaults to the empty string.  _Added in Synapse 1.98.0._
 * `auto_join`: boolean. If true, the user will be automatically joined to the room instead of being invited.
   Defaults to false. _Added in Synapse 1.98.0._
 
-Note that it will only be updated when a new notice event is sent.
+Note that the name, topic and avatar of existing server notice rooms will only be updated when a new notice event is sent.
 
 Example configuration:
 ```yaml
