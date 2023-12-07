@@ -669,7 +669,7 @@ def setup_sentry(hs: "HomeServer") -> None:
     sentry_sdk.init(
         dsn=hs.config.metrics.sentry_dsn,
         release=SYNAPSE_VERSION,
-        environment=environment
+        environment=environment,
     )
 
     # We set some default tags that give some context to this instance
