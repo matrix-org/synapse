@@ -44,9 +44,9 @@ section, which should look like this:
 server_notices:
    system_mxid_localpart: server
    system_mxid_display_name: "Server Notices"
-   system_mxid_avatar_url: "mxc://server.com/oumMVlgDnLYFaPVkExemNVVZ"
+   system_mxid_avatar_url: "mxc://example.com/oumMVlgDnLYFaPVkExemNVVZ"
    room_name: "Server Notices"
-   room_avatar_url: "mxc://server.com/oumMVlgDnLYFaPVkExemNVVZ"
+   room_avatar_url: "mxc://example.com/oumMVlgDnLYFaPVkExemNVVZ"
    room_topic: "Room used by your server admin to notice you of important information"
    auto_join: true
 ```
