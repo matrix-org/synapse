@@ -2741,7 +2741,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         profile = self.get_success(self.store._get_user_in_directory(self.other_user))
         self.assertIsNone(profile)
 
-    def test_reactivate_user(self) -> None:
+    def test_reactivate_user_with_password(self) -> None:
         """
         Test reactivating another user.
         """
@@ -2749,21 +2749,36 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         # Deactivate the user.
         self._deactivate_user("@user:test")
 
-        # Attempt to reactivate the user (without a password).
-        channel = self.make_request(
-            "PUT",
-            self.url_other_user,
-            access_token=self.admin_user_tok,
-            content={"deactivated": False},
-        )
-        self.assertEqual(400, channel.code, msg=channel.json_body)
-
-        # Reactivate the user.
+        # Reactivate the user with password.
         channel = self.make_request(
             "PUT",
             self.url_other_user,
             access_token=self.admin_user_tok,
             content={"deactivated": False, "password": "foo"},
+        )
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual("@user:test", channel.json_body["name"])
+        self.assertFalse(channel.json_body["deactivated"])
+        self._is_erased("@user:test", False)
+
+        # This key was removed intentionally. Ensure it is not accidentally re-included.
+        self.assertNotIn("password_hash", channel.json_body)
+
+    def test_reactivate_user_without_password(self) -> None:
+        """
+        Test reactivating another user without a password.
+        This can be using some local users and some user with SSO (password = `null`).
+        """
+
+        # Deactivate the user.
+        self._deactivate_user("@user:test")
+
+        # Reactivate the user without a password.
+        channel = self.make_request(
+            "PUT",
+            self.url_other_user,
+            access_token=self.admin_user_tok,
+            content={"deactivated": False},
         )
         self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
@@ -2782,7 +2797,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         # Deactivate the user.
         self._deactivate_user("@user:test")
 
-        # Reactivate the user with a password
+        # Reactivate the user with a password.
         channel = self.make_request(
             "PUT",
             self.url_other_user,
@@ -2816,7 +2831,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         # Deactivate the user.
         self._deactivate_user("@user:test")
 
-        # Reactivate the user with a password
+        # Reactivate the user with a password.
         channel = self.make_request(
             "PUT",
             self.url_other_user,
