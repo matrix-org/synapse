@@ -557,6 +557,70 @@ def _get_auth_flow_dict_for_idp(idp: SsoIdentityProvider) -> JsonDict:
         e["brand"] = idp.idp_brand
     return e
 
+class LoginAppServiceOnlyRestServlet(RestServlet):
+    PATTERNS = client_patterns("/login$", v1=True)
+    CATEGORY = "Registration/login requests"
+    APPSERVICE_TYPE = "m.login.application_service"
+
+    def __init__(self, hs: "HomeServer"):
+        super().__init__()
+        self.hs = hs
+        self.auth = hs.get_auth()
+        self.registration_handler = hs.get_registration_handler()
+
+    async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
+        login_submission = parse_json_object_from_request(request)
+   
+        if login_submission["type"] != LoginAppServiceOnlyRestServlet.APPSERVICE_TYPE:
+            raise LoginError(400, "Invalid login type for this endpoint")
+        
+        # Check to see if the client requested a refresh token.
+        client_requested_refresh_token = login_submission.get(
+            LoginRestServlet.REFRESH_TOKEN_PARAM, False
+        )
+        if not isinstance(client_requested_refresh_token, bool):
+            raise SynapseError(400, "`refresh_token` should be true or false.")
+
+        should_issue_refresh_token = (
+            self._refresh_tokens_enabled and client_requested_refresh_token
+        )
+        try:
+            requester = await self.auth.get_user_by_req(request)
+            appservice = requester.app_service
+
+            if appservice is None:
+                raise InvalidClientTokenError(
+                    "This login method is only valid for application services"
+                )
+            
+            if appservice.is_rate_limited():
+                await self._address_ratelimiter.ratelimit(
+                    None, request.getClientAddress().host
+                )
+            
+            result = await LoginRestServlet._do_appservice_login(
+                login_submission,
+                appservice,
+                should_issue_refresh_token=should_issue_refresh_token,
+                request_info=request.request_info()
+            )
+        except KeyError:
+            raise SynapseError(400, "Missing JSON keys.")
+        
+        if self._require_approval:
+            approved = await self.auth_handler.is_user_approved(result["user_id"])
+            if not approved:
+                raise NotApprovedError(
+                    msg="This account is pending approval by a server administrator.",
+                    approval_notice_medium=ApprovalNoticeMedium.NONE,
+                )
+
+        well_known_data = self._well_known_builder.get_well_known()
+        if well_known_data:
+            result["well_known"] = well_known_data
+                   
+        return 200, result
+
 
 class RefreshTokenServlet(RestServlet):
     PATTERNS = client_patterns("/refresh$")
@@ -691,6 +755,7 @@ class CasTicketServlet(RestServlet):
 
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     if hs.config.experimental.msc3861.enabled:
+        LoginAppServiceOnlyRestServlet(hs).register(http_server)
         return
 
     LoginRestServlet(hs).register(http_server)
