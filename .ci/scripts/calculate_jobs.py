@@ -110,7 +110,7 @@ sytest_tests = [
         "workers": "workers",
     },
     {
-        "sytest-tag": "focal",
+        "sytest-tag": "mantic-3.12",
         "postgres": "multi-postgres",
         "workers": "workers",
         "reactor": "asyncio",
@@ -121,11 +121,11 @@ if not IS_PR:
     sytest_tests.extend(
         [
             {
-                "sytest-tag": "focal",
+                "sytest-tag": "mantic-3.12",
                 "reactor": "asyncio",
             },
             {
-                "sytest-tag": "focal",
+                "sytest-tag": "mantic-3.12",
                 "postgres": "postgres",
                 "reactor": "asyncio",
             },
