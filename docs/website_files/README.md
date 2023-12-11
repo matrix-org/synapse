@@ -24,6 +24,11 @@ Finally, we also stylise the chapter titles in the left sidebar by indenting the
 slightly so that they are more visually distinguishable from the section headers
 (the bold titles). This is done through the `indent-section-headers.css` file.
 
+In addition to these modifications, we have added a version picker to the documentation.
+Users can switch between documentations for different versions of Synapse.
+This functionality was implemented through the `version-picker.js` and
+`version-picker.css` files.
+
 More information can be found in mdbook's official documentation for
 [injecting page JS/CSS](https://rust-lang.github.io/mdBook/format/config.html)
 and
