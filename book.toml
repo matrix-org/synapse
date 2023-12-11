@@ -34,6 +34,14 @@ additional-css = [
     "docs/website_files/table-of-contents.css",
     "docs/website_files/remove-nav-buttons.css",
     "docs/website_files/indent-section-headers.css",
+    "docs/website_files/version-picker.css",
 ]
-additional-js = ["docs/website_files/table-of-contents.js"]
+additional-js = [
+    "docs/website_files/table-of-contents.js",
+    "docs/website_files/version-picker.js",
+    "docs/website_files/version.js",
+]
 theme = "docs/website_files/theme"
+
+[preprocessor.schema_versions]
+command = "./scripts-dev/schema_versions.py"
