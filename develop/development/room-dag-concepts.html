@@ -28,6 +28,7 @@
         <link rel="stylesheet" href="../docs/website_files/table-of-contents.css">
         <link rel="stylesheet" href="../docs/website_files/remove-nav-buttons.css">
         <link rel="stylesheet" href="../docs/website_files/indent-section-headers.css">
+        <link rel="stylesheet" href="../docs/website_files/version-picker.css">
     </head>
     <body>
         <!-- Provide site root to javascript -->
@@ -103,6 +104,18 @@
                         <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
                             <i class="fa fa-search"></i>
                         </button>
+                        <div class="version-picker">
+                            <div class="dropdown">
+                                <div class="select">
+                                    <span></span>
+                                    <i class="fa fa-chevron-down"></i>
+                                </div>
+                                <input type="hidden" name="version">
+                                <ul class="dropdown-menu">
+                                    <!-- Versions will be added dynamically in version-picker.js -->
+                                </ul>
+                            </div>
+                        </div>
                     </div>
 
                     <h1 class="menu-title">Synapse</h1>
@@ -274,5 +287,7 @@ notes from @Azrenbeth, https://pastebin.com/seUGVGeT</p>
 
         <!-- Custom JS scripts -->
         <script type="text/javascript" src="../docs/website_files/table-of-contents.js"></script>
+        <script type="text/javascript" src="../docs/website_files/version-picker.js"></script>
+        <script type="text/javascript" src="../docs/website_files/version.js"></script>
     </body>
 </html>
