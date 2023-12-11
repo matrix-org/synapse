@@ -103,10 +103,6 @@ function sortVersions(a, b) {
     const versionA = (a.match(/v\d+(\.\d+)+/) || [])[0];
     const versionB = (b.match(/v\d+(\.\d+)+/) || [])[0];
 
-    // Handle versions without a version number (e.g., 'develop' and 'latest')
-    if (!versionA) return 1;
-    if (!versionB) return -1;
-
     return versionB.localeCompare(versionA);
 }
 
