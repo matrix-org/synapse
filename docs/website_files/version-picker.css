@@ -41,7 +41,7 @@
     background-color: var(--theme-popup-bg);
 }
 .version-picker .dropdown.active .select > i {
-    transform: rotate(-90deg);
+    transform: rotate(-180deg);
 }
 .version-picker .dropdown .dropdown-menu {
     position: absolute;

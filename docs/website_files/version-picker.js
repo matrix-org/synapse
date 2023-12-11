@@ -43,7 +43,7 @@ function initializeVersionDropdown(dropdown, dropdownMenu) {
 };
 
 /**
- * This function fetch the available versions from a GitHub repository
+ * This function fetches the available versions from a GitHub repository
  * and inserts them into the version picker.
  * 
  * @param {Element} dropdown - The dropdown element.
@@ -59,7 +59,7 @@ function fetchVersions(dropdown, dropdownMenu) {
             }).then(res => 
                 res.json()
             ).then(resObject => {
-                const excluded = ['dev-docs', 'v1.80.0', 'v1.69.0'];
+                const excluded = ['dev-docs', 'v1.91.0', 'v1.80.0', 'v1.69.0'];
                 const tree = resObject.tree.filter(item => item.type === "tree" && !excluded.includes(item.path));
                 const versions = tree.map(item => item.path).sort(sortVersions);
 
