@@ -1,1 +1,1 @@
-Add a way to set the avatar and the topic of the server notices room.
+Add config options to set the avatar and the topic of the server notices room.
