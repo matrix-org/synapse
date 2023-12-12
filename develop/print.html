@@ -4334,6 +4334,12 @@ has missed. Disabled by default.</p>
 notifications for new users. Enabled by default.</p>
 </li>
 <li>
+<p><code>notif_delay_before_mail</code>: The time to wait before emailing about a notification.
+This gives the user a chance to view the message via push or an open client.
+Defaults to 10 minutes.</p>
+<p><em>New in Synapse 1.99.0.</em></p>
+</li>
+<li>
 <p><code>client_base_url</code>: Custom URL for client links within the email notifications. By default
 links will be based on &quot;https://matrix.to&quot;. (This setting used to be called <code>riot_base_url</code>;
 the old name is still supported for backwards-compatibility but is now deprecated.)</p>
