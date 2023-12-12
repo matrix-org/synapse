@@ -30,9 +30,15 @@ from synapse.util.stringutils import strtobool
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 # Update your remotes folks.
-print("Synapse is no longer being developed under the matrix-org organization.")
-print("Please update your git remote to pull from vector-im/synapse:")
-print("    git remote set-url origin git@github.com:vector-im/synapse.git")
+announcement = """
+Synapse is no longer being developed under the matrix-org organization. See the
+README.rst for more details.
+
+Please update your git remote to pull from element-hq/synapse:
+
+   git remote set-url origin git@github.com:element-hq/synapse.git
+"""
+print(announcement)
 sys.exit(1)
 
 # Check that we're not running on an unsupported Python version.
