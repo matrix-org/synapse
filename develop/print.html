@@ -7052,15 +7052,20 @@ notices.</p>
 <li><code>system_mxid_display_name</code>: set the display name of the &quot;notices&quot; user</li>
 <li><code>system_mxid_avatar_url</code>: set the avatar for the &quot;notices&quot; user</li>
 <li><code>room_name</code>: set the room name of the server notices room</li>
+<li><code>room_avatar_url</code>: optional string. The room avatar to use for server notice rooms. If set to the empty string <code>&quot;&quot;</code>, notice rooms will not be given an avatar. Defaults to the empty string. <em>Added in Synapse 1.99.0.</em></li>
+<li><code>room_topic</code>: optional string. The topic to use for server notice rooms. If set to the empty string <code>&quot;&quot;</code>, notice rooms will not be given a topic. Defaults to the empty string.  <em>Added in Synapse 1.99.0.</em></li>
 <li><code>auto_join</code>: boolean. If true, the user will be automatically joined to the room instead of being invited.
 Defaults to false. <em>Added in Synapse 1.98.0.</em></li>
 </ul>
+<p>Note that the name, topic and avatar of existing server notice rooms will only be updated when a new notice event is sent.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">server_notices:
   system_mxid_localpart: notices
   system_mxid_display_name: &quot;Server Notices&quot;
-  system_mxid_avatar_url: &quot;mxc://server.com/oumMVlgDnLYFaPVkExemNVVZ&quot;
+  system_mxid_avatar_url: &quot;mxc://example.com/oumMVlgDnLYFaPVkExemNVVZ&quot;
   room_name: &quot;Server Notices&quot;
+  room_avatar_url: &quot;mxc://example.com/oumMVlgDnLYFaPVkExemNVVZ&quot;
+  room_topic: &quot;Room used by your server admin to notice you of important information&quot;
   auto_join: true
 </code></pre>
 <hr />
@@ -9443,13 +9448,15 @@ section, which should look like this:</p>
 <pre><code class="language-yaml">server_notices:
    system_mxid_localpart: server
    system_mxid_display_name: &quot;Server Notices&quot;
-   system_mxid_avatar_url: &quot;mxc://server.com/oumMVlgDnLYFaPVkExemNVVZ&quot;
+   system_mxid_avatar_url: &quot;mxc://example.com/oumMVlgDnLYFaPVkExemNVVZ&quot;
    room_name: &quot;Server Notices&quot;
+   room_avatar_url: &quot;mxc://example.com/oumMVlgDnLYFaPVkExemNVVZ&quot;
+   room_topic: &quot;Room used by your server admin to notice you of important information&quot;
    auto_join: true
 </code></pre>
 <p>The only compulsory setting is <code>system_mxid_localpart</code>, which defines the user
 id of the Server Notices user, as above. <code>room_name</code> defines the name of the
-room which will be created.</p>
+room which will be created, <code>room_avatar_url</code> its avatar and <code>room_topic</code> its topic.</p>
 <p><code>system_mxid_display_name</code> and <code>system_mxid_avatar_url</code> can be used to set the
 displayname and avatar of the Server Notices user.</p>
 <p><code>auto_join</code> will autojoin users to the notices room instead of sending an invite.</p>
