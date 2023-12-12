@@ -354,7 +354,16 @@ class ServerNoticesManager:
                 "",
             )
 
-            if room_info_event and room_info_event.get(info_content_key) == info_value:
+            existing_info_value = None
+            if room_info_event:
+                existing_info_value = room_info_event.get(info_content_key)
+            if existing_info_value == info_value:
+                return
+            if not existing_info_value and not info_value:
+                # A missing `info_value` can either be represented by a None
+                # or an empty string, so we assume that if they're both falsey
+                # they're equivalent.
+                return
                 return
 
         if info_value is None:
