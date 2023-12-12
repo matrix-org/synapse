@@ -1,0 +1,1 @@
+Add new Sentry configuration option `environment` for improved system monitoring. Contributed by @zeeshanrafiqrana.

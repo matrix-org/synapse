@@ -2777,7 +2777,11 @@ enable_metrics: true
 ### `sentry`
 
 Use this option to enable sentry integration. Provide the DSN assigned to you by sentry
-with the `dsn` setting.
+with the `dsn` setting. 
+
+ An optional `environment` field can be used to specify an environment. This allows
+ for log maintenance based on different environments, ensuring better organization
+ and analysis..
 
 NOTE: While attempts are made to ensure that the logs don't contain
 any sensitive information, this cannot be guaranteed. By enabling
@@ -2788,6 +2792,7 @@ through insecure notification channels if so configured.
 Example configuration:
 ```yaml
 sentry:
+    environment: "production"
     dsn: "..."
 ```
 ---
