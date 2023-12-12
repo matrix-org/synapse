@@ -36,6 +36,7 @@ class ServerNoticesManager:
         self._room_member_handler = hs.get_room_member_handler()
         self._event_creation_handler = hs.get_event_creation_handler()
         self._message_handler = hs.get_message_handler()
+        self._storage_controllers = hs.get_storage_controllers()
         self._is_mine_id = hs.is_mine_id
         self._server_name = hs.hostname
 
@@ -302,11 +303,12 @@ class ServerNoticesManager:
 
         assert self.server_notices_mxid is not None
 
-        notice_user_data_in_room = await self._message_handler.get_room_data(
-            create_requester(self.server_notices_mxid),
-            room_id,
-            EventTypes.Member,
-            self.server_notices_mxid,
+        notice_user_data_in_room = (
+            await self._storage_controllers.state.get_current_state_event(
+                room_id,
+                EventTypes.Member,
+                self.server_notices_mxid,
+            )
         )
 
         assert notice_user_data_in_room is not None
@@ -333,7 +335,6 @@ class ServerNoticesManager:
         info_event_type: str,
         info_content_key: str,
         info_value: Optional[str],
-        if_changed: Optional[bool] = True,
     ) -> None:
         """
         Updates a specific notice room's info if it's different from what is set.
@@ -344,27 +345,23 @@ class ServerNoticesManager:
             info_event_type: The event type holding the specific info
             info_content_key: The key containing the specific info in the event's content
             info_value: The expected value for the specific info
-            if_changed: Try to read the info first and does not send the event if it's already the same
         """
-        if if_changed:
-            room_info_event = await self._message_handler.get_room_data(
-                requester,
-                room_id,
-                info_event_type,
-                "",
-            )
+        room_info_event = await self._storage_controllers.state.get_current_state_event(
+            room_id,
+            info_event_type,
+            "",
+        )
 
-            existing_info_value = None
-            if room_info_event:
-                existing_info_value = room_info_event.get(info_content_key)
-            if existing_info_value == info_value:
-                return
-            if not existing_info_value and not info_value:
-                # A missing `info_value` can either be represented by a None
-                # or an empty string, so we assume that if they're both falsey
-                # they're equivalent.
-                return
-                return
+        existing_info_value = None
+        if room_info_event:
+            existing_info_value = room_info_event.get(info_content_key)
+        if existing_info_value == info_value:
+            return
+        if not existing_info_value and not info_value:
+            # A missing `info_value` can either be represented by a None
+            # or an empty string, so we assume that if they're both falsey
+            # they're equivalent.
+            return
 
         if info_value is None:
             info_value = ""
