@@ -1,1 +1,0 @@
-Clarify that in the Sentry configuration, adding the sentry.environment setting alongside the existing sentry.dsn setting enables log maintenance based on different environments, enhancing organizational control and analysis.
