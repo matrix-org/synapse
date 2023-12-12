@@ -30,14 +30,9 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# The amount of time we always wait before ever emailing about a notification
-# (to give the user a chance to respond to other push or notice the window)
-DELAY_BEFORE_MAIL_MS = 10 * 60 * 1000
-
 # THROTTLE is the minimum time between mail notifications sent for a given room.
 # Each room maintains its own throttle counter, but each new mail notification
 # sends the pending notifications for all rooms.
-THROTTLE_START_MS = 10 * 60 * 1000
 THROTTLE_MAX_MS = 24 * 60 * 60 * 1000  # 24h
 # THROTTLE_MULTIPLIER = 6              # 10 mins, 1 hour, 6 hours, 24 hours
 THROTTLE_MULTIPLIER = 144  # 10 mins, 24 hours - i.e. jump straight to 1 day
@@ -79,6 +74,8 @@ class EmailPusher(Pusher):
             validate_email(self.email)
         except ValueError:
             raise PusherConfigException("Invalid email")
+
+        self._delay_before_mail_ms = self.hs.config.email.notif_delay_before_mail_ms
 
     def on_started(self, should_check_for_notifs: bool) -> None:
         """Called when this pusher has been started.
@@ -180,7 +177,7 @@ class EmailPusher(Pusher):
             received_at = push_action.received_ts
             if received_at is None:
                 received_at = 0
-            notif_ready_at = received_at + DELAY_BEFORE_MAIL_MS
+            notif_ready_at = received_at + self._delay_before_mail_ms
 
             room_ready_at = self.room_ready_to_notify_at(push_action.room_id)
 
@@ -196,7 +193,7 @@ class EmailPusher(Pusher):
                     "room_id": push_action.room_id,
                     "now": self.clock.time_msec(),
                     "received_at": received_at,
-                    "delay_before_mail_ms": DELAY_BEFORE_MAIL_MS,
+                    "delay_before_mail_ms": self._delay_before_mail_ms,
                     "last_sent_ts": self.get_room_last_sent_ts(push_action.room_id),
                     "throttle_ms": self.get_room_throttle_ms(push_action.room_id),
                 }
@@ -300,10 +297,10 @@ class EmailPusher(Pusher):
         current_throttle_ms = self.get_room_throttle_ms(room_id)
 
         if gap > THROTTLE_RESET_AFTER_MS:
-            new_throttle_ms = THROTTLE_START_MS
+            new_throttle_ms = self._delay_before_mail_ms
         else:
             if current_throttle_ms == 0:
-                new_throttle_ms = THROTTLE_START_MS
+                new_throttle_ms = self._delay_before_mail_ms
             else:
                 new_throttle_ms = min(
                     current_throttle_ms * THROTTLE_MULTIPLIER, THROTTLE_MAX_MS
