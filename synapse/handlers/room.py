@@ -871,7 +871,9 @@ class RoomCreationHandler:
 
         # The spec says rooms should default to private visibility if
         # `visibility` is not specified.
-        visibility = config.get("visibility", "private")
+        #visibility = config.get("visibility", "private")
+        # temporarily block publishing rooms to directory - patch date 12/12/23
+        visibility = "private"
         is_public = visibility == "public"
 
         self._validate_room_config(config, visibility)
