@@ -1822,6 +1822,7 @@ v1.61.0.</p>
 <tr><td>v1.83.0 – v1.84.1</td><td>v1.77.0</td></tr>
 <tr><td>v1.85.0 – v1.91.2</td><td>v1.83.0</td></tr>
 <tr><td>v1.92.0 – v1.97.0</td><td>v1.90.0</td></tr>
+<tr><td>v1.98.0 – v1.98.0</td><td>v1.96.0</td></tr>
 </tbody></table>
 <h1 id="upgrading-to-v1930"><a class="header" href="#upgrading-to-v1930">Upgrading to v1.93.0</a></h1>
 <h2 id="minimum-supported-rust-version"><a class="header" href="#minimum-supported-rust-version">Minimum supported Rust version</a></h2>
@@ -6018,7 +6019,10 @@ Defaults to false.</p>
 <hr />
 <h3 id="sentry"><a class="header" href="#sentry"><code>sentry</code></a></h3>
 <p>Use this option to enable sentry integration. Provide the DSN assigned to you by sentry
-with the <code>dsn</code> setting.</p>
+with the <code>dsn</code> setting. </p>
+<p>An optional <code>environment</code> field can be used to specify an environment. This allows
+for log maintenance based on different environments, ensuring better organization
+and analysis..</p>
 <p>NOTE: While attempts are made to ensure that the logs don't contain
 any sensitive information, this cannot be guaranteed. By enabling
 this option the sentry server may therefore receive sensitive
@@ -6026,6 +6030,7 @@ information, and it in turn may then disseminate sensitive information
 through insecure notification channels if so configured.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">sentry:
+    environment: &quot;production&quot;
     dsn: &quot;...&quot;
 </code></pre>
 <hr />

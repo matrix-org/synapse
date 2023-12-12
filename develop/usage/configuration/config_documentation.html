@@ -2445,7 +2445,10 @@ Defaults to false.</p>
 <hr />
 <h3 id="sentry"><a class="header" href="#sentry"><code>sentry</code></a></h3>
 <p>Use this option to enable sentry integration. Provide the DSN assigned to you by sentry
-with the <code>dsn</code> setting.</p>
+with the <code>dsn</code> setting. </p>
+<p>An optional <code>environment</code> field can be used to specify an environment. This allows
+for log maintenance based on different environments, ensuring better organization
+and analysis..</p>
 <p>NOTE: While attempts are made to ensure that the logs don't contain
 any sensitive information, this cannot be guaranteed. By enabling
 this option the sentry server may therefore receive sensitive
@@ -2453,6 +2456,7 @@ information, and it in turn may then disseminate sensitive information
 through insecure notification channels if so configured.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">sentry:
+    environment: &quot;production&quot;
     dsn: &quot;...&quot;
 </code></pre>
 <hr />
