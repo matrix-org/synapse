@@ -1,1 +1,1 @@
-Enhanced Sentry configuration with a startup-loaded environment for improved system monitoring. Contributed by @zeeshanrafiqrana.
+Add new Sentry configuration option `environment` for improved system monitoring. Contributed by @zeeshanrafiqrana.
