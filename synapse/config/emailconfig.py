@@ -294,6 +294,11 @@ class EmailConfig(Config):
             self.email_riot_base_url = email_config.get(
                 "client_base_url", email_config.get("riot_base_url", None)
             )
+            # The amount of time we always wait before ever emailing about a notification
+            # (to give the user a chance to respond to other push or notice the window)
+            self.notif_delay_before_mail_ms = Config.parse_duration(
+                email_config.get("notif_delay_before_mail", "10m")
+            )
 
         if self.root.account_validity.account_validity_renew_by_email_enabled:
             expiry_template_html = email_config.get(

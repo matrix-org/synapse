@@ -38,6 +38,14 @@ class ServerNoticesConfig(Config):
         server_notices_room_name (str|None):
             The name to use for the server notices room.
             None if server notices are not enabled.
+
+        server_notices_room_avatar_url (str|None):
+            The avatar URL to use for the server notices room.
+            None if server notices are not enabled.
+
+        server_notices_room_topic (str|None):
+            The topic to use for the server notices room.
+            None if server notices are not enabled.
     """
 
     section = "servernotices"
@@ -48,6 +56,8 @@ class ServerNoticesConfig(Config):
         self.server_notices_mxid_display_name: Optional[str] = None
         self.server_notices_mxid_avatar_url: Optional[str] = None
         self.server_notices_room_name: Optional[str] = None
+        self.server_notices_room_avatar_url: Optional[str] = None
+        self.server_notices_room_topic: Optional[str] = None
         self.server_notices_auto_join: bool = False
 
     def read_config(self, config: JsonDict, **kwargs: Any) -> None:
@@ -63,4 +73,6 @@ class ServerNoticesConfig(Config):
         self.server_notices_mxid_avatar_url = c.get("system_mxid_avatar_url", None)
         # todo: i18n
         self.server_notices_room_name = c.get("room_name", "Server Notices")
+        self.server_notices_room_avatar_url = c.get("room_avatar_url", None)
+        self.server_notices_room_topic = c.get("room_topic", None)
         self.server_notices_auto_join = c.get("auto_join", False)

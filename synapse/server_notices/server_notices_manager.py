@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Optional
 
 from synapse.api.constants import EventTypes, Membership, RoomCreationPreset
 from synapse.events import EventBase
-from synapse.types import Requester, StreamKeyType, UserID, create_requester
+from synapse.types import JsonDict, Requester, StreamKeyType, UserID, create_requester
 from synapse.util.caches.descriptors import cached
 
 if TYPE_CHECKING:
@@ -36,6 +36,7 @@ class ServerNoticesManager:
         self._room_member_handler = hs.get_room_member_handler()
         self._event_creation_handler = hs.get_event_creation_handler()
         self._message_handler = hs.get_message_handler()
+        self._storage_controllers = hs.get_storage_controllers()
         self._is_mine_id = hs.is_mine_id
         self._server_name = hs.hostname
 
@@ -160,6 +161,27 @@ class ServerNoticesManager:
                 self._config.servernotices.server_notices_mxid_display_name,
                 self._config.servernotices.server_notices_mxid_avatar_url,
             )
+            await self._update_room_info(
+                requester,
+                room_id,
+                EventTypes.Name,
+                "name",
+                self._config.servernotices.server_notices_room_name,
+            )
+            await self._update_room_info(
+                requester,
+                room_id,
+                EventTypes.RoomAvatar,
+                "url",
+                self._config.servernotices.server_notices_room_avatar_url,
+            )
+            await self._update_room_info(
+                requester,
+                room_id,
+                EventTypes.Topic,
+                "topic",
+                self._config.servernotices.server_notices_room_topic,
+            )
             return room_id
 
         # apparently no existing notice room: create a new one
@@ -178,15 +200,31 @@ class ServerNoticesManager:
                 "avatar_url": self._config.servernotices.server_notices_mxid_avatar_url,
             }
 
+        room_config: JsonDict = {
+            "preset": RoomCreationPreset.PRIVATE_CHAT,
+            "power_level_content_override": {"users_default": -10},
+        }
+
+        if self._config.servernotices.server_notices_room_name:
+            room_config["name"] = self._config.servernotices.server_notices_room_name
+        if self._config.servernotices.server_notices_room_topic:
+            room_config["topic"] = self._config.servernotices.server_notices_room_topic
+        if self._config.servernotices.server_notices_room_avatar_url:
+            room_config["initial_state"] = [
+                {
+                    "type": EventTypes.RoomAvatar,
+                    "state_key": "",
+                    "content": {
+                        "url": self._config.servernotices.server_notices_room_avatar_url,
+                    },
+                }
+            ]
+
         # `ignore_forced_encryption` is used to bypass `encryption_enabled_by_default_for_room_type`
         # setting if it set, since the server notices will not be encrypted anyway.
         room_id, _, _ = await self._room_creation_handler.create_room(
             requester,
-            config={
-                "preset": RoomCreationPreset.PRIVATE_CHAT,
-                "name": self._config.servernotices.server_notices_room_name,
-                "power_level_content_override": {"users_default": -10},
-            },
+            config=room_config,
             ratelimit=False,
             creator_join_profile=join_profile,
             ignore_forced_encryption=True,
@@ -265,11 +303,12 @@ class ServerNoticesManager:
 
         assert self.server_notices_mxid is not None
 
-        notice_user_data_in_room = await self._message_handler.get_room_data(
-            create_requester(self.server_notices_mxid),
-            room_id,
-            EventTypes.Member,
-            self.server_notices_mxid,
+        notice_user_data_in_room = (
+            await self._storage_controllers.state.get_current_state_event(
+                room_id,
+                EventTypes.Member,
+                self.server_notices_mxid,
+            )
         )
 
         assert notice_user_data_in_room is not None
@@ -288,3 +327,55 @@ class ServerNoticesManager:
                 ratelimit=False,
                 content={"displayname": display_name, "avatar_url": avatar_url},
             )
+
+    async def _update_room_info(
+        self,
+        requester: Requester,
+        room_id: str,
+        info_event_type: str,
+        info_content_key: str,
+        info_value: Optional[str],
+    ) -> None:
+        """
+        Updates a specific notice room's info if it's different from what is set.
+
+        Args:
+            requester: The user who is performing the update.
+            room_id: The ID of the server notice room
+            info_event_type: The event type holding the specific info
+            info_content_key: The key containing the specific info in the event's content
+            info_value: The expected value for the specific info
+        """
+        room_info_event = await self._storage_controllers.state.get_current_state_event(
+            room_id,
+            info_event_type,
+            "",
+        )
+
+        existing_info_value = None
+        if room_info_event:
+            existing_info_value = room_info_event.get(info_content_key)
+        if existing_info_value == info_value:
+            return
+        if not existing_info_value and not info_value:
+            # A missing `info_value` can either be represented by a None
+            # or an empty string, so we assume that if they're both falsey
+            # they're equivalent.
+            return
+
+        if info_value is None:
+            info_value = ""
+
+        room_info_event_dict = {
+            "type": info_event_type,
+            "room_id": room_id,
+            "sender": requester.user.to_string(),
+            "state_key": "",
+            "content": {
+                info_content_key: info_value,
+            },
+        }
+
+        event, _ = await self._event_creation_handler.create_and_send_nonmember_event(
+            requester, room_info_event_dict, ratelimit=False
+        )

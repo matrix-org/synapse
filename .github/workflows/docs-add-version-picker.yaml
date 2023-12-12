@@ -1,0 +1,90 @@
+name: Add Version Picker (RUN ONCE)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  add-version-picker:
+    name: Add Version Picker
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure Git
+        run: |
+          git config user.email "action@synapse.bot.com"
+          git config user.name "Action Bot"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup mdbook
+        uses: peaceiris/actions-mdbook@adeb05db28a0c0004681db83893d56c0388ea9ea # v1.2.0
+        with:
+          mdbook-version: '0.4.17'
+
+      - name: Copy files to release branches
+        run: |
+          for version in "v1.98" "v1.97" "v1.96" "v1.95" "v1.94" "v1.93" "v1.92" "v1.91" "v1.90" "v1.89" "v1.88" "v1.87" "v1.86" "v1.85" "v1.84" "v1.83" "v1.82" "v1.81" "v1.80" "v1.79" "v1.78" "v1.77" "v1.76" "v1.75" "v1.74" "v1.73" "v1.72" "v1.71" "v1.70" "v1.69" "v1.68" "v1.67" "v1.66" "v1.65" "v1.64" "v1.63" "v1.62" "v1.61" "v1.60" "v1.59" "v1.58" "v1.57" "v1.56" "v1.55" "v1.54" "v1.53" "v1.52" "v1.51" "v1.50" "v1.49" "v1.48" "v1.47" "v1.46" "v1.45" "v1.44" "v1.43" "v1.42" "v1.41" "v1.40" "v1.39" "v1.38" "v1.37"
+          do
+            git fetch
+            git checkout -b release-$version origin/release-$version
+
+            git checkout develop -- ./book.toml
+            git checkout develop -- ./docs/website_files/version-picker.js
+            git checkout develop -- ./docs/website_files/version-picker.css
+            git checkout develop -- ./docs/website_files/README.md
+
+            echo "window.SYNAPSE_VERSION = '$version';" > ./docs/website_files/version.js
+
+            # Adding version-picker element to index.hbs
+            awk '/<button id="search-toggle" class="icon-button" type="button" title="Search. \(Shortkey: s\)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">/{
+                print; getline; print; getline; print; getline; print;
+                print "\
+                                  <div class=\"version-picker\">\n\
+                                      <div class=\"dropdown\">\n\
+                                          <div class=\"select\">\n\
+                                              <span></span>\n\
+                                              <i class=\"fa fa-chevron-down\"></i>\n\
+                                          </div>\n\
+                                          <input type=\"hidden\" name=\"version\">\n\
+                                          <ul class=\"dropdown-menu\">\n\
+                                              <!-- Versions will be added dynamically in version-picker.js -->\n\
+                                          </ul>\n\
+                                      </div>\n\
+                                  </div>\
+                ";
+                next
+            } 1' ./docs/website_files/theme/index.hbs > output.html && mv output.html ./docs/website_files/theme/index.hbs
+
+            git add ./book.toml ./docs/website_files/version-picker.js ./docs/website_files/version-picker.css ./docs/website_files/version.js ./docs/website_files/README.md ./docs/website_files/theme/index.hbs
+            git commit -m "Version picker added for $version docs"
+            git push
+          done
+
+      - name: Build docs for Github Pages
+        run: |
+          git fetch
+          git branch gh-pages origin/gh-pages
+
+          for version in "v1.98" "v1.97" "v1.96" "v1.95" "v1.94" "v1.93" "v1.92" "v1.91" "v1.90" "v1.89" "v1.88" "v1.87" "v1.86" "v1.85" "v1.84" "v1.83" "v1.82" "v1.81" "v1.80" "v1.79" "v1.78" "v1.77" "v1.76" "v1.75" "v1.74" "v1.73" "v1.72" "v1.71" "v1.70" "v1.69" "v1.68" "v1.67" "v1.66" "v1.65" "v1.64" "v1.63" "v1.62" "v1.61" "v1.60" "v1.59" "v1.58" "v1.57" "v1.56" "v1.55" "v1.54" "v1.53" "v1.52" "v1.51" "v1.50" "v1.49" "v1.48" "v1.47" "v1.46" "v1.45" "v1.44" "v1.43" "v1.42" "v1.41" "v1.40" "v1.39" "v1.38" "v1.37"
+          do
+            git checkout release-$version
+
+            mdbook build && cp book/welcome_and_overview.html book/index.html
+            mkdir ver-temp && cp -r book/* ver-temp/
+            rm -r ./book
+
+            git checkout gh-pages
+            rm -r $version
+            mv ver-temp $version
+
+            git add ./$version
+            git commit -m "Version picker deployed for $version docs to Github Pages"
+          done
+
+      - name: Push to gh-pages
+        run: |
+          git checkout gh-pages
+          git status
+          git push

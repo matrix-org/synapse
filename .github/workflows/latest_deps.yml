@@ -86,7 +86,7 @@ jobs:
             -e POSTGRES_PASSWORD=postgres \
             -e POSTGRES_INITDB_ARGS="--lc-collate C --lc-ctype C --encoding UTF8" \
             postgres:${{ matrix.postgres-version }}
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.x"
       - run: pip install .[all,test]
@@ -200,7 +200,7 @@ jobs:
       - name: Prepare Complement's Prerequisites
         run: synapse/.ci/scripts/setup_complement_prerequisites.sh
 
-      - uses: actions/setup-go@v4
+      - uses: actions/setup-go@v5
         with:
           cache-dependency-path: complement/go.sum
           go-version-file: complement/go.mod
