@@ -28,6 +28,7 @@
         <link rel="stylesheet" href="../docs/website_files/table-of-contents.css">
         <link rel="stylesheet" href="../docs/website_files/remove-nav-buttons.css">
         <link rel="stylesheet" href="../docs/website_files/indent-section-headers.css">
+        <link rel="stylesheet" href="../docs/website_files/version-picker.css">
     </head>
     <body>
         <!-- Provide site root to javascript -->
@@ -103,6 +104,18 @@
                         <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
                             <i class="fa fa-search"></i>
                         </button>
+                        <div class="version-picker">
+                            <div class="dropdown">
+                                <div class="select">
+                                    <span></span>
+                                    <i class="fa fa-chevron-down"></i>
+                                </div>
+                                <input type="hidden" name="version">
+                                <ul class="dropdown-menu">
+                                    <!-- Versions will be added dynamically in version-picker.js -->
+                                </ul>
+                            </div>
+                        </div>      
                     </div>
 
                     <h1 class="menu-title">Synapse</h1>
@@ -175,6 +188,13 @@ any of the subsequent implementations of this callback.</p>
 operations to keep track of them. (e.g. add them to a database table). The user is
 represented by their Matrix user ID.</p>
 <p>If multiple modules implement this callback, Synapse runs them all in order.</p>
+<h3 id="on_user_login"><a class="header" href="#on_user_login"><code>on_user_login</code></a></h3>
+<p><em>First introduced in Synapse v1.98.0</em></p>
+<pre><code class="language-python">async def on_user_login(user_id: str, auth_provider_type: str, auth_provider_id: str) -&gt; None
+</code></pre>
+<p>Called after successfully login or registration of a user for cases when module needs to perform extra operations after auth.
+represented by their Matrix user ID.</p>
+<p>If multiple modules implement this callback, Synapse runs them all in order.</p>
 
                     </main>
 
@@ -214,5 +234,7 @@ represented by their Matrix user ID.</p>
 
         <!-- Custom JS scripts -->
         <script type="text/javascript" src="../docs/website_files/table-of-contents.js"></script>
+        <script type="text/javascript" src="../docs/website_files/version-picker.js"></script>
+        <script type="text/javascript" src="../docs/website_files/version.js"></script>
     </body>
 </html>

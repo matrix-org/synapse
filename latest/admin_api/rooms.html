@@ -28,6 +28,7 @@
         <link rel="stylesheet" href="../docs/website_files/table-of-contents.css">
         <link rel="stylesheet" href="../docs/website_files/remove-nav-buttons.css">
         <link rel="stylesheet" href="../docs/website_files/indent-section-headers.css">
+        <link rel="stylesheet" href="../docs/website_files/version-picker.css">
     </head>
     <body>
         <!-- Provide site root to javascript -->
@@ -103,6 +104,18 @@
                         <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
                             <i class="fa fa-search"></i>
                         </button>
+                        <div class="version-picker">
+                            <div class="dropdown">
+                                <div class="select">
+                                    <span></span>
+                                    <i class="fa fa-chevron-down"></i>
+                                </div>
+                                <input type="hidden" name="version">
+                                <ul class="dropdown-menu">
+                                    <!-- Versions will be added dynamically in version-picker.js -->
+                                </ul>
+                            </div>
+                        </div>      
                     </div>
 
                     <h1 class="menu-title">Synapse</h1>
@@ -629,7 +642,8 @@ given timestamp. Defaults to <code>f</code>.</li>
 </ul>
 <p><strong>Response</strong></p>
 <ul>
-<li><code>event_id</code> - converted from timestamp</li>
+<li><code>event_id</code> - The event ID closest to the given timestamp.</li>
+<li><code>origin_server_ts</code> - The timestamp of the event in milliseconds since the Unix epoch.</li>
 </ul>
 <h1 id="block-room-api"><a class="header" href="#block-room-api">Block Room API</a></h1>
 <p>The Block Room admin API allows server admins to block and unblock rooms,
@@ -1138,5 +1152,7 @@ that were deleted.</p>
 
         <!-- Custom JS scripts -->
         <script type="text/javascript" src="../docs/website_files/table-of-contents.js"></script>
+        <script type="text/javascript" src="../docs/website_files/version-picker.js"></script>
+        <script type="text/javascript" src="../docs/website_files/version.js"></script>
     </body>
 </html>

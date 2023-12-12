@@ -28,6 +28,7 @@
         <link rel="stylesheet" href="../../docs/website_files/table-of-contents.css">
         <link rel="stylesheet" href="../../docs/website_files/remove-nav-buttons.css">
         <link rel="stylesheet" href="../../docs/website_files/indent-section-headers.css">
+        <link rel="stylesheet" href="../../docs/website_files/version-picker.css">
     </head>
     <body>
         <!-- Provide site root to javascript -->
@@ -103,6 +104,18 @@
                         <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
                             <i class="fa fa-search"></i>
                         </button>
+                        <div class="version-picker">
+                            <div class="dropdown">
+                                <div class="select">
+                                    <span></span>
+                                    <i class="fa fa-chevron-down"></i>
+                                </div>
+                                <input type="hidden" name="version">
+                                <ul class="dropdown-menu">
+                                    <!-- Versions will be added dynamically in version-picker.js -->
+                                </ul>
+                            </div>
+                        </div>      
                     </div>
 
                     <h1 class="menu-title">Synapse</h1>
@@ -176,6 +189,16 @@ messages from the database after 5 minutes, rather than 5 months.</p>
 </ul>
 <p>For example, setting <code>max_avatar_size: 10M</code> means that Synapse will not accept files larger than 10,485,760 bytes
 for a user avatar.</p>
+<h2 id="config-validation"><a class="header" href="#config-validation">Config Validation</a></h2>
+<p>The configuration file can be validated with the following command:</p>
+<pre><code class="language-bash">python -m synapse.config read &lt;config key to print&gt; -c &lt;path to config&gt;
+</code></pre>
+<p>To validate the entire file, omit <code>read &lt;config key to print&gt;</code>:</p>
+<pre><code class="language-bash">python -m synapse.config -c &lt;path to config&gt;
+</code></pre>
+<p>To see how to set other options, check the help reference:</p>
+<pre><code class="language-bash">python -m synapse.config --help
+</code></pre>
 <h3 id="yaml"><a class="header" href="#yaml">YAML</a></h3>
 <p>The configuration file is a <a href="https://yaml.org/">YAML</a> file, which means that certain syntax rules
 apply if you want your config file to be read properly. A few helpful things to know:</p>
@@ -635,7 +658,7 @@ for <a href="../../workers.html">workers</a> and containers without listener e.g
   # Note that x_forwarded will default to true, when using a UNIX socket. Please see
   # https://matrix-org.github.io/synapse/latest/reverse_proxy.html.
   #
-  - path: /var/run/synapse/main_public.sock
+  - path: /run/synapse/main_public.sock
     type: http
     resources:
       - names: [client, federation]
@@ -1390,7 +1413,7 @@ see <a href="../../postgres.html">here</a>.</p>
   args:
     user: synapse_user
     password: secretpassword
-    database: synapse
+    dbname: synapse
     host: localhost
     port: 5432
     cp_min: 5
@@ -1472,7 +1495,7 @@ when Synapse is started.</p>
     args:
       user: synapse_user
       password: secretpassword
-      database: synapse_main
+      dbname: synapse_main
       host: localhost
       port: 5432
       cp_min: 5
@@ -1485,7 +1508,7 @@ when Synapse is started.</p>
     args:
       user: synapse_user
       password: secretpassword
-      database: synapse_state
+      dbname: synapse_state
       host: localhost
       port: 5432
       cp_min: 5
@@ -1665,6 +1688,16 @@ sending the invite. Defaults to <code>per_second: 0.2</code>, <code>burst_count:
   burst_count: 10
 </code></pre>
 <hr />
+<h3 id="rc_media_create"><a class="header" href="#rc_media_create"><code>rc_media_create</code></a></h3>
+<p>This option ratelimits creation of MXC URIs via the <code>/_matrix/media/v1/create</code>
+endpoint based on the account that's creating the media. Defaults to
+<code>per_second: 10</code>, <code>burst_count: 50</code>.</p>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">rc_media_create:
+  per_second: 10
+  burst_count: 50
+</code></pre>
+<hr />
 <h3 id="rc_federation"><a class="header" href="#rc_federation"><code>rc_federation</code></a></h3>
 <p>Defines limits on federation requests.</p>
 <p>The <code>rc_federation</code> configuration has the following sub-options:</p>
@@ -1711,6 +1744,21 @@ Set to false if you are using a separate media store worker.</p>
 <p>Directory where uploaded images and attachments are stored.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">media_store_path: &quot;DATADIR/media_store&quot;
+</code></pre>
+<hr />
+<h3 id="max_pending_media_uploads"><a class="header" href="#max_pending_media_uploads"><code>max_pending_media_uploads</code></a></h3>
+<p>How many <em>pending media uploads</em> can a given user have? A pending media upload
+is a created MXC URI that (a) is not expired (the <code>unused_expires_at</code> timestamp
+has not passed) and (b) the media has not yet been uploaded for. Defaults to 5.</p>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">max_pending_media_uploads: 5
+</code></pre>
+<hr />
+<h3 id="unused_expiration_time"><a class="header" href="#unused_expiration_time"><code>unused_expiration_time</code></a></h3>
+<p>How long to wait in milliseconds before expiring created media IDs. Defaults to
+&quot;24h&quot;</p>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">unused_expiration_time: &quot;1h&quot;
 </code></pre>
 <hr />
 <h3 id="media_storage_providers"><a class="header" href="#media_storage_providers"><code>media_storage_providers</code></a></h3>
@@ -3425,6 +3473,8 @@ notices.</p>
 <li><code>system_mxid_display_name</code>: set the display name of the &quot;notices&quot; user</li>
 <li><code>system_mxid_avatar_url</code>: set the avatar for the &quot;notices&quot; user</li>
 <li><code>room_name</code>: set the room name of the server notices room</li>
+<li><code>auto_join</code>: boolean. If true, the user will be automatically joined to the room instead of being invited.
+Defaults to false. <em>Added in Synapse 1.98.0.</em></li>
 </ul>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">server_notices:
@@ -3432,6 +3482,7 @@ notices.</p>
   system_mxid_display_name: &quot;Server Notices&quot;
   system_mxid_avatar_url: &quot;mxc://server.com/oumMVlgDnLYFaPVkExemNVVZ&quot;
   room_name: &quot;Server Notices&quot;
+  auto_join: true
 </code></pre>
 <hr />
 <h3 id="enable_room_list_search"><a class="header" href="#enable_room_list_search"><code>enable_room_list_search</code></a></h3>
@@ -3741,9 +3792,9 @@ declared inside the <code>listener</code> block for a <code>replication</code> l
 <p>Example configuration(#2, for UNIX sockets):</p>
 <pre><code class="language-yaml">instance_map:
   main:
-    path: /var/run/synapse/main_replication.sock
+    path: /run/synapse/main_replication.sock
   worker1:
-    path: /var/run/synapse/worker1_replication.sock
+    path: /run/synapse/worker1_replication.sock
 </code></pre>
 <hr />
 <h3 id="stream_writers"><a class="header" href="#stream_writers"><code>stream_writers</code></a></h3>
@@ -3768,9 +3819,11 @@ authorize inter-worker communication.</p>
   - federation_sender1
   - federation_sender2
 </code></pre>
-<h2>Also see the <a href="../../workers.html#restrict-outbound-federation-traffic-to-a-specific-set-of-workers">worker
+<p>Also see the <a href="../../workers.html#restrict-outbound-federation-traffic-to-a-specific-set-of-workers">worker
 documentation</a>
-for more info.</h2>
+for more info.</p>
+<p><em>Added in Synapse 1.89.0.</em></p>
+<hr />
 <h3 id="run_background_tasks_on"><a class="header" href="#run_background_tasks_on"><code>run_background_tasks_on</code></a></h3>
 <p>The <a href="../../workers.html#background-tasks">worker</a> that is used to run
 background tasks (e.g. cleaning up expired data). If not provided this
@@ -3900,13 +3953,13 @@ requests from other workers.</p>
 <p>Example configuration(#2, using UNIX sockets with a <code>replication</code> listener):</p>
 <pre><code class="language-yaml">worker_listeners:
   - type: http
-    path: /var/run/synapse/worker_public.sock
-    resources:
-      - names: [client, federation]
-  - type: http
-    path: /var/run/synapse/worker_replication.sock
+    path: /run/synapse/worker_replication.sock
     resources:
       - names: [replication]
+  - type: http
+    path: /run/synapse/worker_public.sock
+    resources:
+      - names: [client, federation]
 </code></pre>
 <hr />
 <h3 id="worker_manhole"><a class="header" href="#worker_manhole"><code>worker_manhole</code></a></h3>
@@ -4017,5 +4070,7 @@ Set a size to change the default.</li>
 
         <!-- Custom JS scripts -->
         <script type="text/javascript" src="../../docs/website_files/table-of-contents.js"></script>
+        <script type="text/javascript" src="../../docs/website_files/version-picker.js"></script>
+        <script type="text/javascript" src="../../docs/website_files/version.js"></script>
     </body>
 </html>

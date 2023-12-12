@@ -28,6 +28,7 @@
         <link rel="stylesheet" href="../docs/website_files/table-of-contents.css">
         <link rel="stylesheet" href="../docs/website_files/remove-nav-buttons.css">
         <link rel="stylesheet" href="../docs/website_files/indent-section-headers.css">
+        <link rel="stylesheet" href="../docs/website_files/version-picker.css">
     </head>
     <body>
         <!-- Provide site root to javascript -->
@@ -103,6 +104,18 @@
                         <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
                             <i class="fa fa-search"></i>
                         </button>
+                        <div class="version-picker">
+                            <div class="dropdown">
+                                <div class="select">
+                                    <span></span>
+                                    <i class="fa fa-chevron-down"></i>
+                                </div>
+                                <input type="hidden" name="version">
+                                <ul class="dropdown-menu">
+                                    <!-- Versions will be added dynamically in version-picker.js -->
+                                </ul>
+                            </div>
+                        </div>      
                     </div>
 
                     <h1 class="menu-title">Synapse</h1>
@@ -715,6 +728,16 @@ The newest media is on top. You can change the order with parameters
       &quot;quarantined_by&quot;: null,
       &quot;safe_from_quarantine&quot;: false,
       &quot;upload_name&quot;: &quot;test2.png&quot;
+    },
+    {
+      &quot;created_ts&quot;: 300400,
+      &quot;last_access_ts&quot;: 300700,
+      &quot;media_id&quot;: &quot;BzYNLRUgGHphBkdKGbzXwbjX&quot;,
+      &quot;media_length&quot;: 1337,
+      &quot;media_type&quot;: &quot;application/octet-stream&quot;,
+      &quot;quarantined_by&quot;: null,
+      &quot;safe_from_quarantine&quot;: false,
+      &quot;upload_name&quot;: null
     }
   ],
   &quot;next_token&quot;: 3,
@@ -780,16 +803,17 @@ database, especially for large environments.</p>
 Media objects contain the following fields:
 <ul>
 <li><code>created_ts</code> - integer - Timestamp when the content was uploaded in ms.</li>
-<li><code>last_access_ts</code> - integer - Timestamp when the content was last accessed in ms.</li>
+<li><code>last_access_ts</code> - integer or null - Timestamp when the content was last accessed in ms.
+Null if there was no access, yet.</li>
 <li><code>media_id</code> - string - The id used to refer to the media. Details about the format
 are documented under
 <a href="../media_repository.html">media repository</a>.</li>
 <li><code>media_length</code> - integer - Length of the media in bytes.</li>
 <li><code>media_type</code> - string - The MIME-type of the media.</li>
-<li><code>quarantined_by</code> - string - The user ID that initiated the quarantine request
-for this media.</li>
+<li><code>quarantined_by</code> - string or null - The user ID that initiated the quarantine request
+for this media. Null if not quarantined.</li>
 <li><code>safe_from_quarantine</code> - bool - Status if this media is safe from quarantining.</li>
-<li><code>upload_name</code> - string - The name the media was uploaded with.</li>
+<li><code>upload_name</code> - string or null - The name the media was uploaded with. Null if not provided during upload.</li>
 </ul>
 </li>
 <li><code>next_token</code>: integer - Indication for pagination. See above.</li>
@@ -850,6 +874,33 @@ tell they have been logged in as.</p>
 <p>Note: The token will expire if the <em>admin</em> user calls <code>/logout/all</code> from any
 of their devices, but the token will <em>not</em> expire if the target user does the
 same.</p>
+<h2 id="allow-replacing-master-cross-signing-key-without-user-interactive-auth"><a class="header" href="#allow-replacing-master-cross-signing-key-without-user-interactive-auth">Allow replacing master cross-signing key without User-Interactive Auth</a></h2>
+<p>This endpoint is not intended for server administrator usage;
+we describe it here for completeness.</p>
+<p>This API temporarily permits a user to replace their master cross-signing key
+without going through
+<a href="https://spec.matrix.org/v1.8/client-server-api/#user-interactive-authentication-api">user-interactive authentication</a> (UIA).
+This is useful when Synapse has delegated its authentication to the
+<a href="https://github.com/matrix-org/matrix-authentication-service/">Matrix Authentication Service</a>;
+as Synapse cannot perform UIA is not possible in these circumstances.</p>
+<p>The API is</p>
+<pre><code class="language-http request">POST /_synapse/admin/v1/users/&lt;user_id&gt;/_allow_cross_signing_replacement_without_uia
+{}
+</code></pre>
+<p>If the user does not exist, or does exist but has no master cross-signing key,
+this will return with status code <code>404 Not Found</code>.</p>
+<p>Otherwise, a response body like the following is returned, with status <code>200 OK</code>:</p>
+<pre><code class="language-json">{
+    &quot;updatable_without_uia_before_ms&quot;: 1234567890
+}
+</code></pre>
+<p>The response body is a JSON object with a single field:</p>
+<ul>
+<li><code>updatable_without_uia_before_ms</code>: integer. The timestamp in milliseconds
+before which the user is permitted to replace their cross-signing key without
+going through UIA.</li>
+</ul>
+<p><em>Added in Synapse 1.97.0.</em></p>
 <h2 id="user-devices"><a class="header" href="#user-devices">User devices</a></h2>
 <h3 id="list-all-devices"><a class="header" href="#list-all-devices">List all devices</a></h3>
 <p>Gets information about all devices for a specific <code>user_id</code>.</p>
@@ -1307,5 +1358,7 @@ for more information.</p>
 
         <!-- Custom JS scripts -->
         <script type="text/javascript" src="../docs/website_files/table-of-contents.js"></script>
+        <script type="text/javascript" src="../docs/website_files/version-picker.js"></script>
+        <script type="text/javascript" src="../docs/website_files/version.js"></script>
     </body>
 </html>
