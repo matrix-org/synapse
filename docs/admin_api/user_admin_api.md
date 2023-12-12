@@ -153,7 +153,7 @@ Body parameters:
   - For the password field there is no strict check of the necessity for its presence.
     It is possible to have active users without a password, e.g. when authenticating with OIDC is configured.
     You must check yourself whether a password is required when reactivating a user or not.
-  - It is not possible to set a password if the config option `password_config.localdb_enabled` is set `true`.
+  - It is not possible to set a password if the config option `password_config.localdb_enabled` is set `false`.
   Users' passwords are wiped upon account deactivation, hence the need to set a new one here.
 
   Note: a user cannot be erased with this API. For more details on
