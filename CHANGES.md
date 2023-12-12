@@ -1,4 +1,4 @@
-# Synapse 1.98.0rc1 (2023-12-05)
+# Synapse 1.98.0 (2023-12-12)
 
 Synapse 1.98.0 will be the last Synapse release in 2023; the regular release cadence will resume in January 2024.
 
@@ -9,13 +9,20 @@ proprietary dual licensing). You can read more about this here:
  - https://element.io/blog/element-to-adopt-agplv3/
 
 The Matrix.org Foundation copy of the project will be archived. Any changes needed
-by server administrators will be communicated via our usual announcements channels, 
+by server administrators will be communicated via our usual announcements channels,
 but we are striving to make this as seamless as possible.
+
+
+No significant changes since 1.98.0rc1.
+
+
+
+# Synapse 1.98.0rc1 (2023-12-05)
 
 ### Features
 
 - Synapse now declares support for Matrix v1.7, v1.8, and v1.9. ([\#16707](https://github.com/matrix-org/synapse/issues/16707))
-- Add `on_user_login` [module API](https://matrix-org.github.io/synapse/latest/modules/writing_a_module.html) callback allowing to execute custom code after (on) Auth. ([\#15207](https://github.com/matrix-org/synapse/issues/15207))
+- Add `on_user_login` [module API](https://matrix-org.github.io/synapse/latest/modules/writing_a_module.html) callback for when a user logs in. ([\#15207](https://github.com/matrix-org/synapse/issues/15207))
 - Support [MSC4069: Inhibit profile propagation](https://github.com/matrix-org/matrix-spec-proposals/pull/4069). ([\#16636](https://github.com/matrix-org/synapse/issues/16636))
 - Restore tracking of requests and monthly active users when delegating authentication via [MSC3861](https://github.com/matrix-org/synapse/pull/16672) to an OIDC provider. ([\#16672](https://github.com/matrix-org/synapse/issues/16672))
 - Add an autojoin setting for server notices rooms, so users may be joined directly instead of receiving an invite. ([\#16699](https://github.com/matrix-org/synapse/issues/16699))
@@ -80,7 +87,7 @@ proprietary dual licensing). You can read more about this here:
  - https://element.io/blog/element-to-adopt-agplv3/
 
 The Matrix.org Foundation copy of the project will be archived. Any changes needed
-by server administrators will be communicated via our usual announcements channels, 
+by server administrators will be communicated via our usual announcements channels,
 but we are striving to make this as seamless as possible.
 
 
