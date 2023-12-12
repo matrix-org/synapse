@@ -131,6 +131,18 @@
                             <i class="fa fa-search"></i>
                         </button>
                         {{/if}}
+                        <div class="version-picker">
+                            <div class="dropdown">
+                                <div class="select">
+                                    <span></span>
+                                    <i class="fa fa-chevron-down"></i>
+                                </div>
+                                <input type="hidden" name="version">
+                                <ul class="dropdown-menu">
+                                    <!-- Versions will be added dynamically in version-picker.js -->
+                                </ul>
+                            </div>
+                        </div>
                     </div>
 
                     <h1 class="menu-title">{{ book_title }}</h1>

@@ -263,7 +263,9 @@ class KeyConfig(Config):
 
         if not self.path_exists(signing_key_path):
             print("Generating signing key file %s" % (signing_key_path,))
-            with open(signing_key_path, "w") as signing_key_file:
+            with open(
+                signing_key_path, "w", opener=lambda p, f: os.open(p, f, mode=0o640)
+            ) as signing_key_file:
                 key_id = "a_" + random_string(4)
                 write_signing_keys(signing_key_file, (generate_signing_key(key_id),))
         else:
@@ -274,7 +276,9 @@ class KeyConfig(Config):
                 key = decode_signing_key_base64(
                     NACL_ED25519, key_id, signing_keys.split("\n")[0]
                 )
-                with open(signing_key_path, "w") as signing_key_file:
+                with open(
+                    signing_key_path, "w", opener=lambda p, f: os.open(p, f, mode=0o640)
+                ) as signing_key_file:
                     write_signing_keys(signing_key_file, (key,))
 
 

@@ -159,6 +159,16 @@ class ClientDirectoryListServer(RestServlet):
 
         content = parse_and_validate_json_object_from_request(request, self.PutBody)
 
+        # temporarily block publishing rooms to public directory for non-admins
+        # patch date 12/12/23
+        if content.visibility == "public":
+            is_admin = await self.is_server_admin(requester)
+            if not is_admin:
+                raise AuthError(
+                    403,
+                    "Publishing rooms to the room list is temporarily disabled.",
+                )
+
         await self.directory_handler.edit_published_room_list(
             requester, room_id, content.visibility
         )

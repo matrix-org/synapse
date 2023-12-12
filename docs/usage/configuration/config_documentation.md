@@ -495,10 +495,10 @@ Unix socket support (_Added in Synapse 1.89.0_):
   * **Note**: The use of both `path` and `port` options for the same `listener` is not
     compatible.
   * The `x_forwarded` option defaults to true  when using Unix sockets and can be omitted.
-  * Other options that would not make sense to use with a UNIX socket, such as 
+  * Other options that would not make sense to use with a UNIX socket, such as
     `bind_addresses` and `tls` will be ignored and can be removed.
 * `mode`: The file permissions to set on the UNIX socket. Defaults to `666`
-* **Note:** Must be set as `type: http` (does not support `metrics` and `manhole`). 
+* **Note:** Must be set as `type: http` (does not support `metrics` and `manhole`).
   Also make sure that `metrics` is not included in `resources` -> `names`
 
 
@@ -2932,7 +2932,7 @@ access tokens via a query parameter.
 
 Example configuration:
 ```yaml
-use_appservice_legacy_authorization: true 
+use_appservice_legacy_authorization: true
 ```
 
 ---
@@ -3613,7 +3613,7 @@ This setting has the following sub-options:
 * `enabled`: Defaults to true.
    Set to false to disable password authentication.
    Set to `only_for_reauth` to allow users with existing passwords to use them
-   to log in and reauthenticate, whilst preventing new users from setting passwords.
+   to reauthenticate (not log in), whilst preventing new users from setting passwords.
 * `localdb_enabled`: Set to false to disable authentication against the local password
    database. This is ignored if `enabled` is false, and is only useful
    if you have other `password_providers`. Defaults to true.
@@ -3865,7 +3865,7 @@ This setting is an optional list of 0 or more rules. By default, no list is
 provided, meaning that all alias creations are permitted.
 
 Otherwise, requests to create aliases are matched against each rule in order.
-The first rule that matches decides if the request is allowed or denied. If no 
+The first rule that matches decides if the request is allowed or denied. If no
 rule matches, the request is denied. In particular, this means that configuring
 an empty list of rules will deny every alias creation request.
 
@@ -3877,7 +3877,7 @@ Each rule is a YAML object containing four fields, each of which is an optional 
 * `action`: either `allow` or `deny`. What to do with the request if the rule matches. Defaults to `allow`.
 
 Each of the glob patterns is optional, defaulting to `*` ("match anything").
-Note that the patterns match against fully qualified IDs, e.g. against 
+Note that the patterns match against fully qualified IDs, e.g. against
 `@alice:example.com`, `#room:example.com` and `!abcdefghijk:example.com` instead
 of `alice`, `room` and `abcedgghijk`.
 
@@ -3914,7 +3914,7 @@ alias_creation_rules:
 alias_creation_rules:
   - user_id: "@bad_user:example.com"
     action: deny
-    
+
   - action: allow
 ```
 
@@ -3992,7 +3992,7 @@ room_list_publication_rules:
 room_list_publication_rules:
   - user_id: "@bad_user:example.com"
     action: deny
-    
+
   - action: allow
 ```
 
@@ -4408,7 +4408,7 @@ must be declared, in the same way as the [`listeners` option](#listeners)
 in the shared config.
 
 Workers declared in [`stream_writers`](#stream_writers) and [`instance_map`](#instance_map)
- will need to include a `replication` listener here, in order to accept internal HTTP 
+ will need to include a `replication` listener here, in order to accept internal HTTP
 requests from other workers.
 
 Example configuration:

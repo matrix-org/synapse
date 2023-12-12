@@ -1,0 +1,1 @@
+Clarify that `password_config.enabled: "only_for_reauth"` does not allow new logins to be created using password auth.
