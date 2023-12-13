@@ -14,6 +14,8 @@ additionally you have the choice of `other Matrix homeservers <https://matrix.or
 See `The future of Synapse and Dendrite <https://matrix.org/blog/2023/11/06/future-of-synapse-dendrite/>`_
 blog post for more information.
 
+=========================================================================
+
 Briefly, Matrix is an open standard for communications on the internet, supporting
 federation, encryption and VoIP. Matrix.org has more to say about the `goals of the
 Matrix project <https://matrix.org/docs/guides/introduction>`_, and the `formal specification
