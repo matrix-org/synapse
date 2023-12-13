@@ -2,7 +2,7 @@
 Synapse |support| |development| |documentation| |license| |pypi| |python|
 =========================================================================
 
-Synapse is now actively maintained at `vector-im/synapse <https://github.com/element-hq/synapse>`_
+Synapse is now actively maintained at `element-hq/synapse <https://github.com/element-hq/synapse>`_
 =================================================================================================
 
 Synapse is an open-source `Matrix <https://matrix.org/>`_ homeserver developed
