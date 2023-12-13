@@ -29,6 +29,18 @@ from synapse.util.stringutils import strtobool
 # Allow truncated JPEG images to be thumbnailed.
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
+# Update your remotes folks.
+announcement = """
+Synapse is no longer being developed under the matrix-org organization. See the
+README.rst for more details.
+
+Please update your git remote to pull from element-hq/synapse:
+
+   git remote set-url origin git@github.com:element-hq/synapse.git
+"""
+print(announcement)
+sys.exit(1)
+
 # Check that we're not running on an unsupported Python version.
 #
 # Note that we use an (unneeded) variable here so that pyupgrade doesn't nuke the
