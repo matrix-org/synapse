@@ -175,6 +175,7 @@ class LoginRestServlet(RestServlet):
             # If the login token flow is enabled advertise the get_login_token flag.
             if self._get_login_token_enabled:
                 tokenTypeFlow["get_login_token"] = True
+                tokenTypeFlow["org.matrix.msc3882.get_login_token"] = True
             flows.append(tokenTypeFlow)
 
         flows.extend({"type": t} for t in self.auth_handler.get_supported_login_types())

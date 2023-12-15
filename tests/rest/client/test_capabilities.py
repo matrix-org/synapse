@@ -200,6 +200,7 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(channel.code, HTTPStatus.OK)
         self.assertFalse(capabilities["m.get_login_token"]["enabled"])
+        self.assertFalse(capabilities["org.matrix.msc3882.get_login_token"]["enabled"])
 
     @override_config({"login_via_existing_session": {"enabled": True}})
     def test_get_get_token_login_fields_when_enabled(self) -> None:
@@ -214,3 +215,4 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(channel.code, HTTPStatus.OK)
         self.assertTrue(capabilities["m.get_login_token"]["enabled"])
+        self.assertTrue(capabilities["org.matrix.msc3882.get_login_token"]["enabled"])

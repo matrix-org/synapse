@@ -15,7 +15,7 @@
 from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.rest import admin
-from synapse.rest.client import login, login_token_request, versions
+from synapse.rest.client import capabilities, login, login_token_request, versions
 from synapse.server import HomeServer
 from synapse.util import Clock
 
@@ -31,6 +31,7 @@ class LoginTokenRequestServletTestCase(unittest.HomeserverTestCase):
         admin.register_servlets,
         login_token_request.register_servlets,
         versions.register_servlets,  # TODO: remove once unstable revision 0 support is removed
+        capabilities.register_servlets,  # TODO: remove once unstable revision 1 support is removed
     ]
 
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
@@ -143,7 +144,7 @@ class LoginTokenRequestServletTestCase(unittest.HomeserverTestCase):
         }
     )
     def test_unstable_support(self) -> None:
-        # TODO: remove support for unstable MSC3882 is no longer needed
+        # TODO: remove when unstable MSC3882 is no longer needed
 
         # check feature is advertised in versions response:
         channel = self.make_request(
@@ -166,3 +167,40 @@ class LoginTokenRequestServletTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(channel.code, 200)
         self.assertEqual(channel.json_body["expires_in"], 15)
+
+    @override_config(
+        {
+            "login_via_existing_session": {
+                "enabled": True,
+                "require_ui_auth": False,
+                "token_timeout": "15s",
+            }
+        }
+    )
+    def test_unstable_revision1_support(self) -> None:
+        # TODO: remove when unstable MSC3882 is no longer needed
+
+        self.register_user(self.user, self.password)
+        token = self.login(self.user, self.password)
+
+        # check feature is advertised in versions response:
+        channel = self.make_request(
+            "GET", "/_matrix/client/v3/capabilities", {}, access_token=token
+        )
+        self.assertEqual(channel.code, 200)
+        self.assertEqual(
+            channel.json_body["capabilities"]["org.matrix.msc3882.get_login_token"][
+                "enabled"
+            ],
+            True,
+        )
+
+        # check feature is available via the r1 unstable endpoint and returns an expires_in_ms value in milliseconds
+        channel = self.make_request(
+            "POST",
+            "/_matrix/client/unstable/org.matrix.msc3882/login/get_token",
+            {},
+            access_token=token,
+        )
+        self.assertEqual(channel.code, 200)
+        self.assertEqual(channel.json_body["expires_in_ms"], 15000)

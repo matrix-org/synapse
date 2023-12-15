@@ -527,7 +527,11 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         self.assertCountEqual(
             channel.json_body["flows"],
             [
-                {"type": "m.login.token", "get_login_token": True},
+                {
+                    "type": "m.login.token",
+                    "get_login_token": True,
+                    "org.matrix.msc3882.get_login_token": True,
+                },
                 {"type": "m.login.password"},
                 {"type": "m.login.application_service"},
             ],
