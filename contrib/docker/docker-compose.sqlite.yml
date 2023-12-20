@@ -1,0 +1,56 @@
+# This compose file is compatible with Compose itself, it might need some
+# adjustments to run properly with stack.
+
+version: '3'
+
+services:
+
+  # use this container to generate the config file and then exit
+  synapse-init:
+    image: matrixdotorg/synapse:latest
+    container_name: synapse-init
+    entrypoint: 'bash'
+    command: "-c './start.py generate && ./start.py migrate_config'"
+    volumes:
+      - synapse_data:/data
+    environment:
+      # more environment variables are available in the project directory `./docker/conf/homeserver.yaml`
+      SYNAPSE_SERVER_NAME: 'changeme.com' # change to your server name
+      SYNAPSE_REPORT_STATS: 'yes'
+      SYNAPSE_NO_TLS: 'yes'
+
+  synapse:
+    image: matrixdotorg/synapse:latest
+    container_name: synapse
+    # Since synapse does not retry to connect to the database, restart upon
+    # failure
+    restart: unless-stopped
+    # See the readme for a full documentation of the environment settings
+    # NOTE: You must edit homeserver.yaml to use postgres, it defaults to sqlite
+    environment:
+      - SYNAPSE_CONFIG_PATH=/data/homeserver.yaml
+    volumes:
+      # You may either store all the files in a local folder
+      - synapse_data:/data
+      # .. or you may split this between different storage points
+      # - ./files:/data
+      # - /path/to/ssd:/data/uploads
+      # - /path/to/large_hdd:/data/media
+    depends_on:
+      synapse-init:
+        # more information about condition https://github.com/compose-spec/compose-spec/blob/master/05-services.md#long-syntax-1
+        condition: service_completed_successfully
+    # In order to expose Synapse, you could use reverse proxying,
+    # or you could expose the ports directly.
+    ports:
+      # http port, you could use `8448` if you unset `SYNAPSE_NO_TLS` above the `synapse-init` container
+      - 8008:8008/tcp 
+
+volumes:
+  synapse_data:
+    # you need to set the local path to your data directory here or you would lost the data if you clean the volume
+    driver: local
+    driver_opts:
+      type: 'none'
+      o: 'bind'
+      device: '${PWD}/deploy_data' # change the `device` to your local path
