@@ -3436,6 +3436,12 @@ Options for each entry include:
 
   You might want to disable this if the `subject_claim` returned by the mapping provider is not `sub`.
 
+* `backchannel_logout_is_soft`: by default all OIDC Back-Channel Logouts correspond to hard logouts on
+  the server side. This may not leave users the ability to recover their encryption keys before being logged-out.
+  This can be set to `true` to treat all OIDC Back-Channel logouts as soft-logouts,
+  allowing users to reconnect to the same device if necessary to recover their keys.
+  Defaults to `false`.
+
 It is possible to configure Synapse to only allow logins if certain attributes
 match particular values in the OIDC userinfo. The requirements can be listed under
 `attribute_requirements` as shown here:
