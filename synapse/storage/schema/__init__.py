@@ -137,3 +137,17 @@ SCHEMA_COMPAT_VERSION = (
 This value is stored in the database, and checked on startup. If the value in the
 database is greater than SCHEMA_VERSION, then Synapse will refuse to start.
 """
+
+BACKGROUND_UPDATES_COMPAT_VERSION = (
+    # The replace_stream_ordering_column from 6001 must have run.
+    61
+)
+"""Limit on how far the syanpse can be rolled forward without breaking db compat
+
+This value is checked on startup against any pending background updates. If there
+are any pending background updates less than BACKGROUND_UPDATES_COMPAT_VERSION, then
+Synapse will refuse to start.
+
+In order to work with *new* databases this *must* be smaller than the latest full
+dump of the database.
+"""
