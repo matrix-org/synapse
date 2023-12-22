@@ -44,10 +44,18 @@ def request_registration(
     shared_secret: str,
     admin: bool = False,
     user_type: Optional[str] = None,
+    inhibit_user_in_use_error: bool = False,
     _print: Callable[[str], None] = print,
     exit: Callable[[int], None] = sys.exit,
 ) -> None:
-    url = "%s/_synapse/admin/v1/register" % (server_location.rstrip("/"),)
+    qs_url_piece = ""
+    if inhibit_user_in_use_error:
+        qs_url_piece = "?inhibit_user_in_use_error=true"
+
+    url = "%s/_synapse/admin/v1/register%s" % (
+        server_location.rstrip("/"),
+        qs_url_piece,
+    )
 
     # Get the nonce
     r = requests.get(url)
@@ -99,7 +107,8 @@ def request_registration(
                 pass
         return exit(1)
 
-    _print("Success!")
+    result = r.json()
+    _print("Success! -> %s" % result)
 
 
 def register_new_user(
@@ -109,6 +118,7 @@ def register_new_user(
     shared_secret: str,
     admin: Optional[bool],
     user_type: Optional[str],
+    inhibit_user_in_use_error: bool = False,
 ) -> None:
     if not user:
         try:
@@ -148,7 +158,13 @@ def register_new_user(
             admin = False
 
     request_registration(
-        user, password, server_location, shared_secret, bool(admin), user_type
+        user,
+        password,
+        server_location,
+        shared_secret,
+        bool(admin),
+        user_type,
+        inhibit_user_in_use_error=inhibit_user_in_use_error,
     )
 
 
@@ -178,6 +194,14 @@ def main() -> None:
         "--user_type",
         default=None,
         help="User type as specified in synapse.api.constants.UserTypes",
+    )
+    parser.add_argument(
+        "--inhibit_user_in_use_error",
+        default=False,
+        help="Whether to inhibit errors raised when registering a new account if the user ID already exists. "
+        "Useful when there is a collision with another MXID that has capital letters "
+        "but you want to register the same user with lower-case. "
+        "The registration will still fail if you try to register with the same MXID. Defaults to False",
     )
     admin_group = parser.add_mutually_exclusive_group()
     admin_group.add_argument(
@@ -264,7 +288,13 @@ def main() -> None:
         admin = args.admin
 
     register_new_user(
-        args.user, args.password, server_url, secret, admin, args.user_type
+        args.user,
+        args.password,
+        server_url,
+        secret,
+        admin,
+        args.user_type,
+        inhibit_user_in_use_error=args.inhibit_user_in_use_error,
     )
 
 

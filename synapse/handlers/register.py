@@ -218,6 +218,7 @@ class RegistrationHandler:
         user_agent_ips: Optional[List[Tuple[str, str]]] = None,
         auth_provider_id: Optional[str] = None,
         approved: bool = False,
+        inhibit_user_in_use_error: bool = False,
     ) -> str:
         """Registers a new client on the server.
 
@@ -283,7 +284,11 @@ class RegistrationHandler:
             await self.auth_blocking.check_auth_blocking(threepid=threepid)
 
         if localpart is not None:
-            await self.check_username(localpart, guest_access_token=guest_access_token)
+            await self.check_username(
+                localpart,
+                guest_access_token=guest_access_token,
+                inhibit_user_in_use_error=inhibit_user_in_use_error,
+            )
 
             was_guest = guest_access_token is not None
 

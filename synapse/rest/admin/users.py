@@ -548,6 +548,10 @@ class UserRegisterServlet(RestServlet):
                 HTTPStatus.BAD_REQUEST, "Shared secret registration is not enabled"
             )
 
+        inhibit_user_in_use_error = parse_boolean(
+            request, "inhibit_user_in_use_error", False
+        )
+
         body = parse_json_object_from_request(request)
 
         if "nonce" not in body:
@@ -649,6 +653,7 @@ class UserRegisterServlet(RestServlet):
             default_display_name=displayname,
             by_admin=True,
             approved=True,
+            inhibit_user_in_use_error=inhibit_user_in_use_error,
         )
 
         result = await register._create_registration_details(
