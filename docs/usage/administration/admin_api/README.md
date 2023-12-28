@@ -18,6 +18,12 @@ already on your `$PATH` depending on how Synapse was installed.
 
 Finding your user's `access_token` is client-dependent, but will usually be shown in the client's settings.
 
+To get an access token from cURL without a client, make a request to `_matrix/client/r0/login` with `type` set to `m.login.password`, `user`, and `password` set to their respective admin account values included in the data field:
+
+```sh
+curl -XPOST -d '{"type":"m.login.password", "user":"<admin>", "password":"<password>"}' "http://127.0.0.1:8008/_matrix/client/r0/login"
+```
+
 ## Making an Admin API request
 For security reasons, we [recommend](../../../reverse_proxy.md#synapse-administration-endpoints)
 that the Admin API (`/_synapse/admin/...`) should be hidden from public view using a
