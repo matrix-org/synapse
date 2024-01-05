@@ -47,6 +47,7 @@ from synapse.http.servlet import (
     parse_enum,
     parse_integer,
     parse_json_object_from_request,
+    parse_json_value_from_request,
     parse_string,
     parse_strings_from_args,
 )
@@ -960,6 +961,17 @@ class RoomForgetRestServlet(TransactionRestServlet):
         self, request: SynapseRequest, room_id: str
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request, allow_guest=False)
+
+        content = parse_json_value_from_request(request, allow_empty_body=True)
+        if content is None:
+            logger.warning(
+                "No JSON body supplied to POST /forget. "
+                "This is not spec-compliant and will not be accepted in a future release!"
+            )
+        elif not isinstance(content, dict):
+            message = "Content must be a JSON object."
+            raise SynapseError(HTTPStatus.BAD_REQUEST, message, errcode=Codes.BAD_JSON)
+
         return await self._do(requester, room_id)
 
     async def on_PUT(
@@ -967,6 +979,16 @@ class RoomForgetRestServlet(TransactionRestServlet):
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request, allow_guest=False)
         set_tag("txn_id", txn_id)
+
+        content = parse_json_value_from_request(request, allow_empty_body=True)
+        if content is None:
+            logger.warning(
+                "No JSON body supplied to PUT /forget. "
+                "This is not spec-compliant and will not be accepted in a future release!"
+            )
+        elif not isinstance(content, dict):
+            message = "Content must be a JSON object."
+            raise SynapseError(HTTPStatus.BAD_REQUEST, message, errcode=Codes.BAD_JSON)
 
         return await self.txns.fetch_or_execute_request(
             request, requester, self._do, requester, room_id

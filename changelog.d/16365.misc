@@ -1,0 +1,1 @@
+Add warning when `/forget` is used without a request body, as this is against the specification.
