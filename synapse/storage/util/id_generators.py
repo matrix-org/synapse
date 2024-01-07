@@ -460,6 +460,9 @@ class MultiWriterIdGenerator(AbstractStreamIdGenerator):
             # position with the current minimum.
             self._current_positions[self._instance_name] = self._persisted_upto_position
 
+        table_string = "\n".join(", ".join(row) for row in tables)
+        logger.debug(f"{table_string}")
+
     def _load_current_ids(
         self,
         db_conn: LoggingDatabaseConnection,
