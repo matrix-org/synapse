@@ -442,6 +442,13 @@ class RootConfig:
             if hasattr(config, func_name):
                 getattr(config, func_name)(*args, **kwargs)
 
+    @staticmethod
+    def paths_from_environment(envvar: str) -> List[str]:
+        envval = os.environ.get(envvar)
+        if not envval:
+            return []
+        return envval.split(":")
+
     def generate_config(
         self,
         config_dir_path: str,
@@ -630,7 +637,9 @@ class RootConfig:
             action="append",
             metavar="CONFIG_FILE",
             help="Specify config file. Can be given multiple times and"
-            " may specify directories containing *.yaml files.",
+            " may specify directories containing *.yaml files."
+            " Also uses the value of the CONFIGURATION_DIRECTORY environment"
+            " variable, where multiple values can be delimited by colons.",
         )
 
         # we nest the mutually-exclusive group inside another group so that the help
@@ -695,7 +704,8 @@ class RootConfig:
             metavar="DIRECTORY",
             help=(
                 "Specify where data such as the media store and database file should be"
-                " stored. Defaults to the current working directory."
+                " stored. Defaults to the first entry of the STATE_DIRECTORY environment"
+                " variable or the current working directory in that order."
             ),
         )
         generate_group.add_argument(
@@ -710,7 +720,10 @@ class RootConfig:
         cls.invoke_all_static("add_arguments", parser)
         config_args = parser.parse_args(argv)
 
-        config_files = find_config_files(search_paths=config_args.config_path)
+        config_paths_env = cls.paths_from_environment("CONFIGURATION_DIRECTORY")
+        config_files = find_config_files(
+            search_paths=config_paths_env + config_args.config_path
+        )
 
         if not config_files:
             parser.error(
@@ -724,7 +737,8 @@ class RootConfig:
         else:
             config_dir_path = os.path.dirname(config_files[-1])
         config_dir_path = os.path.abspath(config_dir_path)
-        data_dir_path = os.getcwd()
+        data_dir_path_env = cls.paths_from_environment("STATE_DIRECTORY")
+        data_dir_path = data_dir_path_env[0] if data_dir_path_env else os.getcwd()
 
         obj = cls(config_files)
 
@@ -742,10 +756,7 @@ class RootConfig:
             if not path_exists(config_path):
                 print("Generating config file %s" % (config_path,))
 
-                if config_args.data_directory:
-                    data_dir_path = config_args.data_directory
-                else:
-                    data_dir_path = os.getcwd()
+                data_dir_path = config_args.data_directory or data_dir_path
                 data_dir_path = os.path.abspath(data_dir_path)
 
                 server_name = config_args.server_name
@@ -905,35 +916,34 @@ def find_config_files(search_paths: List[str]) -> List[str]:
         A list of file paths.
     """
 
-    config_files = []
-    if search_paths:
-        for config_path in search_paths:
-            if os.path.isdir(config_path):
-                # We accept specifying directories as config paths, we search
-                # inside that directory for all files matching *.yaml, and then
-                # we apply them in *sorted* order.
-                files = []
-                for entry in os.listdir(config_path):
-                    entry_path = os.path.join(config_path, entry)
-                    if not os.path.isfile(entry_path):
-                        err = "Found subdirectory in config directory: %r. IGNORING."
-                        print(err % (entry_path,))
-                        continue
+    config_files = {config_path: [] for config_path in search_paths}
+    for config_path, files in config_files.items():
+        if os.path.isdir(config_path):
+            # We accept specifying directories as config paths, we search
+            # inside that directory for all files matching *.yaml, and then
+            # we apply them in *sorted* order.
+            found_files = []
+            for entry in os.listdir(config_path):
+                entry_path = os.path.join(config_path, entry)
+                if not os.path.isfile(entry_path):
+                    err = "Found subdirectory in config directory: %r. IGNORING."
+                    print(err % (entry_path,))
+                    continue
 
-                    if not entry.endswith(".yaml"):
-                        err = (
-                            "Found file in config directory that does not end in "
-                            "'.yaml': %r. IGNORING."
-                        )
-                        print(err % (entry_path,))
-                        continue
+                if not entry.endswith(".yaml"):
+                    err = (
+                        "Found file in config directory that does not end in "
+                        "'.yaml': %r. IGNORING."
+                    )
+                    print(err % (entry_path,))
+                    continue
 
-                    files.append(entry_path)
+                found_files.append(entry_path)
 
-                config_files.extend(sorted(files))
-            else:
-                config_files.append(config_path)
-    return config_files
+            files.extend(sorted(found_files))
+        else:
+            files.append(config_path)
+    return list(itertools.chain(*config_files.values()))
 
 
 @attr.s(auto_attribs=True)
