@@ -1,0 +1,1 @@
+Increase client timeout for potentially long federation requests. It should improve joining behavior of big rooms.
