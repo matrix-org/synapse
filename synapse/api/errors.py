@@ -288,7 +288,7 @@ class UserDeactivatedError(SynapseError):
         )
 
 
-class FederationDeniedError(SynapseError):
+class FederationDeniedError(RuntimeError):
     """An error raised when the server tries to federate with a server which
     is not on its federation whitelist.
 
