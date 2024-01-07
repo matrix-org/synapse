@@ -1,0 +1,41 @@
+name: "Build the nix development environment and run tests"
+on:
+  # TODO: Only run nightly
+  pull_request:
+jobs:
+  nix_dev_env_tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        test: ["unit", "sytest", "complement"]
+    steps:
+    - uses: actions/checkout@v3
+    - uses: cachix/install-nix-action@6ed004b9ccb68dbc28e7c85bee15fa93dbd214ac  # v22
+      with:
+        nix_path: nixpkgs=channel:nixos-unstable
+
+    # Start the development environment.
+    - run: nix develop --impure
+
+    - run: env
+
+    # Sanity check we can import/run Synapse.
+    - run: python -m synapse.app.homeserver --help
+
+    # Run the unit tests.
+    - if: ${{ matrix.unit }}
+      run: python -m twisted.trial -j6 tests
+
+    # Run SyTest test suite.
+    - if: ${{ matrix.sytest }}
+      uses: actions/checkout@v3
+      with:
+        repository: 'matrix-org/sytest'
+        path: './sytest'
+
+    - if: ${{ matrix.sytest }}
+      run: ./sytest/run-tests.pl --test-blacklist-file sytest-blacklist
+
+    # Run Complement test suite
+    - if: ${{ matrix.complement }}
+      run: ./scripts-dev/complement.sh
