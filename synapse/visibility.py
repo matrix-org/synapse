@@ -70,6 +70,7 @@ async def filter_events_for_client(
     is_peeking: bool = False,
     always_include_ids: FrozenSet[str] = frozenset(),
     filter_send_to_client: bool = True,
+    limit: int = -1,
 ) -> List[EventBase]:
     """
     Check which events a user is allowed to see. If the user can see the event but its
@@ -88,6 +89,7 @@ async def filter_events_for_client(
         filter_send_to_client: Whether we're checking an event that's going to be
             sent to a client. This might not always be the case since this function can
             also be called to check whether a user can see the state at a given point.
+        limit: The number of events to bail at, as a hot path optimisation.
 
     Returns:
         The filtered events.
@@ -140,12 +142,15 @@ async def filter_events_for_client(
             sender_erased=erased_senders.get(event.sender, False),
         )
 
-    # Check each event: gives an iterable of None or (a potentially modified)
-    # EventBase.
-    filtered_events = map(allowed, events)
+    filtered_events: List[EventBase] = []
+    for event in events:
+        checked = allowed(event)
+        if checked is not None:
+            filtered_events.append(checked)
+        if len(filtered_events) >= limit >= 0:
+            break
 
-    # Turn it into a list and remove None entries before returning.
-    return [ev for ev in filtered_events if ev]
+    return filtered_events
 
 
 async def filter_event_for_clients_with_state(

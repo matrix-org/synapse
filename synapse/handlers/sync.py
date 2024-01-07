@@ -587,6 +587,7 @@ class SyncHandler:
                     sync_config.user.to_string(),
                     recents,
                     always_include_ids=current_state_ids,
+                    limit=timeline_limit + 1,
                 )
                 log_kv({"recents_after_visibility_filtering": len(recents)})
             else:
@@ -668,6 +669,7 @@ class SyncHandler:
                     sync_config.user.to_string(),
                     loaded_recents,
                     always_include_ids=current_state_ids,
+                    limit=timeline_limit + 1 - len(recents),
                 )
 
                 log_kv({"loaded_recents_after_client_filtering": len(loaded_recents)})
