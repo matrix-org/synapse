@@ -25,6 +25,7 @@ __pycache__/
 /*.log
 /*.log.*
 /*.log.config
+/log.config
 /*.pid
 /.python-version
 /*.signing.key

@@ -100,9 +100,6 @@ esac
 # tweak the pid file location
 /^pid_file:/ and s#:.*#: "/var/run/matrix-synapse.pid"#;
 
-# tweak the path to the log config
-/^log_config:/ and s/SERVERNAME\.log\.config/log.yaml/;
-
 # tweak the path to the media store
 /^media_store_path:/ and s#/media_store#/media#;
 
@@ -116,7 +113,7 @@ esac
 
 # build the log config file
 "${TARGET_PYTHON}" "${VIRTUALENV_DIR}/bin/generate_log_config" \
-        --output-file="${PACKAGE_BUILD_DIR}/etc/matrix-synapse/log.yaml"
+        --output-file="${PACKAGE_BUILD_DIR}/etc/matrix-synapse/log.config"
 
 # add a dependency on the right version of python to substvars.
 PYPKG=$(basename "$SNAKE")

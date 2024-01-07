@@ -146,10 +146,8 @@ class LoggingConfig(Config):
         self.log_config = self.abspath(config.get("log_config"))
         self.no_redirect_stdio = config.get("no_redirect_stdio", False)
 
-    def generate_config_section(
-        self, config_dir_path: str, server_name: str, **kwargs: Any
-    ) -> str:
-        log_config = os.path.join(config_dir_path, server_name + ".log.config")
+    def generate_config_section(self, config_dir_path: str, **kwargs: Any) -> str:
+        log_config = os.path.join(config_dir_path, "log.config")
         return (
             """\
         log_config: "%(log_config)s"
