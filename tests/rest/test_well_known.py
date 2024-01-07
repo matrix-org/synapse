@@ -113,6 +113,7 @@ class WellKnownTests(unittest.HomeserverTestCase):
                 },
             },
             "disable_registration": True,
+            "login_via_existing_session": {"enabled": False},
         }
     )
     def test_client_well_known_msc3861_oauth_delegation(self) -> None:

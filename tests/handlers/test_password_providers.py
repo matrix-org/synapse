@@ -35,13 +35,18 @@ from tests.server import FakeChannel
 from tests.unittest import override_config
 
 # Login flows we expect to appear in the list after the normal ones.
-ADDITIONAL_LOGIN_FLOWS = [
+ADDITIONAL_LOGIN_FLOWS: List[Dict] = [
     {"type": "m.login.application_service"},
+    {"type": "m.login.token", "get_login_token": True},
 ]
 
 # a mock instance which the dummy auth providers delegate to, so we can see what's going
 # on
 mock_password_provider = Mock()
+
+
+def sort_flows(flows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    return sorted(flows, key=lambda f: f["type"])
 
 
 class LegacyPasswordOnlyAuthProvider:
@@ -183,7 +188,10 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
     def password_only_auth_provider_login_test_body(self) -> None:
         # login flows should only have m.login.password
         flows = self._get_login_flows()
-        self.assertEqual(flows, [{"type": "m.login.password"}] + ADDITIONAL_LOGIN_FLOWS)
+        self.assertEqual(
+            sort_flows(flows),
+            sort_flows([{"type": "m.login.password"}] + ADDITIONAL_LOGIN_FLOWS),
+        )
 
         # check_password must return an awaitable
         mock_password_provider.check_password = AsyncMock(return_value=True)
@@ -364,7 +372,7 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         """password auth doesn't work if it's disabled across the board"""
         # login flows should be empty
         flows = self._get_login_flows()
-        self.assertEqual(flows, ADDITIONAL_LOGIN_FLOWS)
+        self.assertEqual(sort_flows(flows), sort_flows(ADDITIONAL_LOGIN_FLOWS))
 
         # login shouldn't work and should be rejected with a 400 ("unknown login type")
         channel = self._send_password_login("u", "p")
@@ -385,9 +393,11 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         # (password must come first, because reasons)
         flows = self._get_login_flows()
         self.assertEqual(
-            flows,
-            [{"type": "m.login.password"}, {"type": "test.login_type"}]
-            + ADDITIONAL_LOGIN_FLOWS,
+            sort_flows(flows),
+            sort_flows(
+                [{"type": "m.login.password"}, {"type": "test.login_type"}]
+                + ADDITIONAL_LOGIN_FLOWS
+            ),
         )
 
         # login with missing param should be rejected
@@ -514,7 +524,10 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         self.register_user("localuser", "localpass")
 
         flows = self._get_login_flows()
-        self.assertEqual(flows, [{"type": "test.login_type"}] + ADDITIONAL_LOGIN_FLOWS)
+        self.assertEqual(
+            sort_flows(flows),
+            sort_flows([{"type": "test.login_type"}] + ADDITIONAL_LOGIN_FLOWS),
+        )
 
         # login shouldn't work and should be rejected with a 400 ("unknown login type")
         channel = self._send_password_login("localuser", "localpass")
@@ -549,7 +562,10 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         self.register_user("localuser", "localpass")
 
         flows = self._get_login_flows()
-        self.assertEqual(flows, [{"type": "test.login_type"}] + ADDITIONAL_LOGIN_FLOWS)
+        self.assertEqual(
+            sort_flows(flows),
+            sort_flows([{"type": "test.login_type"}] + ADDITIONAL_LOGIN_FLOWS),
+        )
 
         # login shouldn't work and should be rejected with a 400 ("unknown login type")
         channel = self._send_password_login("localuser", "localpass")
@@ -580,7 +596,10 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         self.register_user("localuser", "localpass")
 
         flows = self._get_login_flows()
-        self.assertEqual(flows, [{"type": "test.login_type"}] + ADDITIONAL_LOGIN_FLOWS)
+        self.assertEqual(
+            sort_flows(flows),
+            sort_flows([{"type": "test.login_type"}] + ADDITIONAL_LOGIN_FLOWS),
+        )
 
         # login shouldn't work and should be rejected with a 400 ("unknown login type")
         channel = self._send_password_login("localuser", "localpass")
@@ -685,7 +704,10 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         self.register_user("localuser", "localpass")
 
         flows = self._get_login_flows()
-        self.assertEqual(flows, [{"type": "test.login_type"}] + ADDITIONAL_LOGIN_FLOWS)
+        self.assertEqual(
+            sort_flows(flows),
+            sort_flows([{"type": "test.login_type"}] + ADDITIONAL_LOGIN_FLOWS),
+        )
 
         # password login shouldn't work and should be rejected with a 400
         # ("unknown login type")
@@ -923,7 +945,7 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, HTTPStatus.OK, channel.json_body)
         return channel.json_body
 
-    def _get_login_flows(self) -> JsonDict:
+    def _get_login_flows(self) -> List[JsonDict]:
         channel = self.make_request("GET", "/_matrix/client/r0/login")
         self.assertEqual(channel.code, HTTPStatus.OK, channel.result)
         return channel.json_body["flows"]

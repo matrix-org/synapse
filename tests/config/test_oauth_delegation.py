@@ -54,6 +54,9 @@ class MSC3861OAuthDelegation(TestCase):
             **default_config("test"),
             "public_baseurl": BASE_URL,
             "enable_registration": False,
+            "login_via_existing_session": {
+                "enabled": False,
+            },
             "experimental_features": {
                 "msc3861": {
                     "enabled": True,

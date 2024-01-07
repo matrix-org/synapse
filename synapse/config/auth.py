@@ -63,7 +63,7 @@ class AuthConfig(Config):
 
         # Logging in with an existing session.
         login_via_existing = config.get("login_via_existing_session", {})
-        self.login_via_existing_enabled = login_via_existing.get("enabled", False)
+        self.login_via_existing_enabled = login_via_existing.get("enabled", True)
         self.login_via_existing_require_ui_auth = login_via_existing.get(
             "require_ui_auth", True
         )

@@ -46,6 +46,7 @@ class LoginTokenRequestServletTestCase(unittest.HomeserverTestCase):
         self.user = "user123"
         self.password = "password"
 
+    @override_config({"login_via_existing_session": {"enabled": False}})
     def test_disabled(self) -> None:
         channel = self.make_request("POST", GET_TOKEN_ENDPOINT, {}, access_token=None)
         self.assertEqual(channel.code, 404)
@@ -56,12 +57,10 @@ class LoginTokenRequestServletTestCase(unittest.HomeserverTestCase):
         channel = self.make_request("POST", GET_TOKEN_ENDPOINT, {}, access_token=token)
         self.assertEqual(channel.code, 404)
 
-    @override_config({"login_via_existing_session": {"enabled": True}})
     def test_require_auth(self) -> None:
         channel = self.make_request("POST", GET_TOKEN_ENDPOINT, {}, access_token=None)
         self.assertEqual(channel.code, 401)
 
-    @override_config({"login_via_existing_session": {"enabled": True}})
     def test_uia_on(self) -> None:
         user_id = self.register_user(self.user, self.password)
         token = self.login(self.user, self.password)
@@ -95,9 +94,7 @@ class LoginTokenRequestServletTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 200, channel.result)
         self.assertEqual(channel.json_body["user_id"], user_id)
 
-    @override_config(
-        {"login_via_existing_session": {"enabled": True, "require_ui_auth": False}}
-    )
+    @override_config({"login_via_existing_session": {"require_ui_auth": False}})
     def test_uia_off(self) -> None:
         user_id = self.register_user(self.user, self.password)
         token = self.login(self.user, self.password)
@@ -119,7 +116,6 @@ class LoginTokenRequestServletTestCase(unittest.HomeserverTestCase):
     @override_config(
         {
             "login_via_existing_session": {
-                "enabled": True,
                 "require_ui_auth": False,
                 "token_timeout": "15s",
             }
@@ -136,7 +132,6 @@ class LoginTokenRequestServletTestCase(unittest.HomeserverTestCase):
     @override_config(
         {
             "login_via_existing_session": {
-                "enabled": True,
                 "require_ui_auth": False,
                 "token_timeout": "15s",
             }

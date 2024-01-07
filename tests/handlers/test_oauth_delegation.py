@@ -113,6 +113,9 @@ class MSC3861OAuthDelegation(HomeserverTestCase):
         config = super().default_config()
         config["public_baseurl"] = BASE_URL
         config["disable_registration"] = True
+        config["login_via_existing_session"] = {
+            "enabled": False,
+        }
         config["experimental_features"] = {
             "msc3861": {
                 "enabled": True,
